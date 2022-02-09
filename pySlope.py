@@ -1,4 +1,5 @@
 from math import radians, tan, sqrt, atan, cos, sin
+from multiprocessing.sharedctypes import Value
 from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
 
 import plotly.graph_objects as go
@@ -13,7 +14,7 @@ class Slope:
         if length:
             self.length = length
         else:
-            self.length = height / tan(radians(30))
+            self.length = height / tan(radians(angle))
 
         # set up external boundary as a shapely polygon, adopt a max height of 4* h and a max length of 5 * l
         l, h = length, height
@@ -29,6 +30,8 @@ class Slope:
 
         self._search = {}
         self._min_FOS = 0
+
+        self._slices = []
 
     def add_water_table( self, depth : int = 1 ):
         self._water_depth = depth
@@ -61,6 +64,12 @@ class Slope:
                     line_color="LightSeaGreen",
                 )
 
+        # following makes sure x and y are scaled the same, so that
+        # model can be interpretted properly
+        fig.update_yaxes(
+            scaleanchor = "x",
+            scaleratio = 1,
+        )
         return fig
 
     def add_materials(self,*materials):
@@ -130,13 +139,14 @@ class Slope:
         # make sure no input inside twice. Has been observed where the point of intersection
         # is the boundary between two linestrings
         i_list = list(set(i_list))
+        i_list.sort()
 
         # check that there are only two intersecting points otherwise something is wrong
         if len(i_list) != 2:
             return None
         
         # total number of slices
-        SLICES = 50
+        SLICES = 500
 
         # horizontal distance between left and right slice
         dist = i_list[1][0] - i_list[0][0]
@@ -148,12 +158,12 @@ class Slope:
         s_x = i_list[0][0] + b/2
 
         # intialise the push and resistance components for FOS before looping
-        pushing = 0
-        resisting = 0
+        pushing = 0.0
+        resisting = 0.0
         
         # loop through slice, actually want to iterate 1 time less than 
         # the number of slices since we start at half a slice
-        for slice in range(1,SLICES):
+        for slice in range(1,SLICES,1):
             # define y coordinates for slice
             s_yb = c_y - sqrt(radius**2-(s_x-c_x)**2)
             
@@ -185,7 +195,7 @@ class Slope:
             l = b/cos(alpha)
 
             # intialize properties
-            W = 0 #kN
+            W = 0.0 #kN
             top = s_yt
 
             # loop through materials noting that they are already sorted by depth
@@ -214,17 +224,54 @@ class Slope:
             if top > s_yb:
                 m = self._materials[-1]
                 W += b * m.unit_weight * (top-s_yb)
+                top = m.RL
+                cohesion = m.cohesion
+                friction_angle = m.friction_angle
+            
+            # if there is a load on the strip apply it.
+            if self._load_magnitude:
+                load_xl, load_xr = self._load_location 
+                strip_xl = s_x - (b / 2)
+                strip_xr = s_x + (b / 2)
+                # case 1 clearly no load
+                if load_xr <= strip_xl or load_xl >= strip_xr:
+                    pass
+                # case 2 clearly load is completely inside
+                elif load_xl <= strip_xl and load_xr >= strip_xr:
+                    W += (b * self._load_magnitude)
+                # case 3 on the left inside the load
+                elif strip_xl <= load_xl and strip_xr >= load_xl:
+                    W += (strip_xr - load_xl) * self._load_magnitude
+
+                #case 4 on the right side of the load
+                elif strip_xl <= load_xr and strip_xr >= load_xr:
+                    W += (load_xr - strip_xl) * self._load_magnitude
+
+                else:
+                    raise ValueError('ummm is this actually a possible case?')              
 
             if self._water_depth:
                 U = max(min(self._water_depth, s_yt)-s_yb,0) * 9.81
             else:
                 U = 0
                 
-            resisting += cohesion*l + (W*cos(alpha)-U)*tan(friction_angle)
+            resisting += cohesion*l + (W*cos(alpha)-U)*tan(radians(friction_angle))
             pushing += W * sin(alpha)
+            if pushing == 0:
+                stop = True
+
+            # # testing validations to be moved to unit testing possibly later
+            # assert(resisting>0)
+            # assert(pushing>0)
+            # assert(W>0)
+            # assert(l>0)
+            # assert(s_x>0)
+            # assert(s_yt>0)
+            # assert(s_yb>0)
+            # assert(b>0)
 
             # initialise slice x coordinate for next loop
-            s_x += b 
+            s_x = s_x + b 
 
         return resisting / pushing
 
@@ -256,8 +303,27 @@ class Slope:
                         break
 
         self._search = search
-        self._min_FOS = min(search, key=search.get)
+        self._min_FOS_location = min(search, key=search.get)
+        self._min_FOS = search[self._min_FOS_location]
+
+    def add_surcharge(self,offset=0,load=20,length=None):
         
+        right_x = self._top_coord[0] - offset
+        if length:
+            left_x = max(0,right_x-length)
+        else:
+            left_x = 0
+
+        # note that this is slightly different than most coordinates
+        # in that it isnt a LineString and doesnt have y coordinate
+        # also, could add functionality for different loads to apply
+        # in future
+        self._load_magnitude = load
+        self._load_location = [left_x, right_x]
+
+    def remove_surcharge(self):
+        self._load_magnitude = 0 
+    
 
 
 @dataclass
@@ -274,10 +340,11 @@ class Material:
 if __name__ == "__main__":
     s = Slope(height=2, angle=None, length=2)
 
-    sand = Material(20,30,0,1)
-    clay = Material(18,25,5,3)
+    fill = Material(20,30,5,1)
 
-    s.add_materials(sand,clay)
+    s.add_materials(fill)
+    s.add_surcharge(1,5)
+
     s.analyse_slope()
 
     fig = s.plot_boundary()
