@@ -1,4 +1,3 @@
-from lib2to3.pgen2.token import NUMBER
 from math import radians, tan, sqrt, atan, cos, sin
 from multiprocessing.sharedctypes import Value
 from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
@@ -6,6 +5,8 @@ from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
 import plotly.graph_objects as go
 
 from dataclasses import dataclass
+
+from data_validation import *
 
 def mid_coord(p1,p2):
     return [(a+b)/2 for a,b in zip(p1,p2)]
@@ -27,31 +28,47 @@ def circle_centre(beta,chord_intersection,chord_to_centre):
 class Slope:
     def __init__(self, height=2, angle=30, length=None):
 
+        # validate inputs
+        assert_strictly_positive_number(height, 'height')
+        if angle is not None:
+            # is allowed to be 90 but not 0
+            assert_range(angle,'angle',0,90, not_low=True)
+        if length is not None:
+            assert_strictly_positive_number(length, 'length')
+
+        # if angle assigned instead of length work out the model length
         if not length:
             if not angle:
                 raise ValueError('require angle of slope or length of slope to initialise')
             length = height / tan(radians(angle))
         
+        # determine model height and length as minimum of:
+        # 4 * height and 5 * length AND minimum slope dimensions as below:
+        MIN_EXT_H = 6
+        MIN_EXT_L = 10
+        tot_h = max( 4 * height, MIN_EXT_H )
+        tot_l = max( 5 * length, MIN_EXT_L )
+
+        # determine coordinates for edges of slope
+        dx = ( tot_l - length ) / 2 
+        top = (dx, tot_h)
+        bot = ( dx + length, tot_h - height )
+  
+        # set up external boundary as a shapely LinearRing
+        self._external_boundary = LinearRing([(0,0),(0,top[1]), top, bot, (tot_l,bot[1]),(tot_l,0),(0,0)])
+
+        # set relevant variables to self
         self.length = length
         self.height = height
+        self._top_coord = top
+        self._bot_coord = bot
+        self._gradient = height / length
 
-        # set up external boundary as a shapely polygon, adopt a max height of 4* h and a max length of 5 * l
-        l, h = length, height
-        self._external_boundary = LinearRing([(0,0),(0,4*h),(3*l,4*h),(4*l,3*h),(7*l,3*h),(7*l,0),(0,0)])
-
+        # initialise empty properties used in other components of class
         self._materials = []
-
-        # self._top_coord = [3*l, 4*h]
-        # self._bot_coord = [4*l, 3*h]
-        self._top_coord = self._external_boundary.coords[2]
-        self._bot_coord = self._external_boundary.coords[3]
-        self._gradient = h / l
-
         self._water_depth = None
-
         self._search = {}
         self._min_FOS = 0
-
         self._slices = []
 
     def add_water_table( self, depth : int = 1 ):
@@ -61,29 +78,9 @@ class Slope:
         self._water_depth = None 
 
     def plot_boundary(self):
+        # draw the external boundary
         x_, y_ = self._external_boundary.coords.xy
-        fig = go.Figure(go.Scatter(x=list(x_), y=list(y_), fill="toself"))
-
-        for m in self._materials:
-                
-            y = m.RL
-            line = LineString([(-1,y),(self._external_boundary.bounds[2]+1,y)])
-           
-            x = self._external_boundary.intersection(line)
-            # returns multipoint so convert to linestring as follows
-            x = LineString(list(x))
-
-            x_, y_ = x.coords.xy
-            fig.add_trace(go.Scatter(x=list(x_),y=list(y_),mode='lines'))
-
-        # if self._search:
-        #     for k,v in self._search.items():
-        #         c_x,c_y,radius = k
-        #         fig.add_shape(type="circle",
-        #             xref="x", yref="y",
-        #             x0=(c_x-radius), y0=(c_y-radius), x1=(c_x+radius), y1=(c_y+radius),
-        #             line_color="LightSeaGreen",
-        #         )
+        fig = go.Figure(go.Scatter(x=list(x_), y=list(y_), mode='lines'))
 
         # following makes sure x and y are scaled the same, so that
         # model can be interpretted properly
@@ -91,6 +88,63 @@ class Slope:
             scaleanchor = "x",
             scaleratio = 1,
         )
+
+        # if there are no materials just return an empty shell
+        if not self._materials:
+            return fig
+
+        # get the points representing the top line of the model
+        # to help with drawing materials
+        top = self._external_boundary.coords[1:3]
+
+        # length of model (max x coordinate)
+        tot_l = self._external_boundary.bounds[2]
+        num_materials = len(self._materials)
+
+        # loop through materials
+        for i,m in enumerate(self._materials):
+            y = m.RL
+
+            # draw line for material boundary with extra meter to each side
+            # to make sure there is a clear intersection (rather than points
+            # just touching at boundary).
+            long_line = LineString([(-1,y),(tot_l+1,y)])
+
+            # then get intersection to have definite material boundary
+            line = self._external_boundary.intersection(long_line)
+
+            # returns multipoint so convert simple tuple list
+            line = [(p.x, p.y) for p in line.geoms]
+            line.sort()
+
+            # if the bot slope coordinate is between the bounds of the material
+            # need to draw a bit differently
+            if top[1][1] > self._bot_coord[1] and line[1][1] < self._bot_coord[1]:
+                top.append(self._bot_coord)
+                top.append((tot_l,self._bot_coord[1]))
+            
+            # if we are at the last material make the bottom the bottom of the model
+            if i == num_materials-1:
+                bot = self._external_boundary.coords[-2:]
+            else:
+                bot = line
+
+            # change bottom coordinates to be right to left
+            # so points are arranged clockwise in a circle
+            bot = sorted(bot, reverse=True)
+            
+            # get coordinates
+            coords = top + bot
+            x_ = [a[0] for a in coords]
+            y_ = [a[1] for a in coords]
+
+            fig.add_trace(go.Scatter(x=list(x_),y=list(y_),mode='lines', fill='toself'))
+            
+            # set the new top as the bottom, sort to put it back
+            # to left to right order
+            bot.sort()
+            top = bot
+
         return fig
 
     def plot_critical(self):
