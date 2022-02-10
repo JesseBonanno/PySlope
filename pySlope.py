@@ -1,3 +1,4 @@
+from lib2to3.pgen2.token import NUMBER
 from math import radians, tan, sqrt, atan, cos, sin
 from multiprocessing.sharedctypes import Value
 from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
@@ -6,15 +7,33 @@ import plotly.graph_objects as go
 
 from dataclasses import dataclass
 
+def mid_coord(p1,p2):
+    return [(a+b)/2 for a,b in zip(p1,p2)]
+
+def circle_radius_from_abcd(c_to_e, C):
+    # two intersecting chords through circle have segments of chords related
+    # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
+    # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
+    
+    return (C+c_to_e**2)/(2*c_to_e)
+
+def circle_centre(beta,chord_intersection,chord_to_centre):
+    dy = cos(beta) * chord_to_centre
+    dx = sin(beta) * chord_to_centre
+
+    return [a+b for a,b in zip(chord_intersection,(dx,dy))]
+
+
 class Slope:
     def __init__(self, height=2, angle=30, length=None):
-        
-        self.height = height
 
-        if length:
-            self.length = length
-        else:
-            self.length = height / tan(radians(angle))
+        if not length:
+            if not angle:
+                raise ValueError('require angle of slope or length of slope to initialise')
+            length = height / tan(radians(angle))
+        
+        self.length = length
+        self.height = height
 
         # set up external boundary as a shapely polygon, adopt a max height of 4* h and a max length of 5 * l
         l, h = length, height
@@ -22,8 +41,10 @@ class Slope:
 
         self._materials = []
 
-        self._top_coord = [3*l, 4*h]
-        self._bot_coord = [4*l, 3*h]
+        # self._top_coord = [3*l, 4*h]
+        # self._bot_coord = [4*l, 3*h]
+        self._top_coord = self._external_boundary.coords[2]
+        self._bot_coord = self._external_boundary.coords[3]
         self._gradient = h / l
 
         self._water_depth = None
@@ -55,14 +76,14 @@ class Slope:
             x_, y_ = x.coords.xy
             fig.add_trace(go.Scatter(x=list(x_),y=list(y_),mode='lines'))
 
-        if self._search:
-            for k,v in self._search.items():
-                c_x,c_y,radius = k
-                fig.add_shape(type="circle",
-                    xref="x", yref="y",
-                    x0=(c_x-radius), y0=(c_y-radius), x1=(c_x+radius), y1=(c_y+radius),
-                    line_color="LightSeaGreen",
-                )
+        # if self._search:
+        #     for k,v in self._search.items():
+        #         c_x,c_y,radius = k
+        #         fig.add_shape(type="circle",
+        #             xref="x", yref="y",
+        #             x0=(c_x-radius), y0=(c_y-radius), x1=(c_x+radius), y1=(c_y+radius),
+        #             line_color="LightSeaGreen",
+        #         )
 
         # following makes sure x and y are scaled the same, so that
         # model can be interpretted properly
@@ -71,6 +92,30 @@ class Slope:
             scaleratio = 1,
         )
         return fig
+
+    def plot_critical(self):
+        fig = self.plot_boundary()
+        
+        c_x,c_y,radius = self._min_FOS_location
+
+        fig.add_shape(type="circle",
+            xref="x", yref="y",
+            x0=(c_x-radius), y0=(c_y-radius), x1=(c_x+radius), y1=(c_y+radius),
+            line_color="LightSeaGreen",
+        )
+
+        fig.add_trace(go.Scatter(
+            x=[c_x],
+            y=[c_y],
+            mode="lines+text",
+            name="Lines and Text",
+            text=[self._min_FOS],
+            textposition="bottom center"
+        ))
+
+        return fig
+
+
 
     def add_materials(self,*materials):
 
@@ -124,6 +169,10 @@ class Slope:
         i_list = []
 
         # loop through each point in the intersection list
+        if not isinstance(i,MultiPoint):
+            #something is wrong should be multipoint
+            return None
+
         for p in i.geoms:
             # if point append x,y to list
             if isinstance(p, Point):
@@ -134,7 +183,7 @@ class Slope:
             # at its end. In this case just use the first point of the line
             # since the points are close together anyways
             elif isinstance(p, LineString):
-                i_list.append(round(p.coords[0][0],5), round(p.coords[0][1],5))
+                i_list.append((round(p.coords[0][0],5), round(p.coords[0][1],5)))
 
         # make sure no input inside twice. Has been observed where the point of intersection
         # is the boundary between two linestrings
@@ -146,7 +195,7 @@ class Slope:
             return None
         
         # total number of slices
-        SLICES = 500
+        SLICES = 50
 
         # horizontal distance between left and right slice
         dist = i_list[1][0] - i_list[0][0]
@@ -277,7 +326,7 @@ class Slope:
 
     def analyse_slope(self):
         
-        total_searches = 100
+        total_searches = 5000
         total_diameters = 5
         tp_xy = int(sqrt(total_searches / total_diameters))
 
@@ -306,6 +355,75 @@ class Slope:
         self._min_FOS_location = min(search, key=search.get)
         self._min_FOS = search[self._min_FOS_location]
 
+    def analyse_slope_better(self):
+        # generate coordinates for left of slope
+        NUMBER_POINTS = 10
+
+        x1,x2,x3,x4 = 0, self._top_coord[0], self._bot_coord[0], self._external_boundary.bounds[2]
+        y1,y3 = self._top_coord[1], self._bot_coord[1]
+
+        # split top and bottom slope up into 10 coordinate points
+        left_coords = [((n/NUMBER_POINTS) * (x2-x1), y1 ) for n in range(NUMBER_POINTS+1)]
+        right_coords = [(x3+(n/NUMBER_POINTS) * (x4-x3), y3) for n in range(NUMBER_POINTS+1)]
+
+        # add in 3 coordinates for the slope
+        p1,p5 = self._top_coord, self._bot_coord
+        p3 = mid_coord(p1,p5)
+        p2 = mid_coord(p1,p3)
+        p4 = mid_coord(p3,p5)
+        left_coords += [p2, p3, p4]
+
+        search = {}
+
+        # loop through left and right coordinates and generate a circular slope
+        # that passes through these points
+        for l_c in left_coords:
+            for r_c in right_coords:
+                # assume a starting circle that has a straight vertical slope down at the top of the slope
+                # this means the centre of the circle is in line with the top of the slope
+                # since the tangent of the circle is perpendicular to the centre
+
+                # angle of slope of choord (For circular slope)
+                beta = atan( ( l_c[1] - r_c[1] ) / ( r_c[0] - l_c[0] ) )
+
+                # half of the circle coord that passess from top of point to bottom of point
+                half_coord_distance = sqrt(( l_c[1] - r_c[1] )**2 + ( r_c[0] - l_c[0] )**2) / 2
+
+                # starting circle details
+                start_radius = half_coord_distance / cos(beta)
+                start_centre = ( l_c[0] + start_radius, l_c[1] )
+                start_chord_to_centre = sqrt( start_radius**2 - half_coord_distance**2)
+                start_chord_to_edge = start_radius - start_chord_to_centre
+
+                # two intersecting chords through circle have segments of chords related
+                # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
+                # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
+                C = half_coord_distance **2
+
+
+                # loop through circles
+                NUMBER_CIRCLES = 5
+                for i in range(0,NUMBER_CIRCLES):
+
+                    # doesnt include going all the way in which we dont want to do anyways
+                    chord_to_edge = start_chord_to_edge* (NUMBER_CIRCLES-i) / NUMBER_CIRCLES
+                    radius = circle_radius_from_abcd(chord_to_edge, C)
+                    centre = circle_centre(beta=beta,chord_intersection=mid_coord(l_c,r_c),chord_to_centre=radius-chord_to_edge)
+                    c_x,c_y = centre
+
+                    FOS = self.analyse_circular_failure(c_x,c_y,radius)
+                    if FOS:
+                        search[(c_x,c_y,radius)] = self.analyse_circular_failure(c_x,c_y,radius)
+                    else:
+                        break
+                    if FOS <1:
+                        print('stop')
+
+        self._search = search
+        self._min_FOS_location = min(search, key=search.get)
+        self._min_FOS = search[self._min_FOS_location]
+   
+    
     def add_surcharge(self,offset=0,load=20,length=None):
         
         right_x = self._top_coord[0] - offset
@@ -338,18 +456,26 @@ class Material:
 
 
 if __name__ == "__main__":
-    s = Slope(height=2, angle=None, length=2)
+    s = Slope(height=3, angle=30, length=None)
 
     fill = Material(20,30,5,1)
+    granular = Material(20,35,0,5)
 
-    s.add_materials(fill)
-    s.add_surcharge(1,5)
+    s.add_materials(fill, granular)
 
+    s.add_surcharge(0.5,20)
+
+    import time
+    t1 = time.perf_counter()
     s.analyse_slope()
+    print(t1-time.perf_counter())
 
-    fig = s.plot_boundary()
-    fig.update_yaxes(
-        scaleanchor = "x",
-        scaleratio = 1,
-    )
+    t1 = time.perf_counter()
+    s.analyse_slope_better()
+    print(t1-time.perf_counter())
+    print(s._min_FOS)
+    print(s._min_FOS_location)
+
+    fig = s.plot_critical()
+
     fig.write_html("./test.html")
