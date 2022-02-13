@@ -166,28 +166,78 @@ class Slope:
 
         c_x, c_y, radius = self._min_FOS_location
 
-        fig.add_shape(
-            type="circle",
-            xref="x",
-            yref="y",
-            x0=(c_x - radius),
-            y0=(c_y - radius),
-            x1=(c_x + radius),
-            y1=(c_y + radius),
-            line_color="LightSeaGreen",
-        )
+        c_x, c_y, radius, l_c,r_c = self._min_FOS_location
+        FOS = self._min_FOS
+
+        fig = self.plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=FOS, detailed=True)
+        fig = self.plot_annotate_FOS(fig, c_x, c_y, FOS)
+        return fig
+
+    def plot_annotate_FOS(self,fig,c_x,c_y,FOS):
+
+        fig.add_trace(go.Scatter(
+            x=[c_x],
+            y=[c_y],
+            mode="lines+text",
+            text=[f"{FOS:.3f}"],
+            textposition="top right",
+            textfont=dict(
+                family="sans serif",
+                size=24,
+                color="black"
+            )
+        ))
+
+        return fig
+    
+    def plot_failure_plane(self,fig,c_x,c_y,radius,l_c,r_c,FOS=None, detailed=False):
+        if not FOS:
+            FOS =''
+        # generate points for circle
+        p = Point(c_x, c_y)
+        x,y = p.buffer(radius).boundary.coords.xy
+        
+        x = list(x)
+        y = list(y)
+
+        # empty vectors for circle points that we will actually include
+        x_ = []
+        y_ = []
+
+        for i in range(len(x)):
+            # x coordinate should be between left and right
+            # note for y, should be less than left y but can stoop
+            # below right i
+            if x[i] <= r_c[0] and x[i] >= l_c[0] and y[i] <= l_c[1]:
+                x_.append(x[i])
+                y_.append(y[i])
+        
+        if detailed:
+            x_ += [l_c[0],c_x,r_c[0],x_[0]]
+            y_ += [l_c[1],c_y,r_c[1],y_[0]]
+        else:
+            x_ = [r_c[0]] + x_ + [l_c[0]]
+            y_ = [r_c[1]] + y_ + [l_c[1]]
 
         fig.add_trace(
             go.Scatter(
-                x=[c_x],
-                y=[c_y],
-                mode="lines+text",
-                name="Lines and Text",
-                text=[self._min_FOS],
-                textposition="bottom center",
+                x=x_,
+                y=y_,
+                mode="lines",
+                line_color="green",
+                meta = [round(FOS,3)],                
+                hovertemplate="%{meta[0]}",
             )
         )
 
+        return fig
+
+    def plot_all_planes(self):
+        fig = self.plot_boundary()
+
+        for k, v in self._search.items():
+            c_x, c_y, radius, l_c,r_c = k
+            fig = self.plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=v)
         return fig
 
     def add_materials(self, *materials):
@@ -390,11 +440,11 @@ class Slope:
             # initialise slice x coordinate for next loop
             s_x = s_x + b
 
-        return resisting / pushing
+        return (resisting / pushing, i_list[0], i_list[1])
 
     def analyse_slope(self):
         # Approx number of runs
-        ITERATIONS = 2000
+        ITERATIONS = 2500
 
         # 10 * 10 * 5 = 500
         # allow for 3 mid points of slope
@@ -488,10 +538,10 @@ class Slope:
             )
             c_x, c_y = centre
 
-            FOS = self.analyse_circular_failure(c_x, c_y, radius)
-            if FOS:
-                # search[(c_x,c_y,radius)] = FOS
-                search[(l_c[0], r_c[0], radius)] = FOS
+            result = self.analyse_circular_failure(c_x, c_y, radius)
+            if result:
+                FOS,i_l,i_r = result
+                search[(c_x,c_y,radius,i_l,i_r)] = FOS
             else:
                 break
 
@@ -542,5 +592,5 @@ if __name__ == "__main__":
     print(
         f"Took {time.perf_counter()-t1} seconds to process {len(s._search.keys())} runs"
     )
-    print(s._min_FOS)
-    print(s._min_FOS_location)
+    f = s.plot_all_planes()
+    f.write_html('test.html')
