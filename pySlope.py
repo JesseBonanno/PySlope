@@ -2,7 +2,7 @@
 from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
-import concurrent.futures
+# import concurrent.futures
 from rich import print
 
 # third party imports
@@ -13,7 +13,7 @@ from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
 from data_validation import *
 
 
-def mid_coord(p1, p2):
+def mid_coord(p1 : Point, p2 : Point) -> Point:
     return [(a + b) / 2 for a, b in zip(p1, p2)]
 
 
@@ -31,9 +31,50 @@ def circle_centre(beta, chord_intersection, chord_to_centre):
 
     return [a + b for a, b in zip(chord_intersection, (dx, dy))]
 
+@dataclass
+class Material:
+    unit_weight: float = 20
+    friction_angle: int = 35
+    cohesion: int = 2
+    depth_to_bottom: int = 5
+
+    def __repr__(self):
+        return f"Material(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom}"
 
 class Slope:
-    def __init__(self, height=2, angle=30, length=None):
+    
+    def __init__(self, height : float = 2, angle : int = 30, length : float = None):
+        """Initialise a slope object"""
+        
+        self.set_external_boundary(height=height,angle=angle,length=length)
+
+        # initialise empty properties used in other components of class
+        self._materials = []
+        self._water_depth = None
+
+    def set_external_boundary(self,height : float = 2, angle : int = 30, length : float = None, MIN_EXT_H : int = 6, MIN_EXT_L : int = 10):
+        """Set external boundary for model.
+
+        Parameters
+        ----------
+        height : int, optional
+            height of slope in metres, by default 2
+        angle : int, optional
+            angle of slope in degrees (may be left as none if slope
+            is instead expressed by length of slope), by default 30
+        length : int, optional
+            length of slope in metres (may be left as none if slope
+            is instead expressed by angle of slope), by default None
+        MIN_EXT_H : int, optional
+            minimum model length, by default 6
+        MIN_EXT_L : int, optional
+            minimum model height, by default 10
+
+        Raises
+        ------
+        ValueError
+            If input not in required range or of required type
+        """
 
         # validate inputs
         assert_strictly_positive_number(height, "height")
@@ -51,10 +92,6 @@ class Slope:
                 )
             length = height / tan(radians(angle))
 
-        # determine model height and length as minimum of:
-        # 4 * height and 5 * length AND minimum slope dimensions as below:
-        MIN_EXT_H = 6
-        MIN_EXT_L = 10
         tot_h = max(4 * height, MIN_EXT_H)
         tot_l = max(5 * length, MIN_EXT_L)
 
@@ -69,178 +106,72 @@ class Slope:
         )
 
         # set relevant variables to self
-        self.length = length
-        self.height = height
-        self._top_coord = top
-        self._bot_coord = bot
+        self._length = length
+        self._height = height
         self._gradient = height / length
 
-        # initialise empty properties used in other components of class
-        self._materials = []
-        self._water_depth = None
-        self._search = {}
-        self._min_FOS = 0
-        self._slices = []
+        self._top_coord = top
+        self._bot_coord = bot
 
-    def add_water_table(self, depth: int = 1):
+        # reset results to deal with case that boundary is changed after
+        # an analysis has already taken place.
+        self._reset_results()
+
+    def set_water_table(self, depth: int = 1):
+        """set water table value """
         self._water_depth = depth
 
     def remove_water_table(self):
+        """Remove water table from model"""
         self._water_depth = None
 
-    def plot_boundary(self):
-        # draw the external boundary
-        x_, y_ = self._external_boundary.coords.xy
-        fig = go.Figure(go.Scatter(x=list(x_), y=list(y_), mode="lines"))
+    def set_surcharge(self, offset : float = 0, load : float = 20, length : float = None):
+        """set a surface surcharge on top of the slope
 
-        # following makes sure x and y are scaled the same, so that
-        # model can be interpretted properly
-        fig.update_yaxes(
-            scaleanchor="x",
-            scaleratio=1,
-        )
-
-        # if there are no materials just return an empty shell
-        if not self._materials:
-            return fig
-
-        # get the points representing the top line of the model
-        # to help with drawing materials
-        top = self._external_boundary.coords[1:3]
-
-        # length of model (max x coordinate)
-        tot_l = self._external_boundary.bounds[2]
-        num_materials = len(self._materials)
-
-        # loop through materials
-        for i, m in enumerate(self._materials):
-            # get reference level (y coordinate) for material
-            y = m.RL
-
-            # draw line for material boundary with extra meter to each side
-            # to make sure there is a clear intersection (rather than points
-            # just touching at boundary).
-            long_line = LineString([(-1, y), (tot_l + 1, y)])
-
-            # then get intersection to have definite material boundary
-            line = self._external_boundary.intersection(long_line)
-
-            # returns multipoint so convert simple tuple list
-            line = [(p.x, p.y) for p in line.geoms]
-            line.sort()
-
-            # if the bot slope coordinate is between the bounds of the material
-            # need to draw a bit differently
-            if top[1][1] > self._bot_coord[1] and line[1][1] < self._bot_coord[1]:
-                top.append(self._bot_coord)
-                top.append((tot_l, self._bot_coord[1]))
-
-            # if we are at the last material make the bottom the bottom of the model
-            if i == num_materials - 1:
-                bot = self._external_boundary.coords[-2:]
-            else:
-                bot = line
-
-            # change bottom coordinates to be right to left
-            # so points are arranged clockwise in a circle
-            bot = sorted(bot, reverse=True)
-
-            # get coordinates
-            coords = top + bot
-            x_ = [a[0] for a in coords]
-            y_ = [a[1] for a in coords]
-
-            fig.add_trace(
-                go.Scatter(x=list(x_), y=list(y_), mode="lines", fill="toself")
-            )
-
-            # set the new top as the bottom, sort to put it back
-            # to left to right order
-            bot.sort()
-            top = bot
-
-        return fig
-
-    def plot_critical(self):
-        fig = self.plot_boundary()
-
-        c_x, c_y, radius = self._min_FOS_location
-
-        c_x, c_y, radius, l_c,r_c = self._min_FOS_location
-        FOS = self._min_FOS
-
-        fig = self.plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=FOS, detailed=True)
-        fig = self.plot_annotate_FOS(fig, c_x, c_y, FOS)
-        return fig
-
-    def plot_annotate_FOS(self,fig,c_x,c_y,FOS):
-
-        fig.add_trace(go.Scatter(
-            x=[c_x],
-            y=[c_y],
-            mode="lines+text",
-            text=[f"{FOS:.3f}"],
-            textposition="top right",
-            textfont=dict(
-                family="sans serif",
-                size=24,
-                color="black"
-            )
-        ))
-
-        return fig
-    
-    def plot_failure_plane(self,fig,c_x,c_y,radius,l_c,r_c,FOS=None, detailed=False):
-        if not FOS:
-            FOS =''
-        # generate points for circle
-        p = Point(c_x, c_y)
-        x,y = p.buffer(radius).boundary.coords.xy
-        
-        x = list(x)
-        y = list(y)
-
-        # empty vectors for circle points that we will actually include
-        x_ = []
-        y_ = []
-
-        for i in range(len(x)):
-            # x coordinate should be between left and right
-            # note for y, should be less than left y but can stoop
-            # below right i
-            if x[i] <= r_c[0] and x[i] >= l_c[0] and y[i] <= l_c[1]:
-                x_.append(x[i])
-                y_.append(y[i])
-        
-        if detailed:
-            x_ += [l_c[0],c_x,r_c[0],x_[0]]
-            y_ += [l_c[1],c_y,r_c[1],y_[0]]
+        Parameters
+        ----------
+        offset : int, optional
+            offset from the crest of the slope in metres, by default 0
+        load : int, optional
+            load magnitude in kPa, by default 20
+        length : _type_, optional
+            length of the load across the model (perpendicular to slope
+            ) in metres. If length is None or length exceeds edge of model, 
+            then length set to left edge of model, by default None
+        """
+        right_x = self._top_coord[0] - offset
+        if length:
+            left_x = max(0, right_x - length)
         else:
-            x_ = [r_c[0]] + x_ + [l_c[0]]
-            y_ = [r_c[1]] + y_ + [l_c[1]]
+            left_x = 0
 
-        fig.add_trace(
-            go.Scatter(
-                x=x_,
-                y=y_,
-                mode="lines",
-                line_color="green",
-                meta = [round(FOS,3)],                
-                hovertemplate="%{meta[0]}",
-            )
-        )
+        # note that this is slightly different than most coordinates
+        # in that it isnt a LineString and doesnt have y coordinate
+        # also, could add functionality for different loads to apply
+        # in future
+        self._load_magnitude = load
+        self._load_location = [left_x, right_x]
 
-        return fig
+    def remove_surcharge(self):
+        """ Remove surcharge from model. """
+        self._load_magnitude = 0
 
-    def plot_all_planes(self):
-        fig = self.plot_boundary()
+    def set_materials(self, *materials):
+        """Assign material instances to the slope instance.
 
-        for k, v in self._search.items():
-            c_x, c_y, radius, l_c,r_c = k
-            fig = self.plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=v)
-        return fig
+        Parameters
+        ----------
+        *materials : Material (list), optional
+            Material instances to be associated with slope.
 
-    def add_materials(self, *materials):
+
+        Raises
+        ------
+        ValueError
+            If material not instance of Material class error is raised.
+        ValueError
+            If non-unique material depths then error is raised.
+        """
 
         for material in materials:
             if not isinstance(material, Material):
@@ -248,13 +179,14 @@ class Slope:
                     "The funciton add_materials only accepts instances of the Material Class"
                 )
 
-        l = [material.depth_to_bottom for material in materials]
-        if len(l) > len(set(l)):
-            raise ValueError("The same material depth has been input twice")
-
         # sort materials to be in order, include existing materials
         materials = list(materials) + self._materials
         materials.sort(key=lambda x: x.depth_to_bottom)
+
+        depths = [material.depth_to_bottom for material in materials]
+
+        if len(depths) > len(set(depths)):
+            raise ValueError("The same material depth has been input twice")
 
         # define RL for each material
         for material in materials:
@@ -262,11 +194,22 @@ class Slope:
 
         self._materials = materials
 
-    def remove_material(self, material=None, depth=None):
+    def remove_material(self, material : Material = None, depth : float = None):
+        """Remove material from slope.
+
+        Parameters
+        ----------
+        material : Material, optional
+            material object. If specified and exists in materials
+            associated with slope then will be removed, by default None
+        depth : float, optional
+            depth in metres of material object. If not None and material found
+            at indicated depth then will remove the material, by default None
+
+        """
         # if material defined and material type and material in list then remove it
         if material and isinstance(material, Material):
             depth = material.depth_to_bottom
-            return 1
 
         # if depth specified and had no luck removing material
         # try find the depth for a material in the list and then remove it
@@ -274,9 +217,6 @@ class Slope:
             for m in self._materials:
                 if m.depth_to_bottom == depth:
                     self._materials.remove(m)
-                    return 1
-
-        return 0
 
     def analyse_circular_failure(self, c_x, c_y, radius):
         # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
@@ -484,12 +424,12 @@ class Slope:
 
         # loop through left and right coordinates and generate a circular slope
         # that passes through these points
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            for l_c in left_coords:
-                for r_c in right_coords:
-                    search.update(
-                        self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
-                    )
+        # with concurrent.futures.ProcessPoolExecutor() as executor:
+        for l_c in left_coords:
+            for r_c in right_coords:
+                search.update(
+                    self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
+                )
         #             f1 = executor.submit(self.run_analysis_for_circles, l_c,r_c,NUMBER_CIRCLES)
         #             threads.append(f1)
         #             # multi thread circle calc thing
@@ -547,34 +487,196 @@ class Slope:
 
         return search
 
-    def add_surcharge(self, offset=0, load=20, length=None):
+    def _reset_results(self):
+        """ Re-initialise results to erase non-relevant results due to a model change"""
+        self._search = {}
+        self._min_FOS = 0
+        self._slices = []   
 
-        right_x = self._top_coord[0] - offset
-        if length:
-            left_x = max(0, right_x - length)
+    
+    def plot_boundary(self):
+        # draw the external boundary
+        x_, y_ = self._external_boundary.coords.xy
+        fig = go.Figure(go.Scatter(x=list(x_), y=list(y_), mode="lines"))
+
+        # following makes sure x and y are scaled the same, so that
+        # model can be interpretted properly
+        fig.update_yaxes(
+            scaleanchor="x",
+            scaleratio=1,
+        )
+
+        # if there are no materials just return an empty shell
+        if not self._materials:
+            return fig
+
+        # get the points representing the top line of the model
+        # to help with drawing materials
+        top = self._external_boundary.coords[1:3]
+
+        # length of model (max x coordinate)
+        tot_l = self._external_boundary.bounds[2]
+        num_materials = len(self._materials)
+
+        # loop through materials
+        for i, m in enumerate(self._materials):
+            # get reference level (y coordinate) for material
+            y = m.RL
+
+            # draw line for material boundary with extra meter to each side
+            # to make sure there is a clear intersection (rather than points
+            # just touching at boundary).
+            long_line = LineString([(-1, y), (tot_l + 1, y)])
+
+            # then get intersection to have definite material boundary
+            line = self._external_boundary.intersection(long_line)
+
+            # returns multipoint so convert simple tuple list
+            line = [(p.x, p.y) for p in line.geoms]
+            line.sort()
+
+            # if the bot slope coordinate is between the bounds of the material
+            # need to draw a bit differently
+            if top[1][1] > self._bot_coord[1] and line[1][1] < self._bot_coord[1]:
+                top.append(self._bot_coord)
+                top.append((tot_l, self._bot_coord[1]))
+
+            # if we are at the last material make the bottom the bottom of the model
+            if i == num_materials - 1:
+                bot = self._external_boundary.coords[-2:]
+            else:
+                bot = line
+
+            # change bottom coordinates to be right to left
+            # so points are arranged clockwise in a circle
+            bot = sorted(bot, reverse=True)
+
+            # get coordinates
+            coords = top + bot
+            x_ = [a[0] for a in coords]
+            y_ = [a[1] for a in coords]
+
+            fig.add_trace(
+                go.Scatter(x=list(x_), y=list(y_), mode="lines", fill="toself")
+            )
+
+            # set the new top as the bottom, sort to put it back
+            # to left to right order
+            bot.sort()
+            top = bot
+
+        fig = self._plot_load(fig)
+
+        return fig
+
+    def plot_critical(self):
+        fig = self.plot_boundary()
+
+        c_x, c_y, radius = self._min_FOS_location
+
+        c_x, c_y, radius, l_c,r_c = self._min_FOS_location
+        FOS = self._min_FOS
+
+        fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=FOS, detailed=True)
+        fig = self._plot_annotate_FOS(fig, c_x, c_y, FOS)
+        return fig
+
+    def _plot_annotate_FOS(self,fig,c_x,c_y,FOS):
+
+        fig.add_trace(go.Scatter(
+            x=[c_x],
+            y=[c_y],
+            mode="lines+text",
+            text=[f"{FOS:.3f}"],
+            textposition="top right",
+            textfont=dict(
+                family="sans serif",
+                size=24,
+                color="black"
+            )
+        ))
+
+        return fig
+
+    def _plot_load(self,fig):
+        # add in extra arrows, text, and hori line
+
+        p = self._load_magnitude
+        l_x,r_x = self._load_location
+        y = self._external_boundary.bounds[-1]
+
+        for x in self._load_location:
+            fig.add_annotation(
+                y = y,
+                x = x,
+                ay = y+1,
+                ax = x + 0,
+                text='',
+                xref='x',
+                yref='y',
+                axref='x',
+                ayref='y',
+                showarrow = True,
+                arrowhead=3,
+                arrowsize=1,
+                arrowwidth=1,
+                arrowcolor='black'
+
+            )
+
+
+        return fig
+    
+    def _plot_failure_plane(self,fig,c_x,c_y,radius,l_c,r_c,FOS=None, detailed=False):
+        if not FOS:
+            FOS =''
+        # generate points for circle
+        p = Point(c_x, c_y)
+        x,y = p.buffer(radius).boundary.coords.xy
+        
+        x = list(x)
+        y = list(y)
+
+        # empty vectors for circle points that we will actually include
+        x_ = []
+        y_ = []
+
+        for i in range(len(x)):
+            # x coordinate should be between left and right
+            # note for y, should be less than left y but can stoop
+            # below right i
+            if x[i] <= r_c[0] and x[i] >= l_c[0] and y[i] <= l_c[1]:
+                x_.append(x[i])
+                y_.append(y[i])
+        
+        if detailed:
+            x_ += [l_c[0],c_x,r_c[0],x_[0]]
+            y_ += [l_c[1],c_y,r_c[1],y_[0]]
         else:
-            left_x = 0
+            x_ = [r_c[0]] + x_ + [l_c[0]]
+            y_ = [r_c[1]] + y_ + [l_c[1]]
 
-        # note that this is slightly different than most coordinates
-        # in that it isnt a LineString and doesnt have y coordinate
-        # also, could add functionality for different loads to apply
-        # in future
-        self._load_magnitude = load
-        self._load_location = [left_x, right_x]
+        fig.add_trace(
+            go.Scatter(
+                x=x_,
+                y=y_,
+                mode="lines",
+                line_color="green",
+                meta = [round(FOS,3)],                
+                hovertemplate="%{meta[0]}",
+            )
+        )
 
-    def remove_surcharge(self):
-        self._load_magnitude = 0
+        return fig
 
+    def plot_all_planes(self):
+        fig = self.plot_boundary()
 
-@dataclass
-class Material:
-    unit_weight: float = 20
-    friction_angle: int = 35
-    cohesion: int = 2
-    depth_to_bottom: int = 5
+        for k, v in self._search.items():
+            c_x, c_y, radius, l_c,r_c = k
+            fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=v)
+        return fig
 
-    def __repr__(self):
-        return f"Material(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom}"
 
 
 if __name__ == "__main__":
@@ -583,14 +685,19 @@ if __name__ == "__main__":
     fill = Material(20, 30, 5, 1)
     granular = Material(20, 35, 0, 5)
 
-    s.add_materials(fill, granular)
+    s.set_materials(fill, granular)
 
-    s.add_surcharge(0.5, 20)
+    s.set_surcharge(0.5, 20)
 
-    t1 = time.perf_counter()
-    s.analyse_slope()
-    print(
-        f"Took {time.perf_counter()-t1} seconds to process {len(s._search.keys())} runs"
-    )
-    f = s.plot_all_planes()
+    # s.analyse_slope()
+
+    f = s.plot_boundary()
+    
+
+    # t1 = time.perf_counter()
+    # s.analyse_slope()
+    # print(
+    #     f"Took {time.perf_counter()-t1} seconds to process {len(s._search.keys())} runs"
+    # )
+    # f = s.plot_all_planes()
     f.write_html('test.html')
