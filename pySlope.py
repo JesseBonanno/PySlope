@@ -11,25 +11,8 @@ from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
 
 # local imports
 from data_validation import *
+from utilities import mid_coord, circle_radius_from_abcd, circle_centre
 
-
-def mid_coord(p1 : Point, p2 : Point) -> Point:
-    return [(a + b) / 2 for a, b in zip(p1, p2)]
-
-
-def circle_radius_from_abcd(c_to_e, C):
-    # two intersecting chords through circle have segments of chords related
-    # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
-    # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-
-    return (C + c_to_e ** 2) / (2 * c_to_e)
-
-
-def circle_centre(beta, chord_intersection, chord_to_centre):
-    dy = cos(beta) * chord_to_centre
-    dx = sin(beta) * chord_to_centre
-
-    return [a + b for a, b in zip(chord_intersection, (dx, dy))]
 
 @dataclass
 class Material:
@@ -424,18 +407,12 @@ class Slope:
 
         # loop through left and right coordinates and generate a circular slope
         # that passes through these points
-        # with concurrent.futures.ProcessPoolExecutor() as executor:
+        # Not sure if multiprocessing can help, always made it slightly slower for all my tests
         for l_c in left_coords:
             for r_c in right_coords:
                 search.update(
                     self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
                 )
-        #             f1 = executor.submit(self.run_analysis_for_circles, l_c,r_c,NUMBER_CIRCLES)
-        #             threads.append(f1)
-        #             # multi thread circle calc thing
-
-        # for f in concurrent.futures.as_completed(threads):
-        #     search.update(f.result())
 
         self._search = search
         self._min_FOS_location = min(search, key=search.get)
