@@ -8,6 +8,7 @@ from rich import print
 # third party imports
 import plotly.graph_objects as go
 from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
+from tqdm import tqdm
 
 # local imports
 from data_validation import *
@@ -34,6 +35,7 @@ class Slope:
         # initialise empty properties used in other components of class
         self._materials = []
         self._water_depth = None
+        self._load_magnitude = 0
 
     def set_external_boundary(self,height : float = 2, angle : int = 30, length : float = None, MIN_EXT_H : int = 6, MIN_EXT_L : int = 10):
         """Set external boundary for model.
@@ -408,7 +410,7 @@ class Slope:
         # loop through left and right coordinates and generate a circular slope
         # that passes through these points
         # Not sure if multiprocessing can help, always made it slightly slower for all my tests
-        for l_c in left_coords:
+        for l_c in tqdm(left_coords):
             for r_c in right_coords:
                 search.update(
                     self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
@@ -500,21 +502,20 @@ class Slope:
             # get reference level (y coordinate) for material
             y = m.RL
 
-            # draw line for material boundary with extra meter to each side
-            # to make sure there is a clear intersection (rather than points
-            # just touching at boundary).
-            long_line = LineString([(-1, y), (tot_l + 1, y)])
-
-            # then get intersection to have definite material boundary
-            line = self._external_boundary.intersection(long_line)
-
-            # returns multipoint so convert simple tuple list
-            line = [(p.x, p.y) for p in line.geoms]
-            line.sort()
+            if y <= self._bot_coord[1]:
+                line = [(0,y),self._bot_coord]
+            else:
+                x = self._top_coord[0]+(self._top_coord[1]-y)/self._gradient
+                line = [(0,y),(x,y)]
 
             # if the bot slope coordinate is between the bounds of the material
-            # need to draw a bit differently
-            if top[1][1] > self._bot_coord[1] and line[1][1] < self._bot_coord[1]:
+            # OR LAST material and above need to draw a bit differently
+
+            is_last = (i == num_materials - 1)
+
+            if ((top[1][1] > self._bot_coord[1] and
+                line[1][1] < self._bot_coord[1]) or 
+                (is_last and top[1][1]>self._bot_coord[1])):
                 top.append(self._bot_coord)
                 top.append((tot_l, self._bot_coord[1]))
 
@@ -542,7 +543,8 @@ class Slope:
             bot.sort()
             top = bot
 
-        fig = self._plot_load(fig)
+        if self._load_magnitude:
+            fig = self._plot_load(fig)
 
         return fig
 
@@ -578,15 +580,31 @@ class Slope:
     def _plot_load(self,fig):
         # add in extra arrows, text, and hori line
 
-        p = self._load_magnitude
-        l_x,r_x = self._load_location
-        y = self._external_boundary.bounds[-1]
+        # arrow styling parameters
+        ARROW_HEIGHT_FACTOR = 1.1
+        arrowhead=3
+        arrowsize=2
+        arrowwidth=2
+        arrowcolor='red'
 
-        for x in self._load_location:
+
+        p = self._load_magnitude
+        y = self._external_boundary.bounds[-1]
+        l_x,r_x = self._load_location
+
+        # add more arrows in if the load is longer than say 3
+        load_length = r_x - l_x
+
+        if load_length > 3:
+            spaces = divmod(load_length,2)[0]
+            spacing = load_length/spaces
+            arrows = [l_x + spacing * t for t in range(int(spaces+1))]
+
+        for x in arrows:
             fig.add_annotation(
                 y = y,
                 x = x,
-                ay = y+1,
+                ay = y*ARROW_HEIGHT_FACTOR,
                 ax = x + 0,
                 text='',
                 xref='x',
@@ -594,13 +612,43 @@ class Slope:
                 axref='x',
                 ayref='y',
                 showarrow = True,
-                arrowhead=3,
-                arrowsize=1,
-                arrowwidth=1,
-                arrowcolor='black'
-
+                arrowhead=arrowhead,
+                arrowsize=arrowsize,
+                arrowwidth=arrowwidth,
+                arrowcolor=arrowcolor,
             )
 
+        fig.add_annotation(
+            y = y*ARROW_HEIGHT_FACTOR+0.75,
+            x = sum(self._load_location)/2,
+            ay = y,
+            ax = x + 0,
+            text=f'{p} kPa',
+            xref='x',
+            yref='y',
+            axref='x',
+            ayref='y',
+            showarrow = False,
+            font_size=30,
+            font_color=arrowcolor,
+        )
+
+        fig.add_annotation(
+            y = y*ARROW_HEIGHT_FACTOR,
+            x = l_x,
+            ay = y*ARROW_HEIGHT_FACTOR,
+            ax = r_x,
+            text='',
+            xref='x',
+            yref='y',
+            axref='x',
+            ayref='y',
+            showarrow = True,
+            arrowhead=0,
+            arrowsize=arrowsize,
+            arrowwidth=arrowwidth,
+            arrowcolor=arrowcolor,
+        )
 
         return fig
     
@@ -657,14 +705,15 @@ class Slope:
 
 
 if __name__ == "__main__":
-    s = Slope(height=3, angle=30, length=None)
+    s = Slope(height=5, angle=None, length=8)
 
-    fill = Material(20, 30, 5, 1)
-    granular = Material(20, 35, 0, 5)
+    sand = Material(20,30,0,1)
+    clay = Material(18,25,5,4)
+    grass = Material(16,20,4,10)
 
-    s.set_materials(fill, granular)
+    s.set_materials(sand,clay,grass)
 
-    s.set_surcharge(0.5, 20)
+    s.set_surcharge(0.5,10)
 
     # s.analyse_slope()
 
