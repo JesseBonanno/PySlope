@@ -1,10 +1,13 @@
 # standard library imports
-from math import cos, sin
+from math import cos, sin, sqrt
 from shapely.geometry import Point
 
 
 def mid_coord(p1 : Point, p2 : Point) -> Point:
     return [(a + b) / 2 for a, b in zip(p1, p2)]
+
+def dist_points(p1:tuple, p2:tuple) -> float:
+    return sqrt(abs(p1[0]-p2[0])**2 + abs(p1[1]-p2[1]) ** 2 )
 
 
 def circle_radius_from_abcd(c_to_e, C):

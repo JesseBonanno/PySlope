@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 # local imports
 from data_validation import *
-from utilities import mid_coord, circle_radius_from_abcd, circle_centre
+from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_points
 
 
 @dataclass
@@ -67,10 +67,10 @@ class Slope:
             # is allowed to be 90 but not 0
             assert_range(angle, "angle", 0, 90, not_low=True)
         if length is not None:
-            assert_strictly_positive_number(length, "length")
+            assert_positive_number(length, "length")
 
         # if angle assigned instead of length work out the model length
-        if not length:
+        if length is None:
             if not angle:
                 raise ValueError(
                     "require angle of slope or length of slope to initialise"
@@ -78,7 +78,7 @@ class Slope:
             length = height / tan(radians(angle))
 
         tot_h = max(4 * height, MIN_EXT_H)
-        tot_l = max(5 * length, MIN_EXT_L)
+        tot_l = max(5 * length, MIN_EXT_L, 4 * height)
 
         # determine coordinates for edges of slope
         dx = (tot_l - length) / 2
@@ -93,7 +93,11 @@ class Slope:
         # set relevant variables to self
         self._length = length
         self._height = height
-        self._gradient = height / length
+
+        if angle == 90 or length == 0:
+            self._gradient = 100000000000000
+        else:
+            self._gradient = height / length
 
         self._top_coord = top
         self._bot_coord = bot
@@ -365,6 +369,9 @@ class Slope:
             # initialise slice x coordinate for next loop
             s_x = s_x + b
 
+        if pushing <= 0:
+            return None
+
         return (resisting / pushing, i_list[0], i_list[1])
 
     def analyse_slope(self, deep_seeded_only=False):
@@ -403,9 +410,13 @@ class Slope:
         left_coords = [
             ((n / NUMBER_POINTS) * (x2 - x1), y2) for n in range(1, NUMBER_POINTS + 1)
         ]
+
         right_coords = [
             (x3 + (n / NUMBER_POINTS) * (x4 - x3), y3) for n in range(NUMBER_POINTS)
         ]
+
+        if self._gradient > 10:
+            left_coords = left_coords[:-1]
 
         # add in 3 coordinates for the slope
         dx = (x3-x2)
@@ -422,19 +433,22 @@ class Slope:
                     y2 - dy * i / slope_sections) 
                 )
 
+            # only want lines from mid to right for a not very steep gradient
+            if self._gradient < 10:
+                left_coords += mid_coords
+            
             right_coords += mid_coords
-            left_coords += mid_coords
 
         search = {}
 
-        min_x = dx/3
+        min_dist = dist_points(self._top_coord,self._bot_coord)/3
 
         # loop through left and right coordinates and generate a circular slope
         # that passes through these points
         # Not sure if multiprocessing can help, always made it slightly slower for all my tests
         for l_c in tqdm(left_coords):
             for r_c in right_coords:
-                if r_c[0]-l_c[0] > min_x:
+                if dist_points(l_c,r_c) > min_dist and abs(l_c[0]-r_c[0])>0.1:
                     search.update(
                         self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
                     )
@@ -591,8 +605,8 @@ class Slope:
             textposition="top right",
             textfont=dict(
                 family="sans serif",
-                size=24,
-                color="black"
+                size=30,
+                color="Green"
             )
         ))
 
@@ -726,15 +740,15 @@ class Slope:
 
 
 if __name__ == "__main__":
-    s = Slope(height=5, angle=None, length=6)
+    s = Slope(height=1, angle=None, length=0.005)
 
-    sand = Material(20,30,0,1)
+    sand = Material(20,35,5,1)
     clay = Material(18,25,5,4)
     grass = Material(16,20,4,10)
 
-    s.set_materials(sand,clay,grass)
+    s.set_materials(sand)
 
-    s.set_surcharge(0.5,10)
+    s.set_surcharge(0.5,20)
 
     s.analyse_slope()
 
