@@ -367,9 +367,13 @@ class Slope:
 
         return (resisting / pushing, i_list[0], i_list[1])
 
-    def analyse_slope(self):
+    def analyse_slope(self, deep_seeded_only=False):
         # Approx number of runs
-        ITERATIONS = 2500
+        ITERATIONS = 5000
+
+        # seems like 15 % of runs dont happen every time for some reason,
+        # possibly just general geometry clashes
+        ITERATIONS = ITERATIONS * 1.15
 
         # 10 * 10 * 5 = 500
         # allow for 3 mid points of slope
@@ -377,9 +381,15 @@ class Slope:
 
         NUMBER_CIRCLES = 5
 
+        NUMBER_POINTS_SLOPE = 5
+
         # generate coordinates for left of slope
         point_combinations = ITERATIONS / NUMBER_CIRCLES
-        NUMBER_POINTS = int((3 + sqrt(9 + 4 * point_combinations)) / 2)
+        
+        if deep_seeded_only:
+            NUMBER_POINTS = int(sqrt(point_combinations))
+        else:
+            NUMBER_POINTS = int(sqrt(point_combinations)) - NUMBER_POINTS_SLOPE
 
         x1, x2, x3, x4 = (
             0,
@@ -387,34 +397,47 @@ class Slope:
             self._bot_coord[0],
             self._external_boundary.bounds[2],
         )
-        y1, y3 = self._top_coord[1], self._bot_coord[1]
+        y2, y3 = self._top_coord[1], self._bot_coord[1]
 
         # split top and bottom slope up into 10 coordinate points
         left_coords = [
-            ((n / NUMBER_POINTS) * (x2 - x1), y1) for n in range(1, NUMBER_POINTS + 1)
+            ((n / NUMBER_POINTS) * (x2 - x1), y2) for n in range(1, NUMBER_POINTS + 1)
         ]
         right_coords = [
             (x3 + (n / NUMBER_POINTS) * (x4 - x3), y3) for n in range(NUMBER_POINTS)
         ]
 
         # add in 3 coordinates for the slope
-        p1, p5 = self._top_coord, self._bot_coord
-        p3 = mid_coord(p1, p5)
-        p2 = mid_coord(p1, p3)
-        p4 = mid_coord(p3, p5)
-        left_coords += [p2, p3, p4]
+        dx = (x3-x2)
+        dy = (y2-y3)
+
+        slope_sections = NUMBER_POINTS_SLOPE + 1
+
+        if not deep_seeded_only:
+            mid_coords = []
+
+            for i in range(1, slope_sections):
+                mid_coords.append(
+                    (x2 + dx * i / slope_sections,
+                    y2 - dy * i / slope_sections) 
+                )
+
+            right_coords += mid_coords
+            left_coords += mid_coords
 
         search = {}
-        threads = []
+
+        min_x = dx/3
 
         # loop through left and right coordinates and generate a circular slope
         # that passes through these points
         # Not sure if multiprocessing can help, always made it slightly slower for all my tests
         for l_c in tqdm(left_coords):
             for r_c in right_coords:
-                search.update(
-                    self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
-                )
+                if r_c[0]-l_c[0] > min_x:
+                    search.update(
+                        self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
+                    )
 
         self._search = search
         self._min_FOS_location = min(search, key=search.get)
@@ -550,8 +573,6 @@ class Slope:
 
     def plot_critical(self):
         fig = self.plot_boundary()
-
-        c_x, c_y, radius = self._min_FOS_location
 
         c_x, c_y, radius, l_c,r_c = self._min_FOS_location
         FOS = self._min_FOS
@@ -705,7 +726,7 @@ class Slope:
 
 
 if __name__ == "__main__":
-    s = Slope(height=5, angle=None, length=8)
+    s = Slope(height=5, angle=None, length=6)
 
     sand = Material(20,30,0,1)
     clay = Material(18,25,5,4)
@@ -715,9 +736,11 @@ if __name__ == "__main__":
 
     s.set_surcharge(0.5,10)
 
-    # s.analyse_slope()
+    s.analyse_slope()
 
-    f = s.plot_boundary()
+    f = s.plot_critical()
+
+    print(len(s._search))
     
 
     # t1 = time.perf_counter()
