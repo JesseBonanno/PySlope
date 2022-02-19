@@ -3,17 +3,18 @@ from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
 # import concurrent.futures
-from rich import print
+from colour import Color
 
 # third party imports
 import plotly.graph_objects as go
 from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
 from tqdm import tqdm
+from rich import print
 
 # local imports
 from data_validation import *
 from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_points
-
+from utilities import COLOUR_FOS_DICT
 
 @dataclass
 class Material:
@@ -34,8 +35,11 @@ class Slope:
 
         # initialise empty properties used in other components of class
         self._materials = []
-        self._water_depth = None
+        self._water_RL = None
         self._load_magnitude = 0
+
+        # intialise options
+        self.update_options(slices=50,iterations=2500)
 
     def set_external_boundary(self,height : float = 2, angle : int = 30, length : float = None, MIN_EXT_H : int = 6, MIN_EXT_L : int = 10):
         """Set external boundary for model.
@@ -77,7 +81,7 @@ class Slope:
                 )
             length = height / tan(radians(angle))
 
-        tot_h = max(4 * height, MIN_EXT_H)
+        tot_h = max(4 * height, MIN_EXT_H, 5 * length/2)
         tot_l = max(5 * length, MIN_EXT_L, 4 * height)
 
         # determine coordinates for edges of slope
@@ -102,17 +106,20 @@ class Slope:
         self._top_coord = top
         self._bot_coord = bot
 
+        self._external_length = self._external_boundary.bounds[2]
+        self._external_height = self._external_boundary.bounds[3]
+
         # reset results to deal with case that boundary is changed after
         # an analysis has already taken place.
         self._reset_results()
 
     def set_water_table(self, depth: int = 1):
         """set water table value """
-        self._water_depth = depth
+        self._water_RL = max(0, self._top_coord[1] - depth)
 
     def remove_water_table(self):
         """Remove water table from model"""
-        self._water_depth = None
+        self._water_RL = None
 
     def set_surcharge(self, offset : float = 0, load : float = 20, length : float = None):
         """set a surface surcharge on top of the slope
@@ -207,7 +214,35 @@ class Slope:
                 if m.depth_to_bottom == depth:
                     self._materials.remove(m)
 
-    def analyse_circular_failure(self, c_x, c_y, radius):
+    def update_options(self, slices : int = None, iterations : int = None):
+        if slices:
+            self._slices = slices
+        if iterations:
+            if iterations < 1000:
+                print('iterations should be greater than 1000, i have set to the lower bound of 1000')
+            self._iterations = max(iterations,1000)
+        
+
+    def analyse_circular_failure(self, c_x : float, c_y : float, radius : float):
+        """Calculate factor of safety for a circular failure plane through the slope.
+
+        Parameters
+        ----------
+        c_x : float
+            circle center x coordinate
+        c_y : float
+            circle center y coordinate
+        radius : float
+            circle radius
+
+        Returns
+        -------
+        float
+            factor of safety
+        None
+            if cant calculate returns None
+            
+        """
         # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
         # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
         p = Point(c_x, c_y)
@@ -243,13 +278,15 @@ class Slope:
         # is the boundary between two linestrings
         i_list = list(set(i_list))
         i_list.sort()
-
+        
         # check that there are only two intersecting points otherwise something is wrong
-        if len(i_list) != 2:
+        if len(i_list) > 1:
+            i_list= i_list[0:2]
+        else:
             return None
 
         # total number of slices
-        SLICES = 50
+        SLICES = self._slices
 
         # horizontal distance between left and right slice
         dist = i_list[1][0] - i_list[0][0]
@@ -354,12 +391,12 @@ class Slope:
                 else:
                     raise ValueError("ummm is this actually a possible case?")
 
-            if self._water_depth:
-                U = max(min(self._water_depth, s_yt) - s_yb, 0) * 9.81
+            if self._water_RL:
+                U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * l
             else:
                 U = 0
 
-            resisting += cohesion * l + (W * cos(alpha) - U) * tan(
+            resisting += cohesion * l + max(0,(W * cos(alpha) - U)) * tan(
                 radians(friction_angle)
             )
             pushing += W * sin(alpha)
@@ -376,19 +413,21 @@ class Slope:
 
     def analyse_slope(self, deep_seeded_only=False):
         # Approx number of runs
-        ITERATIONS = 5000
+        ITERATIONS = self._iterations
 
-        # seems like 15 % of runs dont happen every time for some reason,
-        # possibly just general geometry clashes
-        ITERATIONS = ITERATIONS * 1.15
+        GRADIENT_TOLERANCE = 10
+
+        # # seems like 15 % of runs dont happen every time for some reason,
+        # # possibly just general geometry clashes
+        # ITERATIONS = ITERATIONS 
 
         # 10 * 10 * 5 = 500
         # allow for 3 mid points of slope
         # 3 * 10 * 5 = 150 (minimum) - 650 min iterations
 
-        NUMBER_CIRCLES = 5
+        NUMBER_CIRCLES = max(5,int(ITERATIONS/1000))
 
-        NUMBER_POINTS_SLOPE = 5
+        NUMBER_POINTS_SLOPE = max(5,int(ITERATIONS/800))
 
         # generate coordinates for left of slope
         point_combinations = ITERATIONS / NUMBER_CIRCLES
@@ -396,13 +435,16 @@ class Slope:
         if deep_seeded_only:
             NUMBER_POINTS = int(sqrt(point_combinations))
         else:
-            NUMBER_POINTS = int(sqrt(point_combinations)) - NUMBER_POINTS_SLOPE
+            if self._gradient > GRADIENT_TOLERANCE:
+                NUMBER_POINTS = int((NUMBER_POINTS_SLOPE+sqrt(NUMBER_POINTS_SLOPE**2+4*point_combinations))/2) - NUMBER_POINTS_SLOPE
+            else:
+                NUMBER_POINTS = int(sqrt(point_combinations)) - NUMBER_POINTS_SLOPE
 
         x1, x2, x3, x4 = (
             0,
             self._top_coord[0],
             self._bot_coord[0],
-            self._external_boundary.bounds[2],
+            self._external_length,
         )
         y2, y3 = self._top_coord[1], self._bot_coord[1]
 
@@ -415,7 +457,7 @@ class Slope:
             (x3 + (n / NUMBER_POINTS) * (x4 - x3), y3) for n in range(NUMBER_POINTS)
         ]
 
-        if self._gradient > 10:
+        if self._gradient > GRADIENT_TOLERANCE:
             left_coords = left_coords[:-1]
 
         # add in 3 coordinates for the slope
@@ -434,7 +476,7 @@ class Slope:
                 )
 
             # only want lines from mid to right for a not very steep gradient
-            if self._gradient < 10:
+            if self._gradient < GRADIENT_TOLERANCE:
                 left_coords += mid_coords
             
             right_coords += mid_coords
@@ -446,6 +488,7 @@ class Slope:
         # loop through left and right coordinates and generate a circular slope
         # that passes through these points
         # Not sure if multiprocessing can help, always made it slightly slower for all my tests
+
         for l_c in tqdm(left_coords):
             for r_c in right_coords:
                 if dist_points(l_c,r_c) > min_dist and abs(l_c[0]-r_c[0])>0.1:
@@ -531,7 +574,7 @@ class Slope:
         top = self._external_boundary.coords[1:3]
 
         # length of model (max x coordinate)
-        tot_l = self._external_boundary.bounds[2]
+        tot_l = self._external_length
         num_materials = len(self._materials)
 
         # loop through materials
@@ -540,7 +583,7 @@ class Slope:
             y = m.RL
 
             if y <= self._bot_coord[1]:
-                line = [(0,y),self._bot_coord]
+                line = [(0,y),(self._external_length,y)]
             else:
                 x = self._top_coord[0]+(self._top_coord[1]-y)/self._gradient
                 line = [(0,y),(x,y)]
@@ -582,6 +625,9 @@ class Slope:
 
         if self._load_magnitude:
             fig = self._plot_load(fig)
+        
+        if self._water_RL:
+            fig = self._plot_water(fig)
 
         return fig
 
@@ -612,6 +658,50 @@ class Slope:
 
         return fig
 
+    def _plot_water(self,fig):
+        if self._water_RL == None:
+            return fig
+
+        y = self._water_RL
+
+        if y <= self._bot_coord[1]:
+            x = [0,self._external_length]
+        else:
+            x = [0, self._top_coord[0]+(self._top_coord[1]-y)/self._gradient]
+        
+        fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=[y,y],
+                    mode="lines",
+                    line_color='blue',
+                    line_width=4,
+                )
+            )
+
+        fig.add_annotation(
+            x=self._top_coord[0]/4,
+            y=y,
+            text='▼',
+            showarrow=False,
+            yshift=15,
+            font_size=35,
+            font_color='blue',
+        )
+
+        fig.add_annotation(
+            x=self._top_coord[0]/4,
+            y=y,
+            text='_',
+            showarrow=False,
+            yshift=10,
+            font_size=40,
+            font_color='blue',
+        )
+        
+
+        return fig
+
     def _plot_load(self,fig):
         # add in extra arrows, text, and hori line
 
@@ -624,16 +714,22 @@ class Slope:
 
 
         p = self._load_magnitude
-        y = self._external_boundary.bounds[-1]
+
+        if p == 0:
+            return fig
+
+        y = self._external_height
         l_x,r_x = self._load_location
 
         # add more arrows in if the load is longer than say 3
         load_length = r_x - l_x
 
         if load_length > 3:
-            spaces = divmod(load_length,2)[0]
+            spaces = divmod(load_length,1.5)[0]
             spacing = load_length/spaces
             arrows = [l_x + spacing * t for t in range(int(spaces+1))]
+        else:
+            arrows = [l_x,(l_x+r_x)/2,r_x]
 
         for x in arrows:
             fig.add_annotation(
@@ -654,10 +750,8 @@ class Slope:
             )
 
         fig.add_annotation(
-            y = y*ARROW_HEIGHT_FACTOR+0.75,
+            y = y*ARROW_HEIGHT_FACTOR,
             x = sum(self._load_location)/2,
-            ay = y,
-            ax = x + 0,
             text=f'{p} kPa',
             xref='x',
             yref='y',
@@ -665,6 +759,7 @@ class Slope:
             ayref='y',
             showarrow = False,
             font_size=30,
+            yshift = 30,
             font_color=arrowcolor,
         )
 
@@ -687,9 +782,12 @@ class Slope:
 
         return fig
     
-    def _plot_failure_plane(self,fig,c_x,c_y,radius,l_c,r_c,FOS=None, detailed=False):
-        if not FOS:
-            FOS =''
+    def _plot_failure_plane(self,fig,c_x,c_y,radius,l_c,r_c,FOS, detailed=False):
+        if FOS > 3 :
+            color = COLOUR_FOS_DICT[3.0]
+        else:
+            color = COLOUR_FOS_DICT[round(FOS,1)]
+
         # generate points for circle
         p = Point(c_x, c_y)
         x,y = p.buffer(radius).boundary.coords.xy
@@ -721,7 +819,7 @@ class Slope:
                 x=x_,
                 y=y_,
                 mode="lines",
-                line_color="green",
+                line_color=color,
                 meta = [round(FOS,3)],                
                 hovertemplate="%{meta[0]}",
             )
@@ -729,30 +827,40 @@ class Slope:
 
         return fig
 
-    def plot_all_planes(self):
+    def plot_all_planes(self, max_fos=None):
         fig = self.plot_boundary()
 
-        for k, v in self._search.items():
-            c_x, c_y, radius, l_c,r_c = k
-            fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=v)
+        if max_fos is None:
+            for k, v in self._search.items():
+                c_x, c_y, radius, l_c,r_c = k
+                fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=v)
+        else:
+            for k, v in self._search.items():
+                if v < max_fos:
+                    c_x, c_y, radius, l_c,r_c = k
+                    fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=v)
+                
+                
         return fig
 
 
 
 if __name__ == "__main__":
-    s = Slope(height=1, angle=None, length=0.005)
+    s = Slope(height=2, angle=None, length=0.005)
 
     sand = Material(20,35,5,1)
     clay = Material(18,25,5,4)
     grass = Material(16,20,4,10)
 
-    s.set_materials(sand)
+    s.set_materials(sand,clay,grass)
+    s.update_options(iterations=1200)
+    s.set_water_table(5)
 
-    s.set_surcharge(0.5,20)
+    s.set_surcharge(0.5,20,1)
 
     s.analyse_slope()
 
-    f = s.plot_critical()
+    f = s.plot_all_planes(2)
 
     print(len(s._search))
     
