@@ -30,6 +30,9 @@ class Slope:
     
     def __init__(self, height : float = 2, angle : int = 30, length : float = None):
         """Initialise a slope object"""
+
+        # intialise options
+        self.update_options(slices=50, iterations=2500, MIN_EXT_H=6, MIN_EXT_L=10)
         
         self.set_external_boundary(height=height,angle=angle,length=length)
 
@@ -38,10 +41,9 @@ class Slope:
         self._water_RL = None
         self._load_magnitude = 0
 
-        # intialise options
-        self.update_options(slices=50,iterations=2500)
 
-    def set_external_boundary(self,height : float = 2, angle : int = 30, length : float = None, MIN_EXT_H : int = 6, MIN_EXT_L : int = 10):
+
+    def set_external_boundary(self,height : float = 2, angle : int = 30, length : float = None):
         """Set external boundary for model.
 
         Parameters
@@ -54,10 +56,6 @@ class Slope:
         length : int, optional
             length of slope in metres (may be left as none if slope
             is instead expressed by angle of slope), by default None
-        MIN_EXT_H : int, optional
-            minimum model length, by default 6
-        MIN_EXT_L : int, optional
-            minimum model height, by default 10
 
         Raises
         ------
@@ -80,6 +78,9 @@ class Slope:
                     "require angle of slope or length of slope to initialise"
                 )
             length = height / tan(radians(angle))
+
+        MIN_EXT_H = self._MIN_EXT_H
+        MIN_EXT_L = self._MIN_EXT_L
 
         tot_h = max(4 * height, MIN_EXT_H, 5 * length/2)
         tot_l = max(5 * length, MIN_EXT_L, 4 * height)
@@ -115,6 +116,7 @@ class Slope:
 
     def set_water_table(self, depth: int = 1):
         """set water table value """
+        assert_positive_number(depth, "water depth")
         self._water_RL = max(0, self._top_coord[1] - depth)
 
     def remove_water_table(self):
@@ -135,6 +137,10 @@ class Slope:
             ) in metres. If length is None or length exceeds edge of model, 
             then length set to left edge of model, by default None
         """
+        assert_positive_number(offset, "offset")
+        assert_positive_number(load, "load")
+        assert_positive_number(length, "length")
+
         right_x = self._top_coord[0] - offset
         if length:
             left_x = max(0, right_x - length)
@@ -172,7 +178,7 @@ class Slope:
         for material in materials:
             if not isinstance(material, Material):
                 raise ValueError(
-                    "The funciton add_materials only accepts instances of the Material Class"
+                    "The function add_materials only accepts instances of the Material Class"
                 )
 
         # sort materials to be in order, include existing materials
@@ -210,19 +216,45 @@ class Slope:
         # if depth specified and had no luck removing material
         # try find the depth for a material in the list and then remove it
         if depth:
+            assert_positive_number(depth, "material depth")
             for m in self._materials:
                 if m.depth_to_bottom == depth:
                     self._materials.remove(m)
 
-    def update_options(self, slices : int = None, iterations : int = None):
+    def update_options(self, slices : int = None, iterations : int = None, MIN_EXT_L : float = None, MIN_EXT_H : float = None):
+        """Function to update general modelling options.
+
+        Parameters
+        ----------
+        slices : int, optional
+            Slices to take in calculation for each potential 
+            circular failureIf None doesnt update the parameter, by default None
+        iterations : int, optional
+            Approximate number of potential slopes to check.
+            If None doesnt update the parameter, by default None
+        MIN_EXT_L : float, optional
+            Minimum external boundary length. If None doesnt update
+            the parameter, by default None
+        MIN_EXT_H : float, optional
+            Minimum external boundary height. If None doesnt update
+            the parameter, by default None.
+        """
+
         if slices:
+            assert_range(slices,'slices',10,500)
             self._slices = slices
         if iterations:
-            if iterations < 1000:
-                print('iterations should be greater than 1000, i have set to the lower bound of 1000')
-            self._iterations = max(iterations,1000)
+            assert_range(iterations,'iterations',1000,100000)
+            self._iterations = iterations
+        if MIN_EXT_H:
+            assert_strictly_positive_number(MIN_EXT_H,'Minimum external model height (MIN_EXT_H)')
+            self._MIN_EXT_H = MIN_EXT_H
+            self.set_external_boundary(height=self._height,length=self._length)
+        if MIN_EXT_L:
+            assert_strictly_positive_number(MIN_EXT_L,'Minimum external model length (MIN_EXT_H)')
+            self._MIN_EXT_L = MIN_EXT_L
+            self.set_external_boundary(height=self._height,length=self._length)
         
-
     def analyse_circular_failure(self, c_x : float, c_y : float, radius : float):
         """Calculate factor of safety for a circular failure plane through the slope.
 
@@ -243,6 +275,12 @@ class Slope:
             if cant calculate returns None
             
         """
+        # data validation
+        assert_strictly_positive_number(c_x,'c_x (circle x coordinate)')
+        assert_strictly_positive_number(c_y,'c_y (circle y coordinate)')
+        assert_strictly_positive_number(radius,'radius')
+
+
         # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
         # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
         p = Point(c_x, c_y)
@@ -412,6 +450,23 @@ class Slope:
         return (resisting / pushing, i_list[0], i_list[1])
 
     def analyse_slope(self, deep_seeded_only=False):
+        """Analyse many possible failure planes for a slope.
+
+        Parameters
+        ----------
+        deep_seeded_only : bool, optional
+            If true doesnt define failures through the slope,
+            only around the slope, by default False.
+
+        Returns
+        ----------
+        Nothing but sets the following in the instance:
+        
+        self._MIN_FOS
+        self._search
+        self._MIN_FOS_LOCATION
+
+        """
         # Approx number of runs
         ITERATIONS = self._iterations
 
@@ -500,7 +555,35 @@ class Slope:
         self._min_FOS_location = min(search, key=search.get)
         self._min_FOS = search[self._min_FOS_location]
 
-    def run_analysis_for_circles(self, l_c, r_c, NUMBER_CIRCLES=5):
+    def run_analysis_for_circles(self, l_c : tuple , r_c : tuple, NUMBER_CIRCLES : float = 5) -> dict:
+        """Runs slope analyse for fixed left and right points for
+        a number of possible circular failures.
+
+        Parameters
+        ----------
+        l_c : tuple,
+            left coordinate written in the form (x,y)
+        r_c : tuple
+            right coordinate written in the form (x,y)
+        NUMBER_CIRCLES : int, optional
+            Number of circular slopes to break the area into
+            (although some potential slopes might not be generated),
+            by default 5
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+
+        #data validation
+        assert_strictly_positive_number(NUMBER_CIRCLES,'NUMBER_CIRCLES')
+        NUMBER_CIRCLES = int(NUMBER_CIRCLES)
+
+        assert_length(l_c,2,'l_c')
+        assert_length(r_c,2,'r_c')
+
+
         # assume a starting circle that has a straight vertical slope down at the top of the slope
         # this means the centre of the circle is in line with the top of the slope
         # since the tangent of the circle is perpendicular to the centre
@@ -554,6 +637,13 @@ class Slope:
 
     
     def plot_boundary(self):
+        """Plot external boundary, materials, loading and water for model.
+
+        Returns
+        -------
+        plotly figure
+
+        """
         # draw the external boundary
         x_, y_ = self._external_boundary.coords.xy
         fig = go.Figure(go.Scatter(x=list(x_), y=list(y_), mode="lines"))
@@ -632,6 +722,12 @@ class Slope:
         return fig
 
     def plot_critical(self):
+        """Plot critical slope (ie slope with lowest FOS)
+
+        Returns
+        -------
+        Plotly figure
+        """
         fig = self.plot_boundary()
 
         c_x, c_y, radius, l_c,r_c = self._min_FOS_location
@@ -854,13 +950,13 @@ if __name__ == "__main__":
 
     s.set_materials(sand,clay,grass)
     s.update_options(iterations=1200)
-    s.set_water_table(5)
+    s.set_water_table('5')
 
     s.set_surcharge(0.5,20,1)
 
     s.analyse_slope()
 
-    f = s.plot_all_planes(2)
+    f = s.plot_all_planes()
 
     print(len(s._search))
     
