@@ -30,6 +30,8 @@ class Slope:
     
     def __init__(self, height : float = 2, angle : int = 30, length : float = None):
         """Initialise a slope object"""
+        
+        self._external_boundary = None
 
         # intialise options
         self.update_options(slices=50, iterations=2500, MIN_EXT_H=6, MIN_EXT_L=10)
@@ -123,7 +125,7 @@ class Slope:
         """Remove water table from model"""
         self._water_RL = None
 
-    def set_surcharge(self, offset : float = 0, load : float = 20, length : float = None):
+    def set_surcharge(self, offset : float = 0.0, load : float = 20.0, length : float = None):
         """set a surface surcharge on top of the slope
 
         Parameters
@@ -137,9 +139,10 @@ class Slope:
             ) in metres. If length is None or length exceeds edge of model, 
             then length set to left edge of model, by default None
         """
-        assert_positive_number(offset, "offset")
+        assert_positive_number(offset, "load offset")
         assert_positive_number(load, "load")
-        assert_positive_number(length, "length")
+        if length is not None:
+            assert_positive_number(length, "load length")
 
         right_x = self._top_coord[0] - offset
         if length:
@@ -249,11 +252,14 @@ class Slope:
         if MIN_EXT_H:
             assert_strictly_positive_number(MIN_EXT_H,'Minimum external model height (MIN_EXT_H)')
             self._MIN_EXT_H = MIN_EXT_H
-            self.set_external_boundary(height=self._height,length=self._length)
         if MIN_EXT_L:
             assert_strictly_positive_number(MIN_EXT_L,'Minimum external model length (MIN_EXT_H)')
             self._MIN_EXT_L = MIN_EXT_L
-            self.set_external_boundary(height=self._height,length=self._length)
+        
+        # if the external boundary has been set this call is after init. Can update the boundary.
+        if self._external_boundary is not None:
+            self.set_external_boundary(height=self._height, length = self._length)
+
         
     def analyse_circular_failure(self, c_x : float, c_y : float, radius : float):
         """Calculate factor of safety for a circular failure plane through the slope.
@@ -633,8 +639,7 @@ class Slope:
         """ Re-initialise results to erase non-relevant results due to a model change"""
         self._search = {}
         self._min_FOS = 0
-        self._slices = []   
-
+        self._min_FOS_location =[]
     
     def plot_boundary(self):
         """Plot external boundary, materials, loading and water for model.
@@ -733,11 +738,37 @@ class Slope:
         c_x, c_y, radius, l_c,r_c = self._min_FOS_location
         FOS = self._min_FOS
 
-        fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=FOS, detailed=True)
+        fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=FOS, show_center=True)
         fig = self._plot_annotate_FOS(fig, c_x, c_y, FOS)
         return fig
 
-    def _plot_annotate_FOS(self,fig,c_x,c_y,FOS):
+    def _plot_annotate_FOS(self,fig,c_x : float, c_y : float, FOS : float):
+        """Annotate FOS on figure.
+
+        Parameters
+        ----------
+        fig : plotly figure
+        c_x : float
+            circle center x coordinate.
+        c_y : float
+            circle center y coordinate.
+        FOS : float
+            circle factor of safety to be annotated to figure.
+
+        Returns
+        -------
+        Plotly figure.
+        """
+
+        # validate inputs
+        assert_strictly_positive_number(c_x,'circle center x coordinate')
+        assert_strictly_positive_number(c_y, 'circle center y coordinate')
+        assert_strictly_positive_number(FOS, 'Factor of safety')
+
+        if FOS > 3 :
+            color = COLOUR_FOS_DICT[3.0]
+        else:
+            color = COLOUR_FOS_DICT[round(FOS,1)]
 
         fig.add_trace(go.Scatter(
             x=[c_x],
@@ -748,13 +779,15 @@ class Slope:
             textfont=dict(
                 family="sans serif",
                 size=30,
-                color="Green"
+                color=color
             )
         ))
 
         return fig
 
     def _plot_water(self,fig):
+        """Add water table to plot"""
+
         if self._water_RL == None:
             return fig
 
@@ -799,6 +832,7 @@ class Slope:
         return fig
 
     def _plot_load(self,fig):
+        """ Add load to plot """
         # add in extra arrows, text, and hori line
 
         # arrow styling parameters
@@ -878,7 +912,41 @@ class Slope:
 
         return fig
     
-    def _plot_failure_plane(self,fig,c_x,c_y,radius,l_c,r_c,FOS, detailed=False):
+    def _plot_failure_plane(self, fig, c_x : float, c_y : float, radius : float, l_c : tuple, r_c : tuple, FOS : float, show_center=False):
+        """Add failure plane to plot.
+
+        Parameters
+        ----------
+        fig : plotly figure
+            plotly figure to have information added to.
+        c_x : float
+            failure plane circle center x coordinate.
+        c_y : float
+            failure plane circle center y coordinate.
+        radius : float
+            failure plane circle radius
+        l_c : tuple
+            left intersection point between failure plane and external boundary.
+        r_c : tuple
+            right intersection point between failure plane and external boundary.
+        FOS : float
+            Factor of safety of slope (used in coloring drawn failure plane)
+        show_center : bool, optional
+            If true will project to the center of circle and show, by default false.
+
+        Returns
+        -------
+        plotly figure
+        """
+
+        # data validation
+        assert_strictly_positive_number(c_x,'circle center x coordinate')
+        assert_strictly_positive_number(c_y, 'circle center y coordinate')
+        assert_strictly_positive_number(radius, 'radius')
+        assert_length(l_c,2,'l_c')
+        assert_length(r_c,2, 'r_c')
+        assert_strictly_positive_number(FOS, 'Factor of safety')
+
         if FOS > 3 :
             color = COLOUR_FOS_DICT[3.0]
         else:
@@ -903,7 +971,7 @@ class Slope:
                 x_.append(x[i])
                 y_.append(y[i])
         
-        if detailed:
+        if show_center:
             x_ += [l_c[0],c_x,r_c[0],x_[0]]
             y_ += [l_c[1],c_y,r_c[1],y_[0]]
         else:
@@ -924,6 +992,19 @@ class Slope:
         return fig
 
     def plot_all_planes(self, max_fos=None):
+        """plot multiple failure planes in the same plot
+
+        Parameters
+        ----------
+        max_fos : float, optional
+            maximum factor of safety to display for planes,
+            If none there is no limit, by default None.
+        
+        Returns
+        -------
+        plotly figure
+        
+        """
         fig = self.plot_boundary()
 
         if max_fos is None:
@@ -942,24 +1023,21 @@ class Slope:
 
 
 if __name__ == "__main__":
-    s = Slope(height=2, angle=None, length=0.005)
+    s = Slope(height=1, angle=None, length=15.608)
 
-    sand = Material(20,35,5,1)
+    sand = Material(20,35,0,1)
     clay = Material(18,25,5,4)
     grass = Material(16,20,4,10)
 
-    s.set_materials(sand,clay,grass)
-    s.update_options(iterations=1200)
-    s.set_water_table('5')
+    s.set_materials(sand)
 
-    s.set_surcharge(0.5,20,1)
+    s.update_options(iterations=1200)
+
+    s.set_surcharge(0,10)
 
     s.analyse_slope()
 
-    f = s.plot_all_planes()
-
-    print(len(s._search))
-    
+    f = s.plot_critical()
 
     # t1 = time.perf_counter()
     # s.analyse_slope()
