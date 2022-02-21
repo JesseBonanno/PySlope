@@ -2,6 +2,7 @@
 from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
+
 # import concurrent.futures
 from colour import Color
 
@@ -16,6 +17,7 @@ from data_validation import *
 from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_points
 from utilities import COLOUR_FOS_DICT
 
+
 @dataclass
 class Material:
     unit_weight: float = 20
@@ -26,26 +28,29 @@ class Material:
     def __repr__(self):
         return f"Material(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom}"
 
+
 class Slope:
-    
-    def __init__(self, height : float = 2, angle : int = 30, length : float = None):
+    def __init__(self, height: float = 2, angle: int = 30, length: float = None):
         """Initialise a slope object"""
-        
+
         self._external_boundary = None
 
         # intialise options
         self.update_options(slices=50, iterations=2500, MIN_EXT_H=6, MIN_EXT_L=10)
-        
-        self.set_external_boundary(height=height,angle=angle,length=length)
+
+        self.set_external_boundary(height=height, angle=angle, length=length)
+
+        # sets default analysis limits (ie no limit)
+        self.reset_analysis_limits()
 
         # initialise empty properties used in other components of class
         self._materials = []
         self._water_RL = None
         self._load_magnitude = 0
 
-
-
-    def set_external_boundary(self,height : float = 2, angle : int = 30, length : float = None):
+    def set_external_boundary(
+        self, height: float = 2, angle: int = 30, length: float = None
+    ):
         """Set external boundary for model.
 
         Parameters
@@ -84,7 +89,7 @@ class Slope:
         MIN_EXT_H = self._MIN_EXT_H
         MIN_EXT_L = self._MIN_EXT_L
 
-        tot_h = max(4 * height, MIN_EXT_H, 5 * length/2)
+        tot_h = max(4 * height, MIN_EXT_H, 5 * length / 2)
         tot_l = max(5 * length, MIN_EXT_L, 4 * height)
 
         # determine coordinates for edges of slope
@@ -117,7 +122,7 @@ class Slope:
         self._reset_results()
 
     def set_water_table(self, depth: int = 1):
-        """set water table value """
+        """set water table value"""
         assert_positive_number(depth, "water depth")
         self._water_RL = max(0, self._top_coord[1] - depth)
 
@@ -125,7 +130,9 @@ class Slope:
         """Remove water table from model"""
         self._water_RL = None
 
-    def set_surcharge(self, offset : float = 0.0, load : float = 20.0, length : float = None):
+    def set_surcharge(
+        self, offset: float = 0.0, load: float = 20.0, length: float = None
+    ):
         """set a surface surcharge on top of the slope
 
         Parameters
@@ -136,7 +143,7 @@ class Slope:
             load magnitude in kPa, by default 20
         length : _type_, optional
             length of the load across the model (perpendicular to slope
-            ) in metres. If length is None or length exceeds edge of model, 
+            ) in metres. If length is None or length exceeds edge of model,
             then length set to left edge of model, by default None
         """
         assert_positive_number(offset, "load offset")
@@ -158,7 +165,7 @@ class Slope:
         self._load_location = [left_x, right_x]
 
     def remove_surcharge(self):
-        """ Remove surcharge from model. """
+        """Remove surcharge from model."""
         self._load_magnitude = 0
 
     def set_materials(self, *materials):
@@ -202,7 +209,7 @@ class Slope:
 
         self._materials = materials
 
-    def remove_material(self, material : Material = None, depth : float = None):
+    def remove_material(self, material: Material = None, depth: float = None):
         """Remove material from slope.
 
         Parameters
@@ -227,13 +234,19 @@ class Slope:
                 if m.depth_to_bottom == depth:
                     self._materials.remove(m)
 
-    def update_options(self, slices : int = None, iterations : int = None, MIN_EXT_L : float = None, MIN_EXT_H : float = None):
+    def update_options(
+        self,
+        slices: int = None,
+        iterations: int = None,
+        MIN_EXT_L: float = None,
+        MIN_EXT_H: float = None,
+    ):
         """Function to update general modelling options.
 
         Parameters
         ----------
         slices : int, optional
-            Slices to take in calculation for each potential 
+            Slices to take in calculation for each potential
             circular failureIf None doesnt update the parameter, by default None
         iterations : int, optional
             Approximate number of potential slopes to check.
@@ -247,24 +260,119 @@ class Slope:
         """
 
         if slices:
-            assert_range(slices,'slices',10,500)
+            assert_range(slices, "slices", 10, 500)
             self._slices = slices
         if iterations:
-            assert_range(iterations,'iterations',1000,100000)
+            assert_range(iterations, "iterations", 1000, 100000)
             self._iterations = iterations
         if MIN_EXT_H:
-            assert_strictly_positive_number(MIN_EXT_H,'Minimum external model height (MIN_EXT_H)')
+            assert_strictly_positive_number(
+                MIN_EXT_H, "Minimum external model height (MIN_EXT_H)"
+            )
             self._MIN_EXT_H = MIN_EXT_H
         if MIN_EXT_L:
-            assert_strictly_positive_number(MIN_EXT_L,'Minimum external model length (MIN_EXT_H)')
+            assert_strictly_positive_number(
+                MIN_EXT_L, "Minimum external model length (MIN_EXT_H)"
+            )
             self._MIN_EXT_L = MIN_EXT_L
-        
+
         # if the external boundary has been set this call is after init. Can update the boundary.
         if self._external_boundary is not None:
-            self.set_external_boundary(height=self._height, length = self._length)
+            self.set_external_boundary(height=self._height, length=self._length)
 
-        
-    def analyse_circular_failure(self, c_x : float, c_y : float, radius : float):
+    def reset_analysis_limits(self):
+        self.set_analysis_limits(
+            left_x = 0,
+            right_x_left = 0,
+            right_x = self._external_length,
+            left_x_right = self._external_length,
+        )
+    
+    def set_analysis_limits(
+        self,
+        left_x: float = None,
+        right_x: float = None,
+        left_x_right: float = None,
+        right_x_left: float = None,
+    ):
+        """set limits on slope analysis search.
+
+        Parameters
+        ----------
+        left_x : float
+            left x coordinate of search, defines outer edge
+            of top of search
+        right_x : float
+            right x coordinate search, defines outer edge of
+            bottom of search
+        left_x_right : float, optional
+            left x coordinate right hand limit of search, defines
+            inner edge of top of search. If none ignored, by default None
+        right_x_left : float, optional
+            right x coordinate left hand limit of search, defines
+            inner edge of bottom of search. If none ignored, by default None
+        """
+        # if only one of the double paremets is defined
+        # the other should be set up to equal it
+        # or the diagram is confusing
+        if left_x_right is not None and right_x_left is None:
+            right_x_left = max(self._limits[1][0], left_x_right)
+
+        if right_x_left is not None and left_x_right is None:
+            left_x_right = min(self._limits[0][1], right_x_left)
+
+        # set to current model values if not set
+        if left_x is None:
+            left_x = self._limits[0][0]
+        if left_x_right is None:
+            left_x_right = self._limits[0][1]
+        if right_x_left is None:
+            right_x_left = self._limits[1][0]
+        if right_x is None:
+            right_x = self._limits[1][1]
+
+        # check correct value entered
+        assert_positive_number(left_x, "left_x limit")
+        assert_strictly_positive_number(right_x, "right_x_limit")
+        assert_strictly_positive_number(right_x_left, "right_x left coordinate")
+        assert_strictly_positive_number(left_x_right, "left_x right coordinate")
+
+        # check the numbers are in the correct ascending order.
+        # note: it is okay for the inner limits to overlap. They look at seperate things.
+        if left_x > right_x:
+            raise ValueError(
+                f"right_x ({right_x}) should be greater than left_x ({left_x}), i cant assign these limits"
+            )
+
+        if right_x_left > right_x:
+            raise ValueError(
+                f"right_x ({right_x}) should be greater than right_x left ({right_x_left}), i cant assign these limits"
+            )
+
+        if left_x_right < left_x:
+            raise ValueError(
+                f"left_x ({left_x}) should be less than left_x right ({left_x_right}), i cant assign these limits"
+            )
+
+        # check that the left x is on top slope
+        if left_x > self._top_coord[0]:
+            raise ValueError(
+                f"left_x ({left_x}) should be < top of slope coordinate ({self._top_coord[0]}"
+            )
+        # check that righ x is on bottom slope
+        if right_x < self._bot_coord[0]:
+            raise ValueError(
+                f"right_x ({right_x}) should be < bottom slope coordinate ({self._bot_coord[0]})"
+            )
+
+        self._limits = [(left_x, left_x_right), (right_x_left, right_x)]
+
+        if right_x_left == 0 and left_x_right == self._external_length:
+            self._number_limits = 2
+        else:
+            self._number_limits = 4
+
+    def analyse_circular_failure(self, c_x: float, c_y: float, radius: float):
         """Calculate factor of safety for a circular failure plane through the slope.
 
         Parameters
@@ -282,13 +390,12 @@ class Slope:
             factor of safety
         None
             if cant calculate returns None
-            
+
         """
         # data validation
-        assert_strictly_positive_number(c_x,'c_x (circle x coordinate)')
-        assert_strictly_positive_number(c_y,'c_y (circle y coordinate)')
-        assert_strictly_positive_number(radius,'radius')
-
+        assert_strictly_positive_number(c_x, "c_x (circle x coordinate)")
+        assert_strictly_positive_number(c_y, "c_y (circle y coordinate)")
+        assert_strictly_positive_number(radius, "radius")
 
         # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
         # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
@@ -325,10 +432,10 @@ class Slope:
         # is the boundary between two linestrings
         i_list = list(set(i_list))
         i_list.sort()
-        
+
         # check that there are only two intersecting points otherwise something is wrong
         if len(i_list) > 1:
-            i_list= i_list[0:2]
+            i_list = i_list[0:2]
         else:
             return None
 
@@ -352,7 +459,7 @@ class Slope:
         # the number of slices since we start at half a slice
         for slice in range(1, SLICES, 1):
             # define y coordinates for slice
-            s_yb = c_y - sqrt(radius ** 2 - (s_x - c_x) ** 2)
+            s_yb = c_y - sqrt(radius**2 - (s_x - c_x) ** 2)
 
             # get y coordinate at top
             # left of slope
@@ -443,7 +550,7 @@ class Slope:
             else:
                 U = 0
 
-            resisting += cohesion * l + max(0,(W * cos(alpha) - U)) * tan(
+            resisting += cohesion * l + max(0, (W * cos(alpha) - U)) * tan(
                 radians(friction_angle)
             )
             pushing += W * sin(alpha)
@@ -470,7 +577,7 @@ class Slope:
         Returns
         ----------
         Nothing but sets the following in the instance:
-        
+
         self._MIN_FOS
         self._search
         self._MIN_FOS_LOCATION
@@ -483,50 +590,66 @@ class Slope:
 
         # # seems like 15 % of runs dont happen every time for some reason,
         # # possibly just general geometry clashes
-        # ITERATIONS = ITERATIONS 
+        # ITERATIONS = ITERATIONS
 
         # 10 * 10 * 5 = 500
         # allow for 3 mid points of slope
         # 3 * 10 * 5 = 150 (minimum) - 650 min iterations
 
-        NUMBER_CIRCLES = max(5,int(ITERATIONS/1000))
+        NUMBER_CIRCLES = max(5, int(ITERATIONS / 1000))
 
-        NUMBER_POINTS_SLOPE = max(5,int(ITERATIONS/800))
+        NUMBER_POINTS_SLOPE = max(5, int(ITERATIONS / 800))
 
         # generate coordinates for left of slope
         point_combinations = ITERATIONS / NUMBER_CIRCLES
-        
+
         if deep_seeded_only:
             NUMBER_POINTS = int(sqrt(point_combinations))
         else:
             if self._gradient > GRADIENT_TOLERANCE:
-                NUMBER_POINTS = int((NUMBER_POINTS_SLOPE+sqrt(NUMBER_POINTS_SLOPE**2+4*point_combinations))/2) - NUMBER_POINTS_SLOPE
+                NUMBER_POINTS = (
+                    int(
+                        (
+                            NUMBER_POINTS_SLOPE
+                            + sqrt(NUMBER_POINTS_SLOPE**2 + 4 * point_combinations)
+                        )
+                        / 2
+                    )
+                    - NUMBER_POINTS_SLOPE
+                )
             else:
                 NUMBER_POINTS = int(sqrt(point_combinations)) - NUMBER_POINTS_SLOPE
 
         x1, x2, x3, x4 = (
-            0,
-            self._top_coord[0],
-            self._bot_coord[0],
-            self._external_length,
+            min(self._top_coord[0], self._limits[0][0]),
+            min(self._top_coord[0], self._limits[0][1]),
+            max(self._bot_coord[0], self._limits[1][0]),
+            max(self._bot_coord[0], self._limits[1][1]),
         )
+
         y2, y3 = self._top_coord[1], self._bot_coord[1]
 
         # split top and bottom slope up into 10 coordinate points
-        left_coords = [
-            ((n / NUMBER_POINTS) * (x2 - x1), y2) for n in range(1, NUMBER_POINTS + 1)
-        ]
+        if x2 != x1:
+            left_coords = [
+                (x1 + (n / NUMBER_POINTS) * (x2 - x1), y2) for n in range(1, NUMBER_POINTS + 1)
+            ]
+        else:
+            left_coords =[]
 
-        right_coords = [
-            (x3 + (n / NUMBER_POINTS) * (x4 - x3), y3) for n in range(NUMBER_POINTS)
-        ]
+        if x3 != x4:
+            right_coords = [
+                (x3 + (n / NUMBER_POINTS) * (x4 - x3), y3) for n in range(NUMBER_POINTS)
+            ]
+        else:
+            right_coords =[]
 
         if self._gradient > GRADIENT_TOLERANCE:
             left_coords = left_coords[:-1]
 
-        # add in 3 coordinates for the slope
-        dx = (x3-x2)
-        dy = (y2-y3)
+        # add in some coordinates for the slope
+        dx = self._length
+        dy = self._height
 
         slope_sections = NUMBER_POINTS_SLOPE + 1
 
@@ -535,19 +658,18 @@ class Slope:
 
             for i in range(1, slope_sections):
                 mid_coords.append(
-                    (x2 + dx * i / slope_sections,
-                    y2 - dy * i / slope_sections) 
+                    (self._top_coord[0] + dx * i / slope_sections, self._top_coord[1] - dy * i / slope_sections)
                 )
 
             # only want lines from mid to right for a not very steep gradient
             if self._gradient < GRADIENT_TOLERANCE:
-                left_coords += mid_coords
-            
-            right_coords += mid_coords
+                left_coords += [a for a in mid_coords if self._limits[0][0] < a[0] < self._limits[0][1]]
+
+            right_coords += [a for a in mid_coords if self._limits[1][0] < a[0] < self._limits[1][1]]
 
         search = {}
 
-        min_dist = dist_points(self._top_coord,self._bot_coord)/3
+        min_dist = dist_points(self._top_coord, self._bot_coord) / 3
 
         # loop through left and right coordinates and generate a circular slope
         # that passes through these points
@@ -555,7 +677,7 @@ class Slope:
 
         for l_c in tqdm(left_coords):
             for r_c in right_coords:
-                if dist_points(l_c,r_c) > min_dist and abs(l_c[0]-r_c[0])>0.1:
+                if dist_points(l_c, r_c) > min_dist and abs(l_c[0] - r_c[0]) > 0.1:
                     search.update(
                         self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
                     )
@@ -564,7 +686,9 @@ class Slope:
         self._min_FOS_location = min(search, key=search.get)
         self._min_FOS = search[self._min_FOS_location]
 
-    def run_analysis_for_circles(self, l_c : tuple , r_c : tuple, NUMBER_CIRCLES : float = 5) -> dict:
+    def run_analysis_for_circles(
+        self, l_c: tuple, r_c: tuple, NUMBER_CIRCLES: float = 5
+    ) -> dict:
         """Runs slope analyse for fixed left and right points for
         a number of possible circular failures.
 
@@ -585,13 +709,12 @@ class Slope:
             _description_
         """
 
-        #data validation
-        assert_strictly_positive_number(NUMBER_CIRCLES,'NUMBER_CIRCLES')
+        # data validation
+        assert_strictly_positive_number(NUMBER_CIRCLES, "NUMBER_CIRCLES")
         NUMBER_CIRCLES = int(NUMBER_CIRCLES)
 
-        assert_length(l_c,2,'l_c')
-        assert_length(r_c,2,'r_c')
-
+        assert_length(l_c, 2, "l_c")
+        assert_length(r_c, 2, "r_c")
 
         # assume a starting circle that has a straight vertical slope down at the top of the slope
         # this means the centre of the circle is in line with the top of the slope
@@ -606,13 +729,13 @@ class Slope:
         # starting circle details
         start_radius = half_coord_distance / cos(beta)
         start_centre = (l_c[0] + start_radius, l_c[1])
-        start_chord_to_centre = sqrt(start_radius ** 2 - half_coord_distance ** 2)
+        start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
         start_chord_to_edge = start_radius - start_chord_to_centre
 
         # two intersecting chords through circle have segments of chords related
         # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
         # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-        C = half_coord_distance ** 2
+        C = half_coord_distance**2
 
         # loop through circles
         search = {}
@@ -631,19 +754,19 @@ class Slope:
 
             result = self.analyse_circular_failure(c_x, c_y, radius)
             if result:
-                FOS,i_l,i_r = result
-                search[(c_x,c_y,radius,i_l,i_r)] = FOS
+                FOS, i_l, i_r = result
+                search[(c_x, c_y, radius, i_l, i_r)] = FOS
             else:
                 break
 
         return search
 
     def _reset_results(self):
-        """ Re-initialise results to erase non-relevant results due to a model change"""
+        """Re-initialise results to erase non-relevant results due to a model change"""
         self._search = {}
         self._min_FOS = 0
-        self._min_FOS_location =[]
-    
+        self._min_FOS_location = []
+
     def plot_boundary(self):
         """Plot external boundary, materials, loading and water for model.
 
@@ -679,21 +802,18 @@ class Slope:
         for i, m in enumerate(self._materials):
             # get reference level (y coordinate) for material
             y = m.RL
+            x = self.external_x_intersection(y)
 
-            if y <= self._bot_coord[1]:
-                line = [(0,y),(self._external_length,y)]
-            else:
-                x = self._top_coord[0]+(self._top_coord[1]-y)/self._gradient
-                line = [(0,y),(x,y)]
+            line = [(0, y), (x, y)]
 
             # if the bot slope coordinate is between the bounds of the material
             # OR LAST material and above need to draw a bit differently
 
-            is_last = (i == num_materials - 1)
+            is_last = i == num_materials - 1
 
-            if ((top[1][1] > self._bot_coord[1] and
-                line[1][1] < self._bot_coord[1]) or 
-                (is_last and top[1][1]>self._bot_coord[1])):
+            if (top[1][1] > self._bot_coord[1] and line[1][1] < self._bot_coord[1]) or (
+                is_last and top[1][1] > self._bot_coord[1]
+            ):
                 top.append(self._bot_coord)
                 top.append((tot_l, self._bot_coord[1]))
 
@@ -723,9 +843,11 @@ class Slope:
 
         if self._load_magnitude:
             fig = self._plot_load(fig)
-        
+
         if self._water_RL:
             fig = self._plot_water(fig)
+
+        fig = self._plot_limits(fig)
 
         return fig
 
@@ -738,14 +860,16 @@ class Slope:
         """
         fig = self.plot_boundary()
 
-        c_x, c_y, radius, l_c,r_c = self._min_FOS_location
+        c_x, c_y, radius, l_c, r_c = self._min_FOS_location
         FOS = self._min_FOS
 
-        fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=FOS, show_center=True)
+        fig = self._plot_failure_plane(
+            fig, c_x, c_y, radius, l_c, r_c, FOS=FOS, show_center=True
+        )
         fig = self._plot_annotate_FOS(fig, c_x, c_y, FOS)
         return fig
 
-    def _plot_annotate_FOS(self,fig,c_x : float, c_y : float, FOS : float):
+    def _plot_annotate_FOS(self, fig, c_x: float, c_y: float, FOS: float):
         """Annotate FOS on figure.
 
         Parameters
@@ -764,87 +888,145 @@ class Slope:
         """
 
         # validate inputs
-        assert_strictly_positive_number(c_x,'circle center x coordinate')
-        assert_strictly_positive_number(c_y, 'circle center y coordinate')
-        assert_strictly_positive_number(FOS, 'Factor of safety')
+        assert_strictly_positive_number(c_x, "circle center x coordinate")
+        assert_strictly_positive_number(c_y, "circle center y coordinate")
+        assert_strictly_positive_number(FOS, "Factor of safety")
 
-        if FOS > 3 :
+        if FOS > 3:
             color = COLOUR_FOS_DICT[3.0]
         else:
-            color = COLOUR_FOS_DICT[round(FOS,1)]
+            color = COLOUR_FOS_DICT[round(FOS, 1)]
 
-        fig.add_trace(go.Scatter(
-            x=[c_x],
-            y=[c_y],
-            mode="lines+text",
-            text=[f"{FOS:.3f}"],
-            textposition="top right",
-            textfont=dict(
-                family="sans serif",
-                size=30,
-                color=color
+        fig.add_trace(
+            go.Scatter(
+                x=[c_x],
+                y=[c_y],
+                mode="lines+text",
+                text=[f"{FOS:.3f}"],
+                textposition="top right",
+                textfont=dict(family="sans serif", size=30, color=color),
             )
-        ))
+        )
 
         return fig
 
-    def _plot_water(self,fig):
+    def _plot_water(self, fig):
         """Add water table to plot"""
 
         if self._water_RL == None:
             return fig
 
         y = self._water_RL
+        x = self.external_x_intersection(y)
 
-        if y <= self._bot_coord[1]:
-            x = [0,self._external_length]
-        else:
-            x = [0, self._top_coord[0]+(self._top_coord[1]-y)/self._gradient]
-        
+        x_line = [0, x]
+        y_line = [y, y]
+
+        # if x is less than bot slope then is also same as saying x is less than the edge of the model.
+        # basically need to make sure the water table continues along the surface
+        # as is conservatively considered in the model
+        if x <= self._bot_coord[0]:
+            x_line += [self._bot_coord[0], self._external_length]
+            y_line += [self._bot_coord[1], self._bot_coord[1]]
+            
         fig.add_trace(
-                go.Scatter(
-                    x=x,
-                    y=[y,y],
-                    mode="lines",
-                    line_color='blue',
-                    line_width=4,
-                )
+            go.Scatter(
+                x=x_line,
+                y=y_line,
+                mode="lines",
+                line_color="blue",
+                line_width=4,
             )
+        )
 
         fig.add_annotation(
-            x=self._top_coord[0]/4,
+            x=self._top_coord[0] / 4,
             y=y,
-            text='▼',
+            text="▼",
             showarrow=False,
             yshift=15,
             font_size=35,
-            font_color='blue',
+            font_color="blue",
         )
 
         fig.add_annotation(
-            x=self._top_coord[0]/4,
+            x=self._top_coord[0] / 4,
             y=y,
-            text='_',
+            text="_",
             showarrow=False,
             yshift=10,
             font_size=40,
-            font_color='blue',
+            font_color="blue",
         )
-        
 
         return fig
 
-    def _plot_load(self,fig):
-        """ Add load to plot """
+    def _plot_limits(self, fig):
+        
+        l1_x, l2_x = self._limits[0]
+        r1_x, r2_x = self._limits[1]
+        
+        l1_y = self.external_y_intersection(l1_x)
+        l2_y = self.external_y_intersection(l2_x)
+        r1_y = self.external_y_intersection(r1_x)
+        r2_y = self.external_y_intersection(r2_x)
+
+        points_right = [(l1_x, l1_y)]
+        points_left = [(r2_x, r2_y)]
+
+        if self._number_limits == 4:
+            points_right += [(r1_x, r1_y)]
+            points_left += [(l2_x, l2_y)]
+
+        # add outer limits
+        for p in points_right:
+            fig.add_annotation(
+                x=p[0],
+                y=p[1],
+                text="▶",
+                showarrow=False,
+                yshift=15,
+                xshift=-13,
+                font_size=35,
+                font_color="black",
+            )
+
+        for p in points_left:
+            fig.add_annotation(
+                x=p[0],
+                y=p[1],
+                text="◀",
+                showarrow=False,
+                yshift=15,
+                xshift=13,
+                font_size=35,
+                font_color="black",
+            )
+
+        for p in points_left + points_right:
+            fig.add_annotation(
+                x=p[0],
+                y=p[1],
+                text="|",
+                showarrow=False,
+                yshift=15,
+                xshift=0,
+                font_size=35,
+                font_color="black",
+            )
+
+        return fig
+
+    def _plot_load(self, fig):
+        """Add load to plot"""
         # add in extra arrows, text, and hori line
 
         # arrow styling parameters
         ARROW_HEIGHT_FACTOR = 1.1
-        arrowhead=3
-        arrowsize=2
-        arrowwidth=2
-        arrowcolor='red'
-
+        arrowhead = 3
+        arrowsize = 2
+        arrowwidth = 2
+        arrowcolor = "red"
 
         p = self._load_magnitude
 
@@ -852,30 +1034,30 @@ class Slope:
             return fig
 
         y = self._external_height
-        l_x,r_x = self._load_location
+        l_x, r_x = self._load_location
 
         # add more arrows in if the load is longer than say 3
         load_length = r_x - l_x
 
         if load_length > 3:
-            spaces = divmod(load_length,1.5)[0]
-            spacing = load_length/spaces
-            arrows = [l_x + spacing * t for t in range(int(spaces+1))]
+            spaces = divmod(load_length, 1.5)[0]
+            spacing = load_length / spaces
+            arrows = [l_x + spacing * t for t in range(int(spaces + 1))]
         else:
-            arrows = [l_x,(l_x+r_x)/2,r_x]
+            arrows = [l_x, (l_x + r_x) / 2, r_x]
 
         for x in arrows:
             fig.add_annotation(
-                y = y,
-                x = x,
-                ay = y*ARROW_HEIGHT_FACTOR,
-                ax = x + 0,
-                text='',
-                xref='x',
-                yref='y',
-                axref='x',
-                ayref='y',
-                showarrow = True,
+                y=y,
+                x=x,
+                ay=y * ARROW_HEIGHT_FACTOR,
+                ax=x + 0,
+                text="",
+                xref="x",
+                yref="y",
+                axref="x",
+                ayref="y",
+                showarrow=True,
                 arrowhead=arrowhead,
                 arrowsize=arrowsize,
                 arrowwidth=arrowwidth,
@@ -883,30 +1065,30 @@ class Slope:
             )
 
         fig.add_annotation(
-            y = y*ARROW_HEIGHT_FACTOR,
-            x = sum(self._load_location)/2,
-            text=f'{p} kPa',
-            xref='x',
-            yref='y',
-            axref='x',
-            ayref='y',
-            showarrow = False,
+            y=y * ARROW_HEIGHT_FACTOR,
+            x=sum(self._load_location) / 2,
+            text=f"{p} kPa",
+            xref="x",
+            yref="y",
+            axref="x",
+            ayref="y",
+            showarrow=False,
             font_size=30,
-            yshift = 30,
+            yshift=30,
             font_color=arrowcolor,
         )
 
         fig.add_annotation(
-            y = y*ARROW_HEIGHT_FACTOR,
-            x = l_x,
-            ay = y*ARROW_HEIGHT_FACTOR,
-            ax = r_x,
-            text='',
-            xref='x',
-            yref='y',
-            axref='x',
-            ayref='y',
-            showarrow = True,
+            y=y * ARROW_HEIGHT_FACTOR,
+            x=l_x,
+            ay=y * ARROW_HEIGHT_FACTOR,
+            ax=r_x,
+            text="",
+            xref="x",
+            yref="y",
+            axref="x",
+            ayref="y",
+            showarrow=True,
             arrowhead=0,
             arrowsize=arrowsize,
             arrowwidth=arrowwidth,
@@ -914,8 +1096,18 @@ class Slope:
         )
 
         return fig
-    
-    def _plot_failure_plane(self, fig, c_x : float, c_y : float, radius : float, l_c : tuple, r_c : tuple, FOS : float, show_center=False):
+
+    def _plot_failure_plane(
+        self,
+        fig,
+        c_x: float,
+        c_y: float,
+        radius: float,
+        l_c: tuple,
+        r_c: tuple,
+        FOS: float,
+        show_center=False,
+    ):
         """Add failure plane to plot.
 
         Parameters
@@ -943,22 +1135,22 @@ class Slope:
         """
 
         # data validation
-        assert_strictly_positive_number(c_x,'circle center x coordinate')
-        assert_strictly_positive_number(c_y, 'circle center y coordinate')
-        assert_strictly_positive_number(radius, 'radius')
-        assert_length(l_c,2,'l_c')
-        assert_length(r_c,2, 'r_c')
-        assert_strictly_positive_number(FOS, 'Factor of safety')
+        assert_strictly_positive_number(c_x, "circle center x coordinate")
+        assert_strictly_positive_number(c_y, "circle center y coordinate")
+        assert_strictly_positive_number(radius, "radius")
+        assert_length(l_c, 2, "l_c")
+        assert_length(r_c, 2, "r_c")
+        assert_strictly_positive_number(FOS, "Factor of safety")
 
-        if FOS > 3 :
+        if FOS > 3:
             color = COLOUR_FOS_DICT[3.0]
         else:
-            color = COLOUR_FOS_DICT[round(FOS,1)]
+            color = COLOUR_FOS_DICT[round(FOS, 1)]
 
         # generate points for circle
         p = Point(c_x, c_y)
-        x,y = p.buffer(radius).boundary.coords.xy
-        
+        x, y = p.buffer(radius).boundary.coords.xy
+
         x = list(x)
         y = list(y)
 
@@ -973,10 +1165,10 @@ class Slope:
             if x[i] <= r_c[0] and x[i] >= l_c[0] and y[i] <= l_c[1]:
                 x_.append(x[i])
                 y_.append(y[i])
-        
+
         if show_center:
-            x_ += [l_c[0],c_x,r_c[0],x_[0]]
-            y_ += [l_c[1],c_y,r_c[1],y_[0]]
+            x_ += [l_c[0], c_x, r_c[0], x_[0]]
+            y_ += [l_c[1], c_y, r_c[1], y_[0]]
         else:
             x_ = [r_c[0]] + x_ + [l_c[0]]
             y_ = [r_c[1]] + y_ + [l_c[1]]
@@ -987,14 +1179,14 @@ class Slope:
                 y=y_,
                 mode="lines",
                 line_color=color,
-                meta = [round(FOS,3)],                
+                meta=[round(FOS, 3)],
                 hovertemplate="%{meta[0]}",
             )
         )
 
         return fig
 
-    def plot_all_planes(self, max_fos : float = None):
+    def plot_all_planes(self, max_fos: float = None):
         """plot multiple failure planes in the same plot
 
         Parameters
@@ -1002,47 +1194,78 @@ class Slope:
         max_fos : float, optional
             maximum factor of safety to display for planes,
             If none there is no limit, by default None.
-        
+
         Returns
         -------
         plotly figure
 
         """
-        assert_strictly_positive_number(max_fos,'max factor of safety (max_fos)')
 
         fig = self.plot_boundary()
 
         if max_fos is None:
             for k, v in self._search.items():
-                c_x, c_y, radius, l_c,r_c = k
-                fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=v)
+                c_x, c_y, radius, l_c, r_c = k
+                fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c, r_c, FOS=v)
         else:
+            assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
             for k, v in self._search.items():
                 if v < max_fos:
-                    c_x, c_y, radius, l_c,r_c = k
-                    fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c,r_c,FOS=v)
-                
-                
+                    c_x, c_y, radius, l_c, r_c = k
+                    fig = self._plot_failure_plane(
+                        fig, c_x, c_y, radius, l_c, r_c, FOS=v
+                    )
+
         return fig
+
+    def external_y_intersection(self,x):
+        """ return y coordinate of intersection with boundary for a given x """
+        if x < 0 or x > self._external_length:
+            return None
+        # y is below the bottom of the slope
+        elif x <= self._top_coord[0]:
+            return self._top_coord[1]
+        elif x >= self._bot_coord[0]:
+            return self._bot_coord[1]        
+        # y is above the bottom of the slope
+        else:
+            return self._top_coord[1] - (x - self._top_coord[0]) * self._gradient
+
+    def external_x_intersection(self,y):
+        """ return x coordinate of intersection with boundary for a given y """
+        # y is below the bottom of the slope
+        if y <= self._bot_coord[1]:
+            return self._external_length
+        
+        # y is above the bottom of the slope
+        elif y <= self._external_height:
+            return self._top_coord[0] + (self._top_coord[1] - y) / self._gradient
+
+        else:
+            return None
 
 
 
 if __name__ == "__main__":
-    s = Slope(height=1, angle=None, length=15.608)
+    s = Slope(height=5, angle=None, length=5.608)
 
-    sand = Material(20,35,0,100)
-    clay = Material(18,25,5,4)
-    grass = Material(16,20,4,10)
+    sand = Material(20, 35, 5, 1)
+    clay = Material(18, 25, 5, 4)
+    grass = Material(16, 20, 4, 10)
 
     s.set_materials(sand)
 
-    s.update_options(iterations=1200)
+    s.update_options(iterations=2000)
 
-    s.set_surcharge(0,10)
+    s.set_surcharge(0, 10)
+
+    s.set_water_table(1)
+
+    s.set_analysis_limits(left_x = 5, right_x = 25, left_x_right =10)
 
     s.analyse_slope()
 
-    f = s.plot_critical()
+    f = s.plot_all_planes()
 
     # t1 = time.perf_counter()
     # s.analyse_slope()
@@ -1050,4 +1273,4 @@ if __name__ == "__main__":
     #     f"Took {time.perf_counter()-t1} seconds to process {len(s._search.keys())} runs"
     # )
     # f = s.plot_all_planes()
-    f.write_html('test.html')
+    f.write_html("test.html")

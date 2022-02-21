@@ -24,6 +24,7 @@ def circle_centre(beta, chord_intersection, chord_to_centre):
 
     return [a + b for a, b in zip(chord_intersection, (dx, dy))]
 
+
 def create_fos_color_dictionary():
     colors = [
         (0,'red'),
