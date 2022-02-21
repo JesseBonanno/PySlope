@@ -190,12 +190,15 @@ class Slope:
 
         depths = [material.depth_to_bottom for material in materials]
 
+        if depths[-1] > self._external_height:
+            self.update_options(MIN_EXT_H=depths[-1])
+
         if len(depths) > len(set(depths)):
             raise ValueError("The same material depth has been input twice")
 
         # define RL for each material
         for material in materials:
-            material.RL = self._top_coord[1] - material.depth_to_bottom
+            material.RL = self._external_height - material.depth_to_bottom
 
         self._materials = materials
 
@@ -991,7 +994,7 @@ class Slope:
 
         return fig
 
-    def plot_all_planes(self, max_fos=None):
+    def plot_all_planes(self, max_fos : float = None):
         """plot multiple failure planes in the same plot
 
         Parameters
@@ -1003,8 +1006,10 @@ class Slope:
         Returns
         -------
         plotly figure
-        
+
         """
+        assert_strictly_positive_number(max_fos,'max factor of safety (max_fos)')
+
         fig = self.plot_boundary()
 
         if max_fos is None:
@@ -1025,7 +1030,7 @@ class Slope:
 if __name__ == "__main__":
     s = Slope(height=1, angle=None, length=15.608)
 
-    sand = Material(20,35,0,1)
+    sand = Material(20,35,0,100)
     clay = Material(18,25,5,4)
     grass = Material(16,20,4,10)
 
