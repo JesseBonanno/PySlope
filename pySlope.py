@@ -26,9 +26,10 @@ class Material:
     friction_angle: int = 35
     cohesion: int = 2
     depth_to_bottom: int = 5
+    name : str = ''
 
     def __repr__(self):
-        return f"Material(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom}"
+        return f"Material:{self.name}(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom}"
 
 
 class Slope:
@@ -807,6 +808,11 @@ class Slope:
             scaleratio=1,
         )
 
+        # dont show legend
+        fig.update_layout(
+            showlegend=False
+        )
+
         # if there are no materials just return an empty shell
         if not self._materials:
             return fig
@@ -862,6 +868,8 @@ class Slope:
             bot.sort()
             top = bot
 
+        fig = self._plot_material_properties(fig)
+        
         if self._load_magnitude:
             fig = self._plot_load(fig)
 
@@ -869,7 +877,7 @@ class Slope:
             fig = self._plot_water(fig)
 
         fig = self._plot_limits(fig)
-        fig = self._plot_material_table(fig)
+        
 
         return fig
 
@@ -1119,68 +1127,113 @@ class Slope:
 
         return fig
 
-    def _plot_material_table(self, fig):
 
-        header_h = 0.1
-        row_h = 0.075
+    def _plot_material_properties(self,fig):
+        # loop through materials
+        for i, m in enumerate(self._materials):
+            # get reference level (y coordinate) for material
+            y = m.RL
 
-        table_width = 0.3
-        table_height = header_h + row_h * len(self._materials)
+            text = f"<b>{m.name.upper()}<b>;  γ = {m.unit_weight} kN/m3, φ = {m.friction_angle}, c' = {m.cohesion} kPa, d = {m.depth_to_bottom} m"
 
-        x0,y0 = 0.1,0.1
+            fig.add_annotation(
+                xref="x", yref="y",
+                xanchor='left',
+                x=0,
+                y=y,
+                text=text,
+                showarrow=False,
+                yshift=20,
+                xshift=20,
+                font_size=15,
+                font_color="black",
+            )
 
-        x1 = x0+table_width
-        y1 = y0+table_height
+        return fig   
 
-        # add background        
-        fig.add_shape(
-            type="rect",
-            xref="x domain", yref="y domain",
-            x0=x0, x1=x1, y0=y0, y1=y1,
-            fillcolor='white'
-        )
 
-        # add columns
-        column_relative_width = [20,10,10,10,10]
+    #NOTE: method not working well since scaling is off.
 
-        t = sum(column_relative_width)
-        column_unit_width = []
+    # def _plot_material_table(self, fig):
+
+    #     header_h = 0.05
+    #     row_h = 0.035
+
+    #     table_width = 0.3
+    #     table_height = header_h + row_h * len(self._materials)
+
+    #     x0,y0 = 0.1,0.1
+
+    #     x1 = x0+table_width
+    #     y1 = y0+table_height
+
+    #     # add background        
+    #     fig.add_shape(
+    #         type="rect",
+    #         xref="x domain", yref="y domain",
+    #         x0=x0, x1=x1, y0=y0, y1=y1,
+    #         fillcolor='white'
+    #     )
+
+    #     # add columns
+    #     column_relative_width = [20,10,10,10,10]
+    #     table_header = ['Material Name','Color','γ (kN/m3)', "c' (kPa)", "ϕ (deg)"]
+    #     table_header = ['<br>'+a+'<br>' for a in table_header]
+
+    #     t = sum(column_relative_width)
+    #     column_unit_pos = []
         
-        prev = 0
-        for a in column_relative_width:
-            column_unit_width.append((prev+a)/t)
-            prev += a
+    #     prev = 0
+    #     for a in column_relative_width:
+    #         column_unit_pos.append((prev+a)/t)
+    #         prev += a
 
-        for c in column_unit_width:
-            x = x0+c*(table_width)
+    #     for c in column_unit_pos:
+    #         x = x0+c*(table_width)
 
-            fig.add_shape(
-                type="rect",
-                xref="x domain", yref="y domain",
-                x0=x, x1=x, y0=y0, y1=y1,
-            )
+    #         fig.add_shape(
+    #             type="rect",
+    #             xref="x domain", yref="y domain",
+    #             x0=x, x1=x, y0=y0, y1=y1,
+    #         )
 
-        # add rows
-        # add header
-        fig.add_shape(
-            type="rect",
-            xref="x domain", yref="y domain",
-            x0=x0, x1=x1, y0=y1-header_h, y1=y1-header_h,
-        )
+    #     # add rows
+    #     # add header
+    #     fig.add_shape(
+    #         type="rect",
+    #         xref="x domain", yref="y domain",
+    #         x0=x0, x1=x1, y0=y1-header_h, y1=y1-header_h,
+    #     )
+
+    #     # add in header text
+    #     x = x0
+    #     for i, c in enumerate(column_unit_pos):
+    #         fig.add_annotation(
+    #             xref="x domain", yref="y domain",
+    #             x=x,
+    #             y=y1-header_h,
+    #             text=table_header[i],
+    #             showarrow=False,
+    #             yshift=15,
+    #             xshift=10,
+    #             font_size=20,
+    #             font_color="black",
+    #         )
+    #         x = x0+c*(table_width)
 
 
-        for r in range(len(self._materials)):
-            y = y1 + r * row_h
+    #     for r in range(len(self._materials)):
+    #         y = y1 + r * row_h
 
-            fig.add_shape(
-                type="rect",
-                xref="x domain", yref="y domain",
-                x0=x, x1=x, y0=y, y1=y,
-            )
+    #         fig.add_shape(
+    #             type="rect",
+    #             xref="x domain", yref="y domain",
+    #             x0=x, x1=x, y0=y, y1=y,
+    #         )
 
-        # add header
+    #     # add header
 
-        return fig
+    #     return fig
 
     def _plot_FOS_legend(self, fig):
         
@@ -1398,11 +1451,11 @@ class Slope:
 if __name__ == "__main__":
     s = Slope(height=5, angle=None, length=5.608)
 
-    sand = Material(20, 35, 5, 1)
-    clay = Material(18, 25, 5, 4)
+    sand = Material(20, 35, 5, 1, 'sand')
+    clay = Material(18, 25, 5, 4, 'clay')
     grass = Material(16, 20, 4, 10)
 
-    s.set_materials(sand)
+    s.set_materials(sand,clay,grass)
 
     s.update_options(iterations=1000)
 
@@ -1414,10 +1467,9 @@ if __name__ == "__main__":
 
     s.analyse_slope()
 
-    # print(len(s._search))
+    # # print(len(s._search))
 
     f = s.plot_all_planes()
-
 
     # t1 = time.perf_counter()
     # s.analyse_slope()
@@ -1425,4 +1477,5 @@ if __name__ == "__main__":
     #     f"Took {time.perf_counter()-t1} seconds to process {len(s._search.keys())} runs"
     # )
     # # f = s.plot_all_planes()
-    f.write_html("test.html")
+    f.write_html('test.html')
+    f.write_image('test.png')
