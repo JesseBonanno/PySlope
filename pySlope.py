@@ -1,7 +1,9 @@
 # standard library imports
+from lib2to3.pgen2.token import NUMBER
 from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
+from turtle import fillcolor
 
 # import concurrent.futures
 from colour import Color
@@ -603,8 +605,23 @@ class Slope:
         # generate coordinates for left of slope
         point_combinations = ITERATIONS / NUMBER_CIRCLES
 
-        if deep_seeded_only:
+        # if deep seeded or limits exclude slope
+        if deep_seeded_only or (
+            self._limits[0][1] < self._top_coord[0] and
+            self._limits[1][0] > self._bot_coord[0]
+            ):
             NUMBER_POINTS = int(sqrt(point_combinations))
+
+        # if limits exclude slope only in one direction
+        elif (
+            self._limits[0][1] < self._top_coord[0] or
+            self._limits[1][0] > self._bot_coord[0]
+            ):
+            P = point_combinations
+            N = NUMBER_POINTS_SLOPE
+
+            NUMBER_POINTS = int((-N + sqrt( N**2 + 4 * P ))/2 )
+            
         else:
             if self._gradient > GRADIENT_TOLERANCE:
                 NUMBER_POINTS = (
@@ -632,14 +649,14 @@ class Slope:
         # split top and bottom slope up into 10 coordinate points
         if x2 != x1:
             left_coords = [
-                (x1 + (n / NUMBER_POINTS) * (x2 - x1), y2) for n in range(1, NUMBER_POINTS + 1)
+                (x1 + (n / (NUMBER_POINTS-1)) * (x2 - x1), y2) for n in range(NUMBER_POINTS)
             ]
         else:
             left_coords =[]
 
         if x3 != x4:
             right_coords = [
-                (x3 + (n / NUMBER_POINTS) * (x4 - x3), y3) for n in range(NUMBER_POINTS)
+                (x3 + (n / (NUMBER_POINTS-1)) * (x4 - x3), y3) for n in range(NUMBER_POINTS)
             ]
         else:
             right_coords =[]
@@ -647,26 +664,30 @@ class Slope:
         if self._gradient > GRADIENT_TOLERANCE:
             left_coords = left_coords[:-1]
 
-        # add in some coordinates for the slope
-        dx = self._length
-        dy = self._height
-
-        slope_sections = NUMBER_POINTS_SLOPE + 1
-
+        # if not deepseeded only add points for the slope
         if not deep_seeded_only:
-            mid_coords = []
-
-            for i in range(1, slope_sections):
-                mid_coords.append(
-                    (self._top_coord[0] + dx * i / slope_sections, self._top_coord[1] - dy * i / slope_sections)
-                )
+            # get limits on bounds of slope
+            # not some limits might still stretch off slope
+            # but <= check later considers this.
+            x1, x2, x3, x4 = (
+                max(self._top_coord[0], self._limits[0][0]),
+                min(self._bot_coord[0], self._limits[0][1]),
+                max(self._top_coord[0], self._limits[1][0]),
+                min(self._bot_coord[0], self._limits[1][1]),
+            )
 
             # only want lines from mid to right for a not very steep gradient
-            if self._gradient < GRADIENT_TOLERANCE:
-                left_coords += [a for a in mid_coords if self._limits[0][0] < a[0] < self._limits[0][1]]
+            # if x2 ! > x1 then limit off of slope
+            # NOTE: we dont want the end points since we already grabbed those in left and right coords.
+            if self._gradient < GRADIENT_TOLERANCE and x2 >= x1:
+                left_mid_coords = [x1 + (x2-x1)*(i/(NUMBER_POINTS_SLOPE+1)) for i in range(1,NUMBER_POINTS_SLOPE+1)]
+                left_coords += [(x, self.external_y_intersection(x)) for x in left_mid_coords]
 
-            right_coords += [a for a in mid_coords if self._limits[1][0] < a[0] < self._limits[1][1]]
-
+            # if x4 ! > x3 then limit off of slope
+            if x4 >= x3:
+                right_mid_coords = [x3 + (x4-x3)*(i/(NUMBER_POINTS_SLOPE+1)) for i in range(1,NUMBER_POINTS_SLOPE+1)]
+                right_coords += [(x, self.external_y_intersection(x)) for x in right_mid_coords]
+                
         search = {}
 
         min_dist = dist_points(self._top_coord, self._bot_coord) / 3
@@ -848,6 +869,7 @@ class Slope:
             fig = self._plot_water(fig)
 
         fig = self._plot_limits(fig)
+        fig = self._plot_material_table(fig)
 
         return fig
 
@@ -1097,6 +1119,131 @@ class Slope:
 
         return fig
 
+    def _plot_material_table(self, fig):
+
+        header_h = 0.1
+        row_h = 0.075
+
+        table_width = 0.3
+        table_height = header_h + row_h * len(self._materials)
+
+        x0,y0 = 0.1,0.1
+
+        x1 = x0+table_width
+        y1 = y0+table_height
+
+        # add background        
+        fig.add_shape(
+            type="rect",
+            xref="x domain", yref="y domain",
+            x0=x0, x1=x1, y0=y0, y1=y1,
+            fillcolor='white'
+        )
+
+        # add columns
+        column_relative_width = [20,10,10,10,10]
+
+        t = sum(column_relative_width)
+        column_unit_width = []
+        
+        prev = 0
+        for a in column_relative_width:
+            column_unit_width.append((prev+a)/t)
+            prev += a
+
+        for c in column_unit_width:
+            x = x0+c*(table_width)
+
+            fig.add_shape(
+                type="rect",
+                xref="x domain", yref="y domain",
+                x0=x, x1=x, y0=y0, y1=y1,
+            )
+
+        # add rows
+        # add header
+        fig.add_shape(
+            type="rect",
+            xref="x domain", yref="y domain",
+            x0=x0, x1=x1, y0=y1-header_h, y1=y1-header_h,
+        )
+
+
+        for r in range(len(self._materials)):
+            y = y1 + r * row_h
+
+            fig.add_shape(
+                type="rect",
+                xref="x domain", yref="y domain",
+                x0=x, x1=x, y0=y, y1=y,
+            )
+
+        # add header
+
+        return fig
+
+    def _plot_FOS_legend(self, fig):
+        
+        total = len(COLOUR_FOS_DICT)
+        yi = 0.9
+        yf = 0.5
+
+        x0 = 0.9
+        x1 = 0.95
+
+        max_fos = max(COLOUR_FOS_DICT)
+
+        for k,v in COLOUR_FOS_DICT.items():
+            fig.add_shape(type='rect',
+                xref="x domain", yref="y domain",
+                x0=x0,
+                x1=x1,
+                y0=yi+k*(yf-yi)/max_fos,
+                y1=yi+(k+0.1)*(yf-yi)/max_fos,
+                fillcolor=v,
+                line = dict(
+                    color='black',
+                    width=0.2,
+                )
+            )
+
+            if round(k,1) % 1 == 0:
+
+                # bandaid fix because i cant figure out why the scale shows wrong
+                if k < 1.5:
+                    y = float(yi)+float(k-0.05)*float(yf-yi)/float(max_fos)
+                else:
+                    y = float(yi)+float(k+0.05)*float(yf-yi)/float(max_fos)
+
+                fig.add_annotation(
+                    xref="x domain", yref="y domain",
+                    x=x1,
+                    y=y,
+                    text=f"{k}",
+                    showarrow=False,
+                    yshift=0,
+                    xshift=50,
+                    font_size=20,
+                    font_color="black",
+                )
+
+        # add top description
+        fig.add_annotation(
+            xref="x domain", yref="y domain",
+            x=(x0+x1)/2,
+            y=yi,
+            text=f"<b>FOS Legend</b>",
+            showarrow=False,
+            yshift=50,
+            xshift=80,
+            font_size=30,
+            font_color="black",
+        )
+
+
+
+        return fig
+
     def _plot_failure_plane(
         self,
         fig,
@@ -1216,6 +1363,8 @@ class Slope:
                         fig, c_x, c_y, radius, l_c, r_c, FOS=v
                     )
 
+        fig = self._plot_FOS_legend(fig)
+
         return fig
 
     def external_y_intersection(self,x):
@@ -1255,22 +1404,25 @@ if __name__ == "__main__":
 
     s.set_materials(sand)
 
-    s.update_options(iterations=2000)
+    s.update_options(iterations=1000)
 
     s.set_surcharge(0, 10)
 
     s.set_water_table(1)
 
-    s.set_analysis_limits(left_x = 5, right_x = 25, left_x_right =10)
+    s.set_analysis_limits(left_x = 5, right_x = 25, left_x_right =10, right_x_left=20)
 
     s.analyse_slope()
 
+    # print(len(s._search))
+
     f = s.plot_all_planes()
+
 
     # t1 = time.perf_counter()
     # s.analyse_slope()
     # print(
     #     f"Took {time.perf_counter()-t1} seconds to process {len(s._search.keys())} runs"
     # )
-    # f = s.plot_all_planes()
+    # # f = s.plot_all_planes()
     f.write_html("test.html")
