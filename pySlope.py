@@ -19,6 +19,7 @@ from data_validation import *
 from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_points
 from utilities import COLOUR_FOS_DICT
 
+MATERIAL_COLORS = ['#efa59c','#77e1ca', '#cdacfc','#f2c6a7','#7edff4','#f2a8c3','#cde9ba','#f2c1fa','#f1dba3','#a3acf7']
 
 @dataclass
 class Material:
@@ -862,7 +863,15 @@ class Slope:
             y_ = [a[1] for a in coords]
 
             fig.add_trace(
-                go.Scatter(x=list(x_), y=list(y_), mode="lines", fill="toself",name='')
+                go.Scatter(
+                    x=list(x_), y=list(y_),
+                    mode="lines",
+                    meta = [m.unit_weight, m.cohesion, m.friction_angle,m.name],
+                    fill="toself",
+                    name=f'{m.name}<br>γ: {m.unit_weight} kN/m3<br>c: {m.cohesion} kPa<br>ϕ: {m.friction_angle} degrees',
+                    hovertemplate="",
+                    fillcolor = MATERIAL_COLORS[i%10]
+                )
             )
 
             # set the new top as the bottom, sort to put it back
@@ -1171,18 +1180,32 @@ class Slope:
         x1 = x0+table_width
         y1 = y0+table_height
 
+                # add header
+
+
+
+        fig.add_shape(
+            type="rect",
+            xref="x domain", yref="y domain",
+            x0=x0, x1=x1, y0=y1-header_h, y1=y1,
+            fillcolor='lightgrey',
+        )
+
         # add background        
         fig.add_shape(
             type="rect",
             xref="x domain", yref="y domain",
-            x0=x0, x1=x1, y0=y0, y1=y1,
+            x0=x0, x1=x1, y0=y0, y1=y1-header_h,
             fillcolor='white'
         )
 
+                # add rows
+
+
         # add columns
-        column_relative_width = [20,15,10,10,10]
-        table_header = ['Material','Color','γ', "c", "ϕ"]
-        table_header = ['<br>'+a+'<br>' for a in table_header]
+        column_relative_width = [20,13,10,10,10]
+        table_header = ['MATERIAL','COLOR','γ', "c", "ϕ"]
+        table_header = ['<b>'+a+'<b>' for a in table_header]
 
         t = sum(column_relative_width)
         column_unit_pos = []
@@ -1201,13 +1224,6 @@ class Slope:
                 x0=x, x1=x, y0=y0, y1=y1,
             )
 
-        # add rows
-        # add header
-        fig.add_shape(
-            type="rect",
-            xref="x domain", yref="y domain",
-            x0=x0, x1=x1, y0=y1-header_h, y1=y1-header_h,
-        )
 
         # add in header text
         x = x0
@@ -1238,14 +1254,20 @@ class Slope:
         # add material info
 
         y = y1-header_h
-        for m in self._materials:
+        for p, m in enumerate(self._materials):
             x = x0
             y -= row_h
             data = [m.name, 'red', m.unit_weight, m.cohesion, m.friction_angle]
 
             for i, c in enumerate(column_unit_pos):
                 if i==1:
-                    pass
+                    fig.add_shape(
+                        type="rect",
+                        xref="paper", yref="paper",
+                        x0=x, x1=x0+column_unit_pos[1]*(table_width),
+                        y0=y+row_h, y1=y,
+                        fillcolor=MATERIAL_COLORS[p%10],
+                    )
                 else:
                     fig.add_annotation(
                         xref="x domain", yref="y domain",
@@ -1489,14 +1511,14 @@ if __name__ == "__main__":
     sand = Material(20, 35, 5, 1, 'sand')
     clay = Material(18, 25, 5, 4, 'clay')
     grass = Material(16, 20, 4, 10)
-
-    s.set_materials(sand,clay,grass)
+    m = [Material(depth_to_bottom=a,name='hello') for a in range(1,5)]
+    s.set_materials(*m)
 
     s.update_options(iterations=1000)
 
     s.set_surcharge(0, 10)
 
-    s.set_water_table(1)
+    s.set_water_table(1.5)
 
     s.set_analysis_limits(left_x = 5, right_x = 25, left_x_right =10, right_x_left=20)
 
@@ -1515,8 +1537,8 @@ if __name__ == "__main__":
 
     f.write_html('test.html')
 
-    f.update_layout(
-        width=2000,
-        height=1500
-    )
-    f.write_image('test.png')
+    # f.update_layout(
+    #     width=2000,
+    #     height=1500
+    # )
+    # f.write_image('test.png')
