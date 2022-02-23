@@ -799,7 +799,7 @@ class Slope:
         """
         # draw the external boundary
         x_, y_ = self._external_boundary.coords.xy
-        fig = go.Figure(go.Scatter(x=list(x_), y=list(y_), mode="lines"))
+        fig = go.Figure(go.Scatter(x=list(x_), y=list(y_), mode="lines",name=''))
 
         # following makes sure x and y are scaled the same, so that
         # model can be interpretted properly
@@ -810,7 +810,9 @@ class Slope:
 
         # dont show legend
         fig.update_layout(
-            showlegend=False
+            showlegend=False,
+            # width=1920,
+            # height=1080
         )
 
         # if there are no materials just return an empty shell
@@ -860,7 +862,7 @@ class Slope:
             y_ = [a[1] for a in coords]
 
             fig.add_trace(
-                go.Scatter(x=list(x_), y=list(y_), mode="lines", fill="toself")
+                go.Scatter(x=list(x_), y=list(y_), mode="lines", fill="toself",name='')
             )
 
             # set the new top as the bottom, sort to put it back
@@ -868,7 +870,7 @@ class Slope:
             bot.sort()
             top = bot
 
-        fig = self._plot_material_properties(fig)
+        fig = self._plot_material_table(fig)
         
         if self._load_magnitude:
             fig = self._plot_load(fig)
@@ -935,6 +937,7 @@ class Slope:
                 text=[f"{FOS:.3f}"],
                 textposition="top right",
                 textfont=dict(family="sans serif", size=30, color=color),
+                name='',
             )
         )
 
@@ -966,6 +969,7 @@ class Slope:
                 mode="lines",
                 line_color="blue",
                 line_width=4,
+                name='',
             )
         )
 
@@ -1154,90 +1158,112 @@ class Slope:
 
     #NOTE: method not working well since scaling is off.
 
-    # def _plot_material_table(self, fig):
+    def _plot_material_table(self, fig):
 
-    #     header_h = 0.05
-    #     row_h = 0.035
+        header_h = 0.05
+        row_h = 0.035
 
-    #     table_width = 0.3
-    #     table_height = header_h + row_h * len(self._materials)
+        table_width = 0.3
+        table_height = header_h + row_h * len(self._materials)
 
-    #     x0,y0 = 0.1,0.1
+        x0,y0 = 0.1,0.1
 
-    #     x1 = x0+table_width
-    #     y1 = y0+table_height
+        x1 = x0+table_width
+        y1 = y0+table_height
 
-    #     # add background        
-    #     fig.add_shape(
-    #         type="rect",
-    #         xref="x domain", yref="y domain",
-    #         x0=x0, x1=x1, y0=y0, y1=y1,
-    #         fillcolor='white'
-    #     )
+        # add background        
+        fig.add_shape(
+            type="rect",
+            xref="x domain", yref="y domain",
+            x0=x0, x1=x1, y0=y0, y1=y1,
+            fillcolor='white'
+        )
 
-    #     # add columns
-    #     column_relative_width = [20,10,10,10,10]
-    #     table_header = ['Material Name','Color','γ (kN/m3)', "c' (kPa)", "ϕ (deg)"]
-    #     table_header = ['<br>'+a+'<br>' for a in table_header]
+        # add columns
+        column_relative_width = [20,15,10,10,10]
+        table_header = ['Material','Color','γ', "c", "ϕ"]
+        table_header = ['<br>'+a+'<br>' for a in table_header]
 
-    #     t = sum(column_relative_width)
-    #     column_unit_pos = []
+        t = sum(column_relative_width)
+        column_unit_pos = []
         
-    #     prev = 0
-    #     for a in column_relative_width:
-    #         column_unit_pos.append((prev+a)/t)
-    #         prev += a
+        prev = 0
+        for a in column_relative_width:
+            column_unit_pos.append((prev+a)/t)
+            prev += a
 
-    #     for c in column_unit_pos:
-    #         x = x0+c*(table_width)
+        for c in column_unit_pos:
+            x = x0+c*(table_width)
 
-    #         fig.add_shape(
-    #             type="rect",
-    #             xref="x domain", yref="y domain",
-    #             x0=x, x1=x, y0=y0, y1=y1,
-    #         )
+            fig.add_shape(
+                type="rect",
+                xref="x domain", yref="y domain",
+                x0=x, x1=x, y0=y0, y1=y1,
+            )
 
-    #     # add rows
-    #     # add header
-    #     fig.add_shape(
-    #         type="rect",
-    #         xref="x domain", yref="y domain",
-    #         x0=x0, x1=x1, y0=y1-header_h, y1=y1-header_h,
-    #     )
+        # add rows
+        # add header
+        fig.add_shape(
+            type="rect",
+            xref="x domain", yref="y domain",
+            x0=x0, x1=x1, y0=y1-header_h, y1=y1-header_h,
+        )
 
-    #     # add in header text
-    #     x = x0
-    #     for i, c in enumerate(column_unit_pos):
-    #         fig.add_annotation(
-    #             xref="x domain", yref="y domain",
-    #             x=x,
-    #             y=y1-header_h,
-    #             text=table_header[i],
-    #             showarrow=False,
-    #             yshift=15,
-    #             xshift=10,
-    #             font_size=20,
-    #             font_color="black",
-    #         )
-    #         x = x0+c*(table_width)
+        # add in header text
+        x = x0
+        for i, c in enumerate(column_unit_pos):
+            fig.add_annotation(
+                xref="x domain", yref="y domain",
+                x=x,
+                y=y1-header_h,
+                text=table_header[i],
+                showarrow=False,
+                yshift=15,
+                xshift=15,
+                font_size=20,
+                font_color="black",
+            )
+            x = x0+c*(table_width)
 
+        # add rows
+        for r in range(len(self._materials)):
+            y = y1 - header_h - r * row_h
 
-    #     for r in range(len(self._materials)):
-    #         y = y1 + r * row_h
+            fig.add_shape(
+                type="rect",
+                xref="x domain", yref="y domain",
+                x0=x0, x1=x1, y0=y, y1=y,
+            )
 
-    #         fig.add_shape(
-    #             type="rect",
-    #             xref="x domain", yref="y domain",
-    #             x0=x, x1=x, y0=y, y1=y,
-    #         )
+        # add material info
 
-    #     # add header
+        y = y1-header_h
+        for m in self._materials:
+            x = x0
+            y -= row_h
+            data = [m.name, 'red', m.unit_weight, m.cohesion, m.friction_angle]
 
-    #     return fig
+            for i, c in enumerate(column_unit_pos):
+                if i==1:
+                    pass
+                else:
+                    fig.add_annotation(
+                        xref="x domain", yref="y domain",
+                        x=x,
+                        y=y,
+                        text=data[i],
+                        showarrow=False,
+                        yshift=10,
+                        xshift=15,
+                        font_size=20,
+                        font_color="black",
+                    )
+                x = x0+c*(table_width)
+
+        return fig
 
     def _plot_FOS_legend(self, fig):
         
-        total = len(COLOUR_FOS_DICT)
         yi = 0.9
         yf = 0.5
 
@@ -1246,9 +1272,16 @@ class Slope:
 
         max_fos = max(COLOUR_FOS_DICT)
 
+        fig.add_shape(
+            type="rect",
+            xref="paper", yref="paper",
+            x0=x0-0.02, x1=x1+0.05, y0=yi+0.05, y1=yf-0.03,
+            fillcolor='white'
+        )
+
         for k,v in COLOUR_FOS_DICT.items():
             fig.add_shape(type='rect',
-                xref="x domain", yref="y domain",
+                xref="paper", yref="paper",
                 x0=x0,
                 x1=x1,
                 y0=yi+k*(yf-yi)/max_fos,
@@ -1269,7 +1302,7 @@ class Slope:
                     y = float(yi)+float(k+0.05)*float(yf-yi)/float(max_fos)
 
                 fig.add_annotation(
-                    xref="x domain", yref="y domain",
+                    xref="paper", yref="paper",
                     x=x1,
                     y=y,
                     text=f"{k}",
@@ -1282,13 +1315,14 @@ class Slope:
 
         # add top description
         fig.add_annotation(
-            xref="x domain", yref="y domain",
+            xref="paper", yref="paper",
             x=(x0+x1)/2,
             y=yi,
-            text=f"<b>FOS Legend</b>",
+            text=f"<b>Legend</b>",
+            align='center',
             showarrow=False,
             yshift=50,
-            xshift=80,
+            xshift=60,
             font_size=30,
             font_color="black",
         )
@@ -1381,6 +1415,7 @@ class Slope:
                 line_color=color,
                 meta=[round(FOS, 3)],
                 hovertemplate="%{meta[0]}",
+                name='',
             )
         )
 
@@ -1477,5 +1512,11 @@ if __name__ == "__main__":
     #     f"Took {time.perf_counter()-t1} seconds to process {len(s._search.keys())} runs"
     # )
     # # f = s.plot_all_planes()
+
     f.write_html('test.html')
+
+    f.update_layout(
+        width=2000,
+        height=1500
+    )
     f.write_image('test.png')
