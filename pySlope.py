@@ -376,6 +376,57 @@ class Slope:
         else:
             self._number_limits = 4
 
+    def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float):
+        # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
+        # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
+        p = Point(c_x, c_y)
+        c = p.buffer(radius).boundary
+
+        # find intersection points with boundary if any, else return None
+        if c.intersects(self._external_boundary):
+            i = c.intersection(self._external_boundary)
+        else:
+            return None
+
+        # list for intersecting points between circle and external boundary
+        i_list = []
+
+        # loop through each point in the intersection list
+        if not isinstance(i, MultiPoint):
+            # something is wrong should be multipoint
+            return None
+
+        for p in i.geoms:
+            # if point append x,y to list
+            if isinstance(p, Point):
+                if p.y < self._bot_coord[1]:
+                    return None
+                i_list.append((round(p.x, 5), round(p.y, 5)))
+
+            # might actually give a line string of the tiniest length
+            # could happen due to 64 sided polygon if the circle is close to intersecting
+            # at its end. In this case just use the first point of the line
+            # since the points are close together anyways
+            elif isinstance(p, LineString):
+                if p[0][1] < self._bot_coord[1]:
+                    return None
+                i_list.append((round(p.coords[0][0], 5), round(p.coords[0][1], 5)))
+
+        # make sure no input inside twice. Has been observed where the point of intersection
+        # is the boundary between two linestrings
+        i_list = list(set(i_list))
+        i_list.sort()
+
+        # check that there are only two intersecting points otherwise something is wrong
+        if len(i_list) > 1:
+            i_list = i_list[0:2]
+        else:
+            return None
+
+        return i_list
+
+
+
     def analyse_circular_failure(self, c_x: float, c_y: float, radius: float):
         """Calculate factor of safety for a circular failure plane through the slope.
 
@@ -401,46 +452,9 @@ class Slope:
         assert_strictly_positive_number(c_y, "c_y (circle y coordinate)")
         assert_strictly_positive_number(radius, "radius")
 
-        # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
-        # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
-        p = Point(c_x, c_y)
-        c = p.buffer(radius).boundary
+        i_list = self._get_circle_external_intersection(c_x,c_y,radius)
 
-        # find intersection points with boundary if any, else return None
-        if c.intersects(self._external_boundary):
-            i = c.intersection(self._external_boundary)
-        else:
-            return None
-
-        # list for intersecting points between circle and external boundary
-        i_list = []
-
-        # loop through each point in the intersection list
-        if not isinstance(i, MultiPoint):
-            # something is wrong should be multipoint
-            return None
-
-        for p in i.geoms:
-            # if point append x,y to list
-            if isinstance(p, Point):
-                i_list.append((round(p.x, 5), round(p.y, 5)))
-
-            # might actually give a line string of the tiniest length
-            # could happen due to 64 sided polygon if the circle is close to intersecting
-            # at its end. In this case just use the first point of the line
-            # since the points are close together anyways
-            elif isinstance(p, LineString):
-                i_list.append((round(p.coords[0][0], 5), round(p.coords[0][1], 5)))
-
-        # make sure no input inside twice. Has been observed where the point of intersection
-        # is the boundary between two linestrings
-        i_list = list(set(i_list))
-        i_list.sort()
-
-        # check that there are only two intersecting points otherwise something is wrong
-        if len(i_list) > 1:
-            i_list = i_list[0:2]
-        else:
+        if not i_list:
             return None
 
         # total number of slices
@@ -459,36 +473,19 @@ class Slope:
         pushing = 0.0
         resisting = 0.0
 
-        # loop through slice, actually want to iterate 1 time less than
-        # the number of slices since we start at half a slice
-        for slice in range(1, SLICES, 1):
+        # loop through slices
+        for _ in range(0, SLICES):
             # define y coordinates for slice
             s_yb = c_y - sqrt(radius**2 - (s_x - c_x) ** 2)
 
             # get y coordinate at top
-            # left of slope
-            if s_x <= self._top_coord[0]:
-                s_yt = self._top_coord[1]
-            # right of slope
-            elif s_x >= self._bot_coord[0]:
-                s_yt = self._bot_coord[1]
-            # on the slope
-            else:
-                # similiar triangles
-                # minus because going to the right down
-                # equation defining gradient just considers abs height on abs length
-                s_yt = (-self._gradient) * (s_x - self._top_coord[0]) + self._top_coord[
-                    1
-                ]
+            s_yt = self.get_external_y_intersection(s_x)
 
             # get alpha, dy always positive, dx negative to right (uphill), dx positive to left
             # note alpha in radians by default
             dy = c_y - s_yb
             dx = c_x - s_x
             alpha = atan(dx / dy)
-
-            # get height of unit
-            h = s_yt - s_yb
 
             # get length
             l = b / cos(alpha)
@@ -558,8 +555,6 @@ class Slope:
                 radians(friction_angle)
             )
             pushing += W * sin(alpha)
-            if pushing == 0:
-                stop = True
 
             # initialise slice x coordinate for next loop
             s_x = s_x + b
@@ -683,12 +678,12 @@ class Slope:
             # NOTE: we dont want the end points since we already grabbed those in left and right coords.
             if self._gradient < GRADIENT_TOLERANCE and x2 >= x1:
                 left_mid_coords = [x1 + (x2-x1)*(i/(NUMBER_POINTS_SLOPE+1)) for i in range(1,NUMBER_POINTS_SLOPE+1)]
-                left_coords += [(x, self.external_y_intersection(x)) for x in left_mid_coords]
+                left_coords += [(x, self.get_external_y_intersection(x)) for x in left_mid_coords]
 
             # if x4 ! > x3 then limit off of slope
             if x4 >= x3:
                 right_mid_coords = [x3 + (x4-x3)*(i/(NUMBER_POINTS_SLOPE+1)) for i in range(1,NUMBER_POINTS_SLOPE+1)]
-                right_coords += [(x, self.external_y_intersection(x)) for x in right_mid_coords]
+                right_coords += [(x, self.get_external_y_intersection(x)) for x in right_mid_coords]
                 
         search = {}
 
@@ -832,7 +827,7 @@ class Slope:
         for i, m in enumerate(self._materials):
             # get reference level (y coordinate) for material
             y = m.RL
-            x = self.external_x_intersection(y)
+            x = self.get_external_x_intersection(y)
 
             line = [(0, y), (x, y)]
 
@@ -959,7 +954,7 @@ class Slope:
             return fig
 
         y = self._water_RL
-        x = self.external_x_intersection(y)
+        x = self.get_external_x_intersection(y)
 
         x_line = [0, x]
         y_line = [y, y]
@@ -1009,10 +1004,10 @@ class Slope:
         l1_x, l2_x = self._limits[0]
         r1_x, r2_x = self._limits[1]
         
-        l1_y = self.external_y_intersection(l1_x)
-        l2_y = self.external_y_intersection(l2_x)
-        r1_y = self.external_y_intersection(r1_x)
-        r2_y = self.external_y_intersection(r2_x)
+        l1_y = self.get_external_y_intersection(l1_x)
+        l2_y = self.get_external_y_intersection(l2_x)
+        r1_y = self.get_external_y_intersection(r1_x)
+        r2_y = self.get_external_y_intersection(r2_x)
 
         points_right = [(l1_x, l1_y)]
         points_left = [(r2_x, r2_y)]
@@ -1477,7 +1472,7 @@ class Slope:
 
         return fig
 
-    def external_y_intersection(self,x):
+    def get_external_y_intersection(self,x):
         """ return y coordinate of intersection with boundary for a given x """
         if x < 0 or x > self._external_length:
             return None
@@ -1490,7 +1485,7 @@ class Slope:
         else:
             return self._top_coord[1] - (x - self._top_coord[0]) * self._gradient
 
-    def external_x_intersection(self,y):
+    def get_external_x_intersection(self,y):
         """ return x coordinate of intersection with boundary for a given y """
         # y is below the bottom of the slope
         if y <= self._bot_coord[1]:
