@@ -1,9 +1,7 @@
 # standard library imports
-from lib2to3.pgen2.token import NUMBER
 from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
-from turtle import fillcolor
 
 # import concurrent.futures
 from colour import Color
@@ -746,7 +744,7 @@ class Slope:
 
         # starting circle details
         start_radius = half_coord_distance / cos(beta)
-        start_centre = (l_c[0] + start_radius, l_c[1])
+        # start_centre = (l_c[0] + start_radius, l_c[1])
         start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
         start_chord_to_edge = start_radius - start_chord_to_centre
 
