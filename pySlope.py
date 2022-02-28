@@ -583,7 +583,7 @@ class Slope:
         # Approx number of runs
         ITERATIONS = self._iterations
 
-        GRADIENT_TOLERANCE = 10
+        GRADIENT_TOLERANCE = 5
 
         # # seems like 15 % of runs dont happen every time for some reason,
         # # possibly just general geometry clashes
