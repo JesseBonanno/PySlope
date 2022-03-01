@@ -27,9 +27,42 @@ class Material:
     depth_to_bottom: int = 5
     name : str = ''
 
+    def __post_init__(self):
+        assert_positive_number(self.unit_weight, 'unit weight')
+        assert_positive_number(self.friction_angle, 'friction_angle')
+        assert_positive_number(self.cohesion, 'cohesion')
+        assert_positive_number(self.depth_to_bottom, 'depth to bottom')
+        assert(isinstance(self.name, str))
+
+
     def __repr__(self):
         return f"Material:{self.name}(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom}"
 
+@dataclass
+class UDL:
+    load_magnitude: float = 0
+    load_location: tuple = (0, 1)
+
+    def __post_init__(self):
+        assert_positive_number(self.load_magnitude, 'load magnitude')
+        assert_positive_number(self.load_location[0], 'load start location')
+        assert_positive_number(self.load_location[1], 'load end location')
+        assert_length(self.load_location, 2, 'load location tuple')
+
+    def __repr__(self):
+        return f"UDL: {load_magnitude} kPa, from x = {load_location[0]} m to x = {load_location[1]} m"
+
+@dataclass
+class PointLoad:
+    load_magnitude: float = 0
+    load_location: float = 0
+
+    def __post_init__(self):
+        assert_positive_number(self.load_magnitude, 'load magnitude')
+        assert_positive_number(self.load_location, 'load location')
+
+    def __repr__(self):
+        return f"UDL: {load_magnitude} kPa, from x = {load_location} m"
 
 class Slope:
     def __init__(self, height: float = 2, angle: int = 30, length: float = None):
@@ -128,12 +161,15 @@ class Slope:
         assert_positive_number(depth, "water depth")
         self._water_RL = max(0, self._top_coord[1] - depth)
 
+        self._reset_results()
+
     def remove_water_table(self):
         """Remove water table from model"""
         self._water_RL = None
 
-    def set_surcharge(
-        self, offset: float = 0.0, load: float = 20.0, length: float = None
+        self._reset_results()
+
+    def set_surcharge(self, offset: float = 0.0, load: float = 20.0, length: float = None
     ):
         """set a surface surcharge on top of the slope
 
@@ -166,9 +202,13 @@ class Slope:
         self._load_magnitude = load
         self._load_location = [left_x, right_x]
 
+        self._reset_results()
+
     def remove_surcharge(self):
         """Remove surcharge from model."""
         self._load_magnitude = 0
+
+        self._reset_results()
 
     def set_materials(self, *materials):
         """Assign material instances to the slope instance.
@@ -193,6 +233,8 @@ class Slope:
                     "The function add_materials only accepts instances of the Material Class"
                 )
 
+        # Need to validate material values also
+
         # sort materials to be in order, include existing materials
         materials = list(materials) + self._materials
         materials.sort(key=lambda x: x.depth_to_bottom)
@@ -210,6 +252,8 @@ class Slope:
             material.RL = self._external_height - material.depth_to_bottom
 
         self._materials = materials
+
+        self._reset_results()
 
     def remove_material(self, material: Material = None, depth: float = None):
         """Remove material from slope.
@@ -235,6 +279,8 @@ class Slope:
             for m in self._materials:
                 if m.depth_to_bottom == depth:
                     self._materials.remove(m)
+
+        self._reset_results()
 
     def update_options(
         self,
@@ -282,6 +328,8 @@ class Slope:
         if self._external_boundary is not None:
             self.set_external_boundary(height=self._height, length=self._length)
 
+        self._reset_results()
+
     def reset_analysis_limits(self):
         self.set_analysis_limits(
             left_x = 0,
@@ -289,7 +337,9 @@ class Slope:
             right_x = self._external_length,
             left_x_right = self._external_length,
         )
-    
+
+        self._reset_results()
+
     def set_analysis_limits(
         self,
         left_x: float = None,
@@ -374,6 +424,8 @@ class Slope:
         else:
             self._number_limits = 4
 
+        self._reset_results()
+
     def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float):
         # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
         # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
@@ -423,6 +475,81 @@ class Slope:
 
         return i_list
 
+    def _calculate_strip_weight(self, b, s_yt, s_yb):
+        # intialize properties
+        W = 0.0  # kN
+        top = s_yt
+
+        # loop through materials noting that they are already sorted by depth
+        for m in self._materials:
+            # while layers are higher than the top of the slice ignore the material
+            if m.RL > s_yt:
+                continue
+            # while the bottom of layer is in the slice consider, go from the
+            # current top to the bottom of the layer
+            # this captures the case of the top of the strip being partially in a layer
+            elif m.RL < s_yt and m.RL > s_yb:
+                W += b * m.unit_weight * (top - m.RL)
+                top = m.RL
+            # in the case that the bottom of the strip is now outside the range
+            # we still have material between the current top and the bottom of the strip
+            # we capture it in this edge case and then break since everything below can be ignored
+            # we also grab the material properties at the base
+            else:
+                W += b * m.unit_weight * (top - s_yb)
+                top = m.RL
+                break
+
+        # check case that ran out of layers (loop terminated earlier than expected)
+        if top > s_yb:
+            m = self._materials[-1]
+            W += b * m.unit_weight * (top - s_yb)
+
+        return W
+
+    def _get_material_at_depth(self, s_yb):
+
+        #initialise previous material
+        previous = self._materials[0]
+
+        # loop through all materials, if we have passed the bottom take the previous
+        for m in self._materials:
+            # while layers are higher than the top of the bottom of the slice ignore the material
+            if m.RL > s_yb:
+                return previous
+            else:
+                previous = m
+
+        return self._materials[-1]
+
+    def _calculate_strip_UDL_force(self, b, s_x):
+        W = 0
+
+        if self._load_magnitude:
+            load_xl, load_xr = self._load_location
+            strip_xl = s_x - (b / 2)
+            strip_xr = s_x + (b / 2)
+            # case 1 clearly no load
+            if load_xr <= strip_xl or load_xl >= strip_xr:
+                pass
+            # case 2 clearly load is completely inside
+            elif load_xl <= strip_xl and load_xr >= strip_xr:
+                W += b * self._load_magnitude
+            # case 3 on the left inside the load
+            elif strip_xl <= load_xl and strip_xr >= load_xl:
+                W += (strip_xr - load_xl) * self._load_magnitude
+
+            # case 4 on the right side of the load
+            elif strip_xl <= load_xr and strip_xr >= load_xr:
+                W += (load_xr - strip_xl) * self._load_magnitude
+
+            else:
+                raise ValueError("ummm is this actually a possible case?")
+
+        return W
+
+    def _calculate_strip_point_load(self, s_x):
+        return 0
 
 
     def analyse_circular_failure(self, c_x: float, c_y: float, radius: float):
@@ -473,10 +600,10 @@ class Slope:
 
         # loop through slices
         for _ in range(0, SLICES):
-            # define y coordinates for slice
+            # define y coordinates for slice bottom
             s_yb = c_y - sqrt(radius**2 - (s_x - c_x) ** 2)
 
-            # get y coordinate at top
+            # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
 
             # get alpha, dy always positive, dx negative to right (uphill), dx positive to left
@@ -488,70 +615,33 @@ class Slope:
             # get length
             l = b / cos(alpha)
 
-            # intialize properties
-            W = 0.0  # kN
-            top = s_yt
+            # calculate strip weight
+            W = self._calculate_strip_weight(b, s_yt, s_yb)
 
-            # loop through materials noting that they are already sorted by depth
-            for m in self._materials:
-                # while layers are higher than the top of the slice ignore the material
-                if m.RL > s_yt:
-                    continue
-                # while the bottom of layer is in the slice consider, go from the
-                # current top to the bottom of the layer
-                # this captures the case of the top of the strip being partially in a layer
-                elif m.RL < s_yt and m.RL > s_yb:
-                    W += b * m.unit_weight * (top - m.RL)
-                    top = m.RL
-                # in the case that the bottom of the strip is now outside the range
-                # we still have material between the current top and the bottom of the strip
-                # we capture it in this edge case and then break since everything below can be ignored
-                # we also grab the material properties at the base
-                else:
-                    W += b * m.unit_weight * (top - s_yb)
-                    top = m.RL
-                    cohesion = m.cohesion
-                    friction_angle = m.friction_angle
-                    break
+            # get material properties at the bottom of the slice
+            bottom_material = self._get_material_at_depth(s_yb)
 
-            # check case that ran out of layers (loop terminated earlier than expected)
-            if top > s_yb:
-                m = self._materials[-1]
-                W += b * m.unit_weight * (top - s_yb)
-                top = m.RL
-                cohesion = m.cohesion
-                friction_angle = m.friction_angle
+            cohesion = bottom_material.cohesion
+            friction_angle = bottom_material.friction_angle
 
-            # if there is a load on the strip apply it.
-            if self._load_magnitude:
-                load_xl, load_xr = self._load_location
-                strip_xl = s_x - (b / 2)
-                strip_xr = s_x + (b / 2)
-                # case 1 clearly no load
-                if load_xr <= strip_xl or load_xl >= strip_xr:
-                    pass
-                # case 2 clearly load is completely inside
-                elif load_xl <= strip_xl and load_xr >= strip_xr:
-                    W += b * self._load_magnitude
-                # case 3 on the left inside the load
-                elif strip_xl <= load_xl and strip_xr >= load_xl:
-                    W += (strip_xr - load_xl) * self._load_magnitude
+            # if there is a UDL load on the strip apply it.
+            W += self._calculate_strip_UDL_force(b, s_x)
 
-                # case 4 on the right side of the load
-                elif strip_xl <= load_xr and strip_xr >= load_xr:
-                    W += (load_xr - strip_xl) * self._load_magnitude
+            # if there is a point load on the strip apply it.
+            W += self._calculate_strip_point_load(s_x)
 
-                else:
-                    raise ValueError("ummm is this actually a possible case?")
-
+            # consideration for water
             if self._water_RL:
                 U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * l
             else:
                 U = 0
 
+            # calculate resisting
             resisting += cohesion * l + max(0, (W * cos(alpha) - U)) * tan(
                 radians(friction_angle)
             )
+
+            # calculate pushing
             pushing += W * sin(alpha)
 
             # initialise slice x coordinate for next loop
@@ -561,6 +651,42 @@ class Slope:
             return None
 
         return (resisting / pushing, i_list[0], i_list[1])
+
+    def _calculate_number_points_slope(self, deep_seeded_only, point_combinations, GRADIENT_TOLERANCE):
+        # if deep seeded or limits exclude slope
+        if deep_seeded_only or (
+            self._limits[0][1] < self._top_coord[0] and
+            self._limits[1][0] > self._bot_coord[0]
+            ):
+            NUMBER_POINTS = int(sqrt(point_combinations))
+
+        # if limits exclude slope only in one direction
+        elif (
+            self._limits[0][1] < self._top_coord[0] or
+            self._limits[1][0] > self._bot_coord[0]
+            ):
+            P = point_combinations
+            N = NUMBER_POINTS_SLOPE
+
+            NUMBER_POINTS = int((-N + sqrt( N**2 + 4 * P ))/2 )
+
+        else:
+            if self._gradient > GRADIENT_TOLERANCE:
+                NUMBER_POINTS = (
+                    int(
+                        (
+                            NUMBER_POINTS_SLOPE
+                            + sqrt(NUMBER_POINTS_SLOPE**2 + 4 * point_combinations)
+                        )
+                        / 2
+                    )
+                    - NUMBER_POINTS_SLOPE
+                )
+            else:
+                NUMBER_POINTS = int(sqrt(point_combinations)) - NUMBER_POINTS_SLOPE
+
+        return NUMBER_POINTS
+
 
     def analyse_slope(self, deep_seeded_only=False):
         """Analyse many possible failure planes for a slope.
@@ -580,18 +706,11 @@ class Slope:
         self._MIN_FOS_LOCATION
 
         """
-        # Approx number of runs
+        # tolerance for when to stop adding points to slope
+        GRADIENT_TOLERANCE = 8
+
+        # Approximate number of runs and distribution of searches
         ITERATIONS = self._iterations
-
-        GRADIENT_TOLERANCE = 5
-
-        # # seems like 15 % of runs dont happen every time for some reason,
-        # # possibly just general geometry clashes
-        # ITERATIONS = ITERATIONS
-
-        # 10 * 10 * 5 = 500
-        # allow for 3 mid points of slope
-        # 3 * 10 * 5 = 150 (minimum) - 650 min iterations
 
         NUMBER_CIRCLES = max(5, int(ITERATIONS / 1000))
 
@@ -600,37 +719,7 @@ class Slope:
         # generate coordinates for left of slope
         point_combinations = ITERATIONS / NUMBER_CIRCLES
 
-        # if deep seeded or limits exclude slope
-        if deep_seeded_only or (
-            self._limits[0][1] < self._top_coord[0] and
-            self._limits[1][0] > self._bot_coord[0]
-            ):
-            NUMBER_POINTS = int(sqrt(point_combinations))
-
-        # if limits exclude slope only in one direction
-        elif (
-            self._limits[0][1] < self._top_coord[0] or
-            self._limits[1][0] > self._bot_coord[0]
-            ):
-            P = point_combinations
-            N = NUMBER_POINTS_SLOPE
-
-            NUMBER_POINTS = int((-N + sqrt( N**2 + 4 * P ))/2 )
-            
-        else:
-            if self._gradient > GRADIENT_TOLERANCE:
-                NUMBER_POINTS = (
-                    int(
-                        (
-                            NUMBER_POINTS_SLOPE
-                            + sqrt(NUMBER_POINTS_SLOPE**2 + 4 * point_combinations)
-                        )
-                        / 2
-                    )
-                    - NUMBER_POINTS_SLOPE
-                )
-            else:
-                NUMBER_POINTS = int(sqrt(point_combinations)) - NUMBER_POINTS_SLOPE
+        NUMBER_POINTS = self._calculate_number_points_slope(deep_seeded_only, point_combinations, GRADIENT_TOLERANCE)
 
         x1, x2, x3, x4 = (
             min(self._top_coord[0], self._limits[0][0]),
@@ -682,7 +771,7 @@ class Slope:
             if x4 >= x3:
                 right_mid_coords = [x3 + (x4-x3)*(i/(NUMBER_POINTS_SLOPE+1)) for i in range(1,NUMBER_POINTS_SLOPE+1)]
                 right_coords += [(x, self.get_external_y_intersection(x)) for x in right_mid_coords]
-                
+
         search = {}
 
         min_dist = dist_points(self._top_coord, self._bot_coord) / 3
@@ -873,7 +962,7 @@ class Slope:
             top = bot
 
         fig = self._plot_material_table(fig)
-        
+
         if self._load_magnitude:
             fig = self._plot_load(fig)
 
@@ -881,7 +970,7 @@ class Slope:
             fig = self._plot_water(fig)
 
         fig = self._plot_limits(fig)
-        
+
 
         return fig
 
@@ -963,7 +1052,7 @@ class Slope:
         if x <= self._bot_coord[0]:
             x_line += [self._bot_coord[0], self._external_length]
             y_line += [self._bot_coord[1], self._bot_coord[1]]
-            
+
         fig.add_trace(
             go.Scatter(
                 x=x_line,
@@ -998,10 +1087,10 @@ class Slope:
         return fig
 
     def _plot_limits(self, fig):
-        
+
         l1_x, l2_x = self._limits[0]
         r1_x, r2_x = self._limits[1]
-        
+
         l1_y = self.get_external_y_intersection(l1_x)
         l2_y = self.get_external_y_intersection(l2_x)
         r1_y = self.get_external_y_intersection(r1_x)
@@ -1155,7 +1244,7 @@ class Slope:
                 font_color="black",
             )
 
-        return fig   
+        return fig
 
 
     #NOTE: method not working well since scaling is off.
@@ -1184,7 +1273,7 @@ class Slope:
             fillcolor='lightgrey',
         )
 
-        # add background        
+        # add background
         fig.add_shape(
             type="rect",
             xref="x domain", yref="y domain",
@@ -1202,7 +1291,7 @@ class Slope:
 
         t = sum(column_relative_width)
         column_unit_pos = []
-        
+
         prev = 0
         for a in column_relative_width:
             column_unit_pos.append((prev+a)/t)
@@ -1278,7 +1367,7 @@ class Slope:
         return fig
 
     def _plot_FOS_legend(self, fig):
-        
+
         yi = 0.9
         yf = 0.5
 
@@ -1478,7 +1567,7 @@ class Slope:
         elif x <= self._top_coord[0]:
             return self._top_coord[1]
         elif x >= self._bot_coord[0]:
-            return self._bot_coord[1]        
+            return self._bot_coord[1]
         # y is above the bottom of the slope
         else:
             return self._top_coord[1] - (x - self._top_coord[0]) * self._gradient
@@ -1488,7 +1577,7 @@ class Slope:
         # y is below the bottom of the slope
         if y <= self._bot_coord[1]:
             return self._external_length
-        
+
         # y is above the bottom of the slope
         elif y <= self._external_height:
             return self._top_coord[0] + (self._top_coord[1] - y) / self._gradient
@@ -1499,9 +1588,10 @@ class Slope:
 
 
 if __name__ == "__main__":
+    a = UDL(1,(1,2))
     s = Slope(height=5, angle=None, length=5.608)
 
-    sand = Material(20, 35, 5, 1, 'sand')
+    sand = Material(20, 35, 5, 4)
     clay = Material(18, 25, 5, 4, 'clay')
     grass = Material(16, 20, 4, 10)
     m = [Material(depth_to_bottom=a,name='hello') for a in range(1,5)]
