@@ -26,6 +26,7 @@ class Material:
     cohesion: int = 2
     depth_to_bottom: int = 5
     name : str = ''
+    color: str = ''
 
     def __post_init__(self):
         assert_positive_number(self.unit_weight, 'unit weight')
@@ -248,8 +249,17 @@ class Slope:
             raise ValueError("The same material depth has been input twice")
 
         # define RL for each material
-        for material in materials:
+        for i, material in enumerate(materials):
             material.RL = self._external_height - material.depth_to_bottom
+
+            if material.color:
+                try:
+                    color = Color(material.color)
+                    material.color = color.hex
+                except:
+                    material.color = MATERIAL_COLORS[i%10]
+            else:
+                material.color = MATERIAL_COLORS[i%10]
 
         self._materials = materials
 
@@ -952,7 +962,7 @@ class Slope:
                     fill="toself",
                     name=f'{m.name}<br>γ: {m.unit_weight} kN/m3<br>c: {m.cohesion} kPa<br>ϕ: {m.friction_angle} degrees',
                     hovertemplate="",
-                    fillcolor = MATERIAL_COLORS[i%10]
+                    fillcolor = m.color
                 )
             )
 
@@ -1348,7 +1358,7 @@ class Slope:
                         xref="paper", yref="paper",
                         x0=x, x1=x0+column_unit_pos[1]*(table_width),
                         y0=y+row_h, y1=y,
-                        fillcolor=MATERIAL_COLORS[p%10],
+                        fillcolor= m.color,
                     )
                 else:
                     fig.add_annotation(
@@ -1591,11 +1601,10 @@ if __name__ == "__main__":
     a = UDL(1,(1,2))
     s = Slope(height=5, angle=None, length=5.608)
 
-    sand = Material(20, 35, 5, 4)
-    clay = Material(18, 25, 5, 4, 'clay')
+    sand = Material(20, 35, 5, 4, color='blue')
+    clay = Material(18, 25, 5, 1, 'clay', 'blue')
     grass = Material(16, 20, 4, 10)
-    m = [Material(depth_to_bottom=a,name='hello') for a in range(1,5)]
-    s.set_materials(*m)
+    s.set_materials(sand, clay)
 
     s.update_options(iterations=1000)
 
