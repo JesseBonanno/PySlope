@@ -72,9 +72,11 @@ class Slope:
         self._external_boundary = None
 
         # intialise options
-        self.update_options(slices=50, iterations=2500, MIN_EXT_H=6, MIN_EXT_L=10)
-
+        self.update_analysis_options(slices=50, iterations=2500)
+        self.update_boundary_options(MIN_EXT_H=6, MIN_EXT_L=10)
         self.set_external_boundary(height=height, angle=angle, length=length)
+        
+        self.update_water_analysis_options(auto=True)
 
         # sets default analysis limits (ie no limit)
         self.reset_analysis_limits()
@@ -243,7 +245,7 @@ class Slope:
         depths = [material.depth_to_bottom for material in materials]
 
         if depths[-1] > self._external_height:
-            self.update_options(MIN_EXT_H=depths[-1])
+            self.update_boundary_options(MIN_EXT_H=depths[-1])
 
         if len(depths) > len(set(depths)):
             raise ValueError("The same material depth has been input twice")
@@ -292,14 +294,27 @@ class Slope:
 
         self._reset_results()
 
-    def update_options(
+    def update_water_analysis_options(self,auto : bool = True,H : int = 1):
+
+        if auto:
+            a = atan(self._gradient)
+            H = cos(a)**2
+
+        else:
+            assert_number(H, 'H')
+            if H > 1:
+                H = 1
+            elif H < 0:
+                H = 0
+        
+        self._water_analysis_H = H
+        self._reset_results()
+
+    def update_analysis_options(
         self,
         slices: int = None,
-        iterations: int = None,
-        MIN_EXT_L: float = None,
-        MIN_EXT_H: float = None,
-    ):
-        """Function to update general modelling options.
+        iterations: int = None):
+        """Function to update analysis modelling options.
 
         Parameters
         ----------
@@ -309,6 +324,25 @@ class Slope:
         iterations : int, optional
             Approximate number of potential slopes to check.
             If None doesnt update the parameter, by default None
+        """
+        if slices:
+            assert_range(slices, "slices", 10, 500)
+            self._slices = slices
+        if iterations:
+            assert_range(iterations, "iterations", 1000, 100000)
+            self._iterations = iterations
+
+        self._reset_results()
+
+    def update_boundary_options(
+        self,
+        MIN_EXT_L: float = None,
+        MIN_EXT_H: float = None,
+    ):
+        """Function to update external boundary options.
+
+        Parameters
+        ----------
         MIN_EXT_L : float, optional
             Minimum external boundary length. If None doesnt update
             the parameter, by default None
@@ -317,12 +351,6 @@ class Slope:
             the parameter, by default None.
         """
 
-        if slices:
-            assert_range(slices, "slices", 10, 500)
-            self._slices = slices
-        if iterations:
-            assert_range(iterations, "iterations", 1000, 100000)
-            self._iterations = iterations
         if MIN_EXT_H:
             assert_strictly_positive_number(
                 MIN_EXT_H, "Minimum external model height (MIN_EXT_H)"
@@ -519,16 +547,10 @@ class Slope:
 
     def _get_material_at_depth(self, s_yb):
 
-        #initialise previous material
-        previous = self._materials[0]
-
         # loop through all materials, if we have passed the bottom take the previous
         for m in self._materials:
-            # while layers are higher than the top of the bottom of the slice ignore the material
-            if m.RL > s_yb:
-                return previous
-            else:
-                previous = m
+            if m.RL < s_yb:
+                return m
 
         return self._materials[-1]
 
@@ -560,7 +582,6 @@ class Slope:
 
     def _calculate_strip_point_load(self, s_x):
         return 0
-
 
     def analyse_circular_failure(self, c_x: float, c_y: float, radius: float):
         """Calculate factor of safety for a circular failure plane through the slope.
@@ -642,7 +663,14 @@ class Slope:
 
             # consideration for water
             if self._water_RL:
-                U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * l
+                # determine H factor based on setting
+                # https://www.rocscience.com/help/slide2/documentation/slide-model/material-properties/define-material-properties/water-parameters
+
+                # only use H factor if on the slope, otherwise use 1
+                if self._top_coord[0] < s_x < self._bot_coord[0]:
+                    U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * l * self._water_analysis_H
+                else:
+                    U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * l * 1
             else:
                 U = 0
 
@@ -662,8 +690,8 @@ class Slope:
 
         return (resisting / pushing, i_list[0], i_list[1])
 
-    def _calculate_number_points_slope(self, deep_seeded_only, point_combinations, GRADIENT_TOLERANCE):
-        # if deep seeded or limits exclude slope
+    def _calculate_number_points_slope(self, deep_seeded_only, point_combinations, GRADIENT_TOLERANCE, NUMBER_POINTS_SLOPE):
+        # if deep seeded or limits exclude
         if deep_seeded_only or (
             self._limits[0][1] < self._top_coord[0] and
             self._limits[1][0] > self._bot_coord[0]
@@ -729,7 +757,7 @@ class Slope:
         # generate coordinates for left of slope
         point_combinations = ITERATIONS / NUMBER_CIRCLES
 
-        NUMBER_POINTS = self._calculate_number_points_slope(deep_seeded_only, point_combinations, GRADIENT_TOLERANCE)
+        NUMBER_POINTS = self._calculate_number_points_slope(deep_seeded_only, point_combinations, GRADIENT_TOLERANCE, NUMBER_POINTS_SLOPE)
 
         x1, x2, x3, x4 = (
             min(self._top_coord[0], self._limits[0][0]),
@@ -882,6 +910,15 @@ class Slope:
         self._min_FOS = 0
         self._min_FOS_location = []
 
+    def get_min_FOS(self):
+        return self._min_FOS
+
+    def get_min_FOS_circle(self):
+        return self._min_FOS_location[0:3]
+
+    def get_min_FOS_end_points(self):
+        return self._min_FOS_location[3:]
+
     def plot_boundary(self):
         """Plot external boundary, materials, loading and water for model.
 
@@ -993,8 +1030,9 @@ class Slope:
         """
         fig = self.plot_boundary()
 
-        c_x, c_y, radius, l_c, r_c = self._min_FOS_location
-        FOS = self._min_FOS
+        c_x, c_y, radius = self.get_min_FOS_circle()
+        l_c, r_c = self.get_min_FOS_end_points()
+        FOS = self.get_min_FOS()
 
         fig = self._plot_failure_plane(
             fig, c_x, c_y, radius, l_c, r_c, FOS=FOS, show_center=True
@@ -1598,36 +1636,25 @@ class Slope:
 
 
 if __name__ == "__main__":
-    a = UDL(1,(1,2))
-    s = Slope(height=5, angle=None, length=5.608)
+    s = Slope(height=3, angle=30, length=None)
 
-    sand = Material(20, 35, 5, 4, color='blue')
-    clay = Material(18, 25, 5, 1, 'clay', 'blue')
-    grass = Material(16, 20, 4, 10)
-    s.set_materials(sand, clay)
+    m1 = Material(20,35,5,1)
+    m2 = Material(20,35,0,5)
 
-    s.update_options(iterations=1000)
+    s.set_surcharge(0.5,20)
 
-    s.set_surcharge(0, 10)
+    s.set_materials(m1,m2)
 
-    s.set_water_table(1.5)
+    s.set_water_table(0)
 
-    s.set_analysis_limits(left_x = 5, right_x = 25, left_x_right =10, right_x_left=20)
+    s.update_water_analysis_options(auto=True)
 
     s.analyse_slope()
 
-    # # print(len(s._search))
-
-    f = s.plot_all_planes()
-
-    # t1 = time.perf_counter()
-    # s.analyse_slope()
-    # print(
-    #     f"Took {time.perf_counter()-t1} seconds to process {len(s._search.keys())} runs"
-    # )
-    # # f = s.plot_all_planes()
+    f = s.plot_all_planes(0.8)
 
     f.write_html('test.html')
+
 
     # f.update_layout(
     #     width=2000,
