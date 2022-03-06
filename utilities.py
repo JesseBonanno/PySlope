@@ -2,6 +2,21 @@
 from math import cos, sin, sqrt
 from shapely.geometry import Point
 from colour import Color
+from functools import wraps
+
+MATERIAL_COLORS = ['#efa59c','#77e1ca', '#cdacfc','#f2c6a7','#7edff4','#f2a8c3','#cde9ba','#f2c1fa','#f1dba3','#a3acf7']
+
+#wrapper for slope results
+def reset_results(method):
+    @wraps(method)
+    def _impl(self, *method_args, **method_kwargs):
+        method_output = method(self, *method_args, **method_kwargs)
+        self._search = []
+        self._min_FOS = 0
+        self._min_FOS_location = []
+        return method_output
+    return _impl
+
 
 def mid_coord(p1 : Point, p2 : Point) -> Point:
     return [(a + b) / 2 for a, b in zip(p1, p2)]

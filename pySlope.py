@@ -15,21 +15,8 @@ from rich import print
 
 # local imports
 from data_validation import *
-from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_points
-from utilities import COLOUR_FOS_DICT
-
-MATERIAL_COLORS = ['#efa59c','#77e1ca', '#cdacfc','#f2c6a7','#7edff4','#f2a8c3','#cde9ba','#f2c1fa','#f1dba3','#a3acf7']
-
-#wrapper for slope results
-def reset_results(method):
-    @wraps(method)
-    def _impl(self, *method_args, **method_kwargs):
-        method_output = method(self, *method_args, **method_kwargs)
-        self._search = {}
-        self._min_FOS = 0
-        self._min_FOS_location = []
-        return method_output
-    return _impl
+from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_points, reset_results
+from utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
 
 @dataclass
 class Material:
@@ -84,10 +71,10 @@ class Slope:
         self._external_boundary = None
 
         # intialise options
-        self.update_analysis_options(slices=50, iterations=2500)
         self.update_boundary_options(MIN_EXT_H=6, MIN_EXT_L=10)
         self.set_external_boundary(height=height, angle=angle, length=length)
-        
+        self.update_analysis_options(slices=50, iterations=2500, min_failure_dist = 0)
+
         self.update_water_analysis_options(auto=True)
 
         # sets default analysis limits (ie no limit)
@@ -299,6 +286,17 @@ class Slope:
 
     @reset_results
     def update_water_analysis_options(self,auto : bool = True,H : int = 1):
+        """Update analysis options regarding how water is treated.
+
+        Parameters
+        ----------
+        auto : bool, optional
+            If true calculates pressure head automatically (factor is cos(a)**2 where a is 
+            the angle of slope). If False takes manual factor (H). by default True
+        H : int, optional
+            factor on water pressure. If 1 water head equals distance between water 
+            table and bottom of slice. If 0 no water pressure is considered. By default 1.
+        """
 
         if auto:
             a = atan(self._gradient)
@@ -317,7 +315,9 @@ class Slope:
     def update_analysis_options(
         self,
         slices: int = None,
-        iterations: int = None):
+        iterations: int = None,
+        min_failure_dist: int = None
+    ):
         """Function to update analysis modelling options.
 
         Parameters
@@ -335,6 +335,11 @@ class Slope:
         if iterations:
             assert_range(iterations, "iterations", 1000, 100000)
             self._iterations = iterations
+        if min_failure_dist is not None:
+            assert_positive_number(min_failure_dist, 'min failure distance')
+            if min_failure_dist > self._external_length:
+                print('min failure distance should not be greater than the length of the model. Check Value.')
+            self._min_failure_distance = min(min_failure_dist, self._external_length * 0.9)
 
     @reset_results
     def update_boundary_options(
@@ -371,6 +376,7 @@ class Slope:
 
     @reset_results
     def reset_analysis_limits(self):
+        """Reset analysis limits to default (no limits). """
         self.set_analysis_limits(
             left_x = 0,
             right_x_left = 0,
@@ -809,9 +815,9 @@ class Slope:
                 right_mid_coords = [x3 + (x4-x3)*(i/(NUMBER_POINTS_SLOPE+1)) for i in range(1,NUMBER_POINTS_SLOPE+1)]
                 right_coords += [(x, self.get_external_y_intersection(x)) for x in right_mid_coords]
 
-        search = {}
+        search = []
 
-        min_dist = dist_points(self._top_coord, self._bot_coord) / 3
+        min_dist = self._min_failure_distance
 
         # loop through left and right coordinates and generate a circular slope
         # that passes through these points
@@ -819,18 +825,15 @@ class Slope:
 
         for l_c in tqdm(left_coords):
             for r_c in right_coords:
-                if dist_points(l_c, r_c) > min_dist and abs(l_c[0] - r_c[0]) > 0.1:
-                    search.update(
-                        self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
-                    )
+                if dist_points(l_c, r_c) > min_dist:
+                    search += self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
 
         self._search = search
-        self._min_FOS_location = min(search, key=search.get)
-        self._min_FOS = search[self._min_FOS_location]
+        self._min_FOS_dict = min(search, key = lambda x : x['FOS'])
 
     def run_analysis_for_circles(
         self, l_c: tuple, r_c: tuple, NUMBER_CIRCLES: float = 5
-    ) -> dict:
+    ) -> list:
         """Runs slope analyse for fixed left and right points for
         a number of possible circular failures.
 
@@ -847,8 +850,8 @@ class Slope:
 
         Returns
         -------
-        _type_
-            _description_
+        list
+            list of dictionaries of searched results
         """
 
         # data validation
@@ -880,7 +883,7 @@ class Slope:
         C = half_coord_distance**2
 
         # loop through circles
-        search = {}
+        search = []
 
         for i in range(0, NUMBER_CIRCLES):
 
@@ -897,7 +900,15 @@ class Slope:
             result = self.analyse_circular_failure(c_x, c_y, radius)
             if result:
                 FOS, i_l, i_r = result
-                search[(c_x, c_y, radius, i_l, i_r)] = FOS
+                search += [{
+                    'FOS': FOS,
+                    'l_c': i_l,
+                    'r_c': i_r,
+                    'c_x': c_x,
+                    'c_y': c_y,
+                    'radius': radius,
+                    'full_path' : l_c == i_l and r_c == i_r,
+                     }]
             else:
                 break
 
@@ -905,13 +916,18 @@ class Slope:
 
 
     def get_min_FOS(self):
-        return self._min_FOS
+        return self._min_FOS_dict['FOS']
 
     def get_min_FOS_circle(self):
-        return self._min_FOS_location[0:3]
+        c_x = self._min_FOS_location['c_x']
+        c_y = self._min_FOS_location['c_y']
+        radius = self._min_FOS_location['radius']
+        return (c_x, c_y, radius)
 
     def get_min_FOS_end_points(self):
-        return self._min_FOS_location[3:]
+        l_c = self._min_FOS_location['l_c']
+        r_c = self._min_FOS_location['r_c']
+        return (l_c, r_c)
 
     def plot_boundary(self):
         """Plot external boundary, materials, loading and water for model.
@@ -1024,9 +1040,12 @@ class Slope:
         """
         fig = self.plot_boundary()
 
-        c_x, c_y, radius = self.get_min_FOS_circle()
-        l_c, r_c = self.get_min_FOS_end_points()
-        FOS = self.get_min_FOS()
+        FOS = self._min_FOS_dict['FOS']
+        c_x = self._min_FOS_location['c_x']
+        c_y = self._min_FOS_location['c_y']
+        radius = self._min_FOS_location['radius']
+        l_c = self._min_FOS_location['l_c']
+        r_c = self._min_FOS_location['r_c']
 
         fig = self._plot_failure_plane(
             fig, c_x, c_y, radius, l_c, r_c, FOS=FOS, show_center=True
@@ -1567,14 +1586,14 @@ class Slope:
 
         return fig
 
-    def plot_all_planes(self, max_fos: float = None):
+    def plot_all_planes(self, max_fos: float = 10, full_paths_only = True):
         """plot multiple failure planes in the same plot
 
         Parameters
         ----------
         max_fos : float, optional
-            maximum factor of safety to display for planes,
-            If none there is no limit, by default None.
+            maximum factor of safety to display for planes, 
+            by default 10.
 
         Returns
         -------
@@ -1583,19 +1602,27 @@ class Slope:
         """
 
         fig = self.plot_boundary()
+        
+        assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
 
-        if max_fos is None:
-            for k, v in self._search.items():
-                c_x, c_y, radius, l_c, r_c = k
+        # yield ? 
+        for i in self._search:
+
+            FOS = i['FOS']
+            full_path = i['full_path']
+            
+            if FOS < max_fos:
+                if full_paths_only and not full_path:
+                    continue
+                
+                c_x = i['c_x']
+                c_y = i['c_y']
+                radius = i['radius']
+                l_c = i['l_c']
+                r_c = i['r_c']
+
                 fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c, r_c, FOS=v)
-        else:
-            assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
-            for k, v in self._search.items():
-                if v < max_fos:
-                    c_x, c_y, radius, l_c, r_c = k
-                    fig = self._plot_failure_plane(
-                        fig, c_x, c_y, radius, l_c, r_c, FOS=v
-                    )
+    
 
         fig = self._plot_FOS_legend(fig)
 
