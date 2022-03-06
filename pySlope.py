@@ -2,6 +2,7 @@
 from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
+from functools import wraps
 
 # import concurrent.futures
 from colour import Color
@@ -18,6 +19,17 @@ from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_po
 from utilities import COLOUR_FOS_DICT
 
 MATERIAL_COLORS = ['#efa59c','#77e1ca', '#cdacfc','#f2c6a7','#7edff4','#f2a8c3','#cde9ba','#f2c1fa','#f1dba3','#a3acf7']
+
+#wrapper for slope results
+def reset_results(method):
+    @wraps(method)
+    def _impl(self, *method_args, **method_kwargs):
+        method_output = method(self, *method_args, **method_kwargs)
+        self._search = {}
+        self._min_FOS = 0
+        self._min_FOS_location = []
+        return method_output
+    return _impl
 
 @dataclass
 class Material:
@@ -86,6 +98,7 @@ class Slope:
         self._water_RL = None
         self._load_magnitude = 0
 
+    @reset_results
     def set_external_boundary(
         self, height: float = 2, angle: int = 30, length: float = None
     ):
@@ -155,23 +168,18 @@ class Slope:
         self._external_length = self._external_boundary.bounds[2]
         self._external_height = self._external_boundary.bounds[3]
 
-        # reset results to deal with case that boundary is changed after
-        # an analysis has already taken place.
-        self._reset_results()
-
+    @reset_results
     def set_water_table(self, depth: int = 1):
         """set water table value"""
         assert_positive_number(depth, "water depth")
         self._water_RL = max(0, self._top_coord[1] - depth)
 
-        self._reset_results()
-
+    @reset_results
     def remove_water_table(self):
         """Remove water table from model"""
         self._water_RL = None
 
-        self._reset_results()
-
+    @reset_results
     def set_surcharge(self, offset: float = 0.0, load: float = 20.0, length: float = None
     ):
         """set a surface surcharge on top of the slope
@@ -205,14 +213,12 @@ class Slope:
         self._load_magnitude = load
         self._load_location = [left_x, right_x]
 
-        self._reset_results()
-
+    @reset_results
     def remove_surcharge(self):
         """Remove surcharge from model."""
         self._load_magnitude = 0
 
-        self._reset_results()
-
+    @reset_results
     def set_materials(self, *materials):
         """Assign material instances to the slope instance.
 
@@ -265,8 +271,7 @@ class Slope:
 
         self._materials = materials
 
-        self._reset_results()
-
+    @reset_results
     def remove_material(self, material: Material = None, depth: float = None):
         """Remove material from slope.
 
@@ -292,8 +297,7 @@ class Slope:
                 if m.depth_to_bottom == depth:
                     self._materials.remove(m)
 
-        self._reset_results()
-
+    @reset_results
     def update_water_analysis_options(self,auto : bool = True,H : int = 1):
 
         if auto:
@@ -308,8 +312,8 @@ class Slope:
                 H = 0
         
         self._water_analysis_H = H
-        self._reset_results()
-
+    
+    @reset_results
     def update_analysis_options(
         self,
         slices: int = None,
@@ -332,8 +336,7 @@ class Slope:
             assert_range(iterations, "iterations", 1000, 100000)
             self._iterations = iterations
 
-        self._reset_results()
-
+    @reset_results
     def update_boundary_options(
         self,
         MIN_EXT_L: float = None,
@@ -366,8 +369,7 @@ class Slope:
         if self._external_boundary is not None:
             self.set_external_boundary(height=self._height, length=self._length)
 
-        self._reset_results()
-
+    @reset_results
     def reset_analysis_limits(self):
         self.set_analysis_limits(
             left_x = 0,
@@ -375,9 +377,8 @@ class Slope:
             right_x = self._external_length,
             left_x_right = self._external_length,
         )
-
-        self._reset_results()
-
+    
+    @reset_results
     def set_analysis_limits(
         self,
         left_x: float = None,
@@ -461,8 +462,6 @@ class Slope:
             self._number_limits = 2
         else:
             self._number_limits = 4
-
-        self._reset_results()
 
     def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float):
         # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
@@ -904,11 +903,6 @@ class Slope:
 
         return search
 
-    def _reset_results(self):
-        """Re-initialise results to erase non-relevant results due to a model change"""
-        self._search = {}
-        self._min_FOS = 0
-        self._min_FOS_location = []
 
     def get_min_FOS(self):
         return self._min_FOS
@@ -1650,10 +1644,12 @@ if __name__ == "__main__":
     s.update_water_analysis_options(auto=True)
 
     s.analyse_slope()
+    
+    print(s.get_min_FOS())
 
-    f = s.plot_all_planes(0.8)
+    s.set_water_table(1)
 
-    f.write_html('test.html')
+    print(s.get_min_FOS())
 
 
     # f.update_layout(
