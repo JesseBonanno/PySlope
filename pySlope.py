@@ -28,11 +28,12 @@ class Material:
     color: str = ''
 
     def __post_init__(self):
-        assert_positive_number(self.unit_weight, 'unit weight')
+        assert_range(self.unit_weight, 'unit weight', 1, 50)
         assert_positive_number(self.friction_angle, 'friction_angle')
         assert_positive_number(self.cohesion, 'cohesion')
         assert_positive_number(self.depth_to_bottom, 'depth to bottom')
         assert(isinstance(self.name, str))
+        assert(isinstance(self.color, str))
 
 
     def __repr__(self):
@@ -50,7 +51,7 @@ class UDL:
         assert_length(self.load_location, 2, 'load location tuple')
 
     def __repr__(self):
-        return f"UDL: {load_magnitude} kPa, from x = {load_location[0]} m to x = {load_location[1]} m"
+        return f"UDL: {self.load_magnitude} kPa, from x = {self.load_location[0]} m to x = {self.load_location[1]} m"
 
 @dataclass
 class PointLoad:
@@ -62,12 +63,23 @@ class PointLoad:
         assert_positive_number(self.load_location, 'load location')
 
     def __repr__(self):
-        return f"UDL: {load_magnitude} kPa, from x = {load_location} m"
+        return f"UDL: {self.load_magnitude} kPa, from x = {self.load_location} m"
 
 class Slope:
-    def __init__(self, height: float = 2, angle: int = 30, length: float = None):
-        """Initialise a slope object"""
+    """Slope object.
 
+        Parameters
+        ----------
+        height : float
+            height of slope in metres, by default 2
+        angle : int, optional
+            angle of slope (only used if length None), by default 30
+        length : float, optional
+            length of slope in metres, by default None
+    """
+
+    def __init__(self, height: float = 2, angle: int = 30, length: float = None):
+        
         self._external_boundary = None
 
         # intialise options
@@ -145,7 +157,7 @@ class Slope:
         self._height = height
 
         if angle == 90 or length == 0:
-            self._gradient = 100000000000000
+            self._gradient = 10000000
         else:
             self._gradient = height / length
 
@@ -469,267 +481,6 @@ class Slope:
         else:
             self._number_limits = 4
 
-    def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float):
-        # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
-        # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
-        p = Point(c_x, c_y)
-        c = p.buffer(radius).boundary
-
-        # find intersection points with boundary if any, else return None
-        if c.intersects(self._external_boundary):
-            i = c.intersection(self._external_boundary)
-        else:
-            return None
-
-        # list for intersecting points between circle and external boundary
-        i_list = []
-
-        # loop through each point in the intersection list
-        if not isinstance(i, MultiPoint):
-            # something is wrong should be multipoint
-            return None
-
-        for p in i.geoms:
-            # if point append x,y to list
-            if isinstance(p, Point):
-                if p.y < self._bot_coord[1]:
-                    return None
-                i_list.append((round(p.x, 5), round(p.y, 5)))
-
-            # might actually give a line string of the tiniest length
-            # could happen due to 64 sided polygon if the circle is close to intersecting
-            # at its end. In this case just use the first point of the line
-            # since the points are close together anyways
-            elif isinstance(p, LineString):
-                if p[0][1] < self._bot_coord[1]:
-                    return None
-                i_list.append((round(p.coords[0][0], 5), round(p.coords[0][1], 5)))
-
-        # make sure no input inside twice. Has been observed where the point of intersection
-        # is the boundary between two linestrings
-        i_list = list(set(i_list))
-        i_list.sort()
-
-        # check that there are only two intersecting points otherwise something is wrong
-        if len(i_list) > 1:
-            i_list = i_list[0:2]
-        else:
-            return None
-
-        return i_list
-
-    def _calculate_strip_weight(self, b, s_yt, s_yb):
-        # intialize properties
-        W = 0.0  # kN
-        top = s_yt
-
-        # loop through materials noting that they are already sorted by depth
-        for m in self._materials:
-            # while layers are higher than the top of the slice ignore the material
-            if m.RL > s_yt:
-                continue
-            # while the bottom of layer is in the slice consider, go from the
-            # current top to the bottom of the layer
-            # this captures the case of the top of the strip being partially in a layer
-            elif m.RL < s_yt and m.RL > s_yb:
-                W += b * m.unit_weight * (top - m.RL)
-                top = m.RL
-            # in the case that the bottom of the strip is now outside the range
-            # we still have material between the current top and the bottom of the strip
-            # we capture it in this edge case and then break since everything below can be ignored
-            # we also grab the material properties at the base
-            else:
-                W += b * m.unit_weight * (top - s_yb)
-                top = m.RL
-                break
-
-        # check case that ran out of layers (loop terminated earlier than expected)
-        if top > s_yb:
-            m = self._materials[-1]
-            W += b * m.unit_weight * (top - s_yb)
-
-        return W
-
-    def _get_material_at_depth(self, s_yb):
-
-        # loop through all materials, if we have passed the bottom take the previous
-        for m in self._materials:
-            if m.RL < s_yb:
-                return m
-
-        return self._materials[-1]
-
-    def _calculate_strip_UDL_force(self, b, s_x):
-        W = 0
-
-        if self._load_magnitude:
-            load_xl, load_xr = self._load_location
-            strip_xl = s_x - (b / 2)
-            strip_xr = s_x + (b / 2)
-            # case 1 clearly no load
-            if load_xr <= strip_xl or load_xl >= strip_xr:
-                pass
-            # case 2 clearly load is completely inside
-            elif load_xl <= strip_xl and load_xr >= strip_xr:
-                W += b * self._load_magnitude
-            # case 3 on the left inside the load
-            elif strip_xl <= load_xl and strip_xr >= load_xl:
-                W += (strip_xr - load_xl) * self._load_magnitude
-
-            # case 4 on the right side of the load
-            elif strip_xl <= load_xr and strip_xr >= load_xr:
-                W += (load_xr - strip_xl) * self._load_magnitude
-
-            else:
-                raise ValueError("ummm is this actually a possible case?")
-
-        return W
-
-    def _calculate_strip_point_load(self, s_x):
-        return 0
-
-    def analyse_circular_failure(self, c_x: float, c_y: float, radius: float):
-        """Calculate factor of safety for a circular failure plane through the slope.
-
-        Parameters
-        ----------
-        c_x : float
-            circle center x coordinate
-        c_y : float
-            circle center y coordinate
-        radius : float
-            circle radius
-
-        Returns
-        -------
-        float
-            factor of safety
-        None
-            if cant calculate returns None
-
-        """
-        # data validation
-        assert_strictly_positive_number(c_x, "c_x (circle x coordinate)")
-        assert_strictly_positive_number(c_y, "c_y (circle y coordinate)")
-        assert_strictly_positive_number(radius, "radius")
-
-        i_list = self._get_circle_external_intersection(c_x,c_y,radius)
-
-        if not i_list:
-            return None
-
-        # total number of slices
-        SLICES = self._slices
-
-        # horizontal distance between left and right slice
-        dist = i_list[1][0] - i_list[0][0]
-
-        # width of a slice
-        b = dist / SLICES
-
-        # initialise left point of first slice
-        s_x = i_list[0][0] + b / 2
-
-        # intialise the push and resistance components for FOS before looping
-        pushing = 0.0
-        resisting = 0.0
-
-        # loop through slices
-        for _ in range(0, SLICES):
-            # define y coordinates for slice bottom
-            s_yb = c_y - sqrt(radius**2 - (s_x - c_x) ** 2)
-
-            # get y coordinate at slice top
-            s_yt = self.get_external_y_intersection(s_x)
-
-            # get alpha, dy always positive, dx negative to right (uphill), dx positive to left
-            # note alpha in radians by default
-            dy = c_y - s_yb
-            dx = c_x - s_x
-            alpha = atan(dx / dy)
-
-            # get length
-            l = b / cos(alpha)
-
-            # calculate strip weight
-            W = self._calculate_strip_weight(b, s_yt, s_yb)
-
-            # get material properties at the bottom of the slice
-            bottom_material = self._get_material_at_depth(s_yb)
-
-            cohesion = bottom_material.cohesion
-            friction_angle = bottom_material.friction_angle
-
-            # if there is a UDL load on the strip apply it.
-            W += self._calculate_strip_UDL_force(b, s_x)
-
-            # if there is a point load on the strip apply it.
-            W += self._calculate_strip_point_load(s_x)
-
-            # consideration for water
-            if self._water_RL:
-                # determine H factor based on setting
-                # https://www.rocscience.com/help/slide2/documentation/slide-model/material-properties/define-material-properties/water-parameters
-
-                # only use H factor if on the slope, otherwise use 1
-                if self._top_coord[0] < s_x < self._bot_coord[0]:
-                    U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * l * self._water_analysis_H
-                else:
-                    U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * l * 1
-            else:
-                U = 0
-
-            # calculate resisting
-            resisting += cohesion * l + max(0, (W * cos(alpha) - U)) * tan(
-                radians(friction_angle)
-            )
-
-            # calculate pushing
-            pushing += W * sin(alpha)
-
-            # initialise slice x coordinate for next loop
-            s_x = s_x + b
-
-        if pushing <= 0:
-            return None
-
-        return (resisting / pushing, i_list[0], i_list[1])
-
-    def _calculate_number_points_slope(self, deep_seeded_only, point_combinations, GRADIENT_TOLERANCE, NUMBER_POINTS_SLOPE):
-        # if deep seeded or limits exclude
-        if deep_seeded_only or (
-            self._limits[0][1] < self._top_coord[0] and
-            self._limits[1][0] > self._bot_coord[0]
-            ):
-            NUMBER_POINTS = int(sqrt(point_combinations))
-
-        # if limits exclude slope only in one direction
-        elif (
-            self._limits[0][1] < self._top_coord[0] or
-            self._limits[1][0] > self._bot_coord[0]
-            ):
-            P = point_combinations
-            N = NUMBER_POINTS_SLOPE
-
-            NUMBER_POINTS = int((-N + sqrt( N**2 + 4 * P ))/2 )
-
-        else:
-            if self._gradient > GRADIENT_TOLERANCE:
-                NUMBER_POINTS = (
-                    int(
-                        (
-                            NUMBER_POINTS_SLOPE
-                            + sqrt(NUMBER_POINTS_SLOPE**2 + 4 * point_combinations)
-                        )
-                        / 2
-                    )
-                    - NUMBER_POINTS_SLOPE
-                )
-            else:
-                NUMBER_POINTS = int(sqrt(point_combinations)) - NUMBER_POINTS_SLOPE
-
-        return NUMBER_POINTS
-
 
     def analyse_slope(self, deep_seeded_only=False):
         """Analyse many possible failure planes for a slope.
@@ -914,6 +665,268 @@ class Slope:
 
         return search
 
+    def analyse_circular_failure(self, c_x: float, c_y: float, radius: float):
+        """Calculate factor of safety for a circular failure plane through the slope.
+
+        Parameters
+        ----------
+        c_x : float
+            circle center x coordinate
+        c_y : float
+            circle center y coordinate
+        radius : float
+            circle radius
+
+        Returns
+        -------
+        float
+            factor of safety
+        None
+            if cant calculate returns None
+
+        """
+        # data validation
+        assert_strictly_positive_number(c_x, "c_x (circle x coordinate)")
+        assert_strictly_positive_number(c_y, "c_y (circle y coordinate)")
+        assert_strictly_positive_number(radius, "radius")
+
+        i_list = self._get_circle_external_intersection(c_x,c_y,radius)
+
+        if not i_list:
+            return None
+
+        # total number of slices
+        SLICES = self._slices
+
+        # horizontal distance between left and right slice
+        dist = i_list[1][0] - i_list[0][0]
+
+        # width of a slice
+        b = dist / SLICES
+
+        # initialise left point of first slice
+        s_x = i_list[0][0] + b / 2
+
+        # intialise the push and resistance components for FOS before looping
+        pushing = 0.0
+        resisting = 0.0
+
+        # loop through slices
+        for _ in range(0, SLICES):
+            # define y coordinates for slice bottom
+            s_yb = c_y - sqrt(radius**2 - (s_x - c_x) ** 2)
+
+            # get y coordinate at slice top
+            s_yt = self.get_external_y_intersection(s_x)
+
+            # get alpha, dy always positive, dx negative to right (uphill), dx positive to left
+            # note alpha in radians by default
+            dy = c_y - s_yb
+            dx = c_x - s_x
+            alpha = atan(dx / dy)
+
+            # get length
+            l = b / cos(alpha)
+
+            # calculate strip weight
+            W = self._calculate_strip_weight(b, s_yt, s_yb)
+
+            # get material properties at the bottom of the slice
+            bottom_material = self._get_material_at_depth(s_yb)
+
+            cohesion = bottom_material.cohesion
+            friction_angle = bottom_material.friction_angle
+
+            # if there is a UDL load on the strip apply it.
+            W += self._calculate_strip_UDL_force(b, s_x)
+
+            # if there is a point load on the strip apply it.
+            W += self._calculate_strip_point_load(s_x)
+
+            # consideration for water
+            if self._water_RL:
+                # determine H factor based on setting
+                # https://www.rocscience.com/help/slide2/documentation/slide-model/material-properties/define-material-properties/water-parameters
+
+                # only use H factor if on the slope, otherwise use 1
+                if self._top_coord[0] < s_x < self._bot_coord[0]:
+                    U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * l * self._water_analysis_H
+                else:
+                    U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * l * 1
+            else:
+                U = 0
+
+            # calculate resisting
+            resisting += cohesion * l + max(0, (W * cos(alpha) - U)) * tan(
+                radians(friction_angle)
+            )
+
+            # calculate pushing
+            pushing += W * sin(alpha)
+
+            # initialise slice x coordinate for next loop
+            s_x = s_x + b
+
+        if pushing <= 0:
+            return None
+
+        return (resisting / pushing, i_list[0], i_list[1])
+
+
+    def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float):
+        # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
+        # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
+        p = Point(c_x, c_y)
+        c = p.buffer(radius).boundary
+
+        # find intersection points with boundary if any, else return None
+        if c.intersects(self._external_boundary):
+            i = c.intersection(self._external_boundary)
+        else:
+            return None
+
+        # list for intersecting points between circle and external boundary
+        i_list = []
+
+        # loop through each point in the intersection list
+        if not isinstance(i, MultiPoint):
+            # something is wrong should be multipoint
+            return None
+
+        for p in i.geoms:
+            # if point append x,y to list
+            if isinstance(p, Point):
+                if p.y < self._bot_coord[1]:
+                    return None
+                i_list.append((round(p.x, 5), round(p.y, 5)))
+
+            # might actually give a line string of the tiniest length
+            # could happen due to 64 sided polygon if the circle is close to intersecting
+            # at its end. In this case just use the first point of the line
+            # since the points are close together anyways
+            elif isinstance(p, LineString):
+                if p[0][1] < self._bot_coord[1]:
+                    return None
+                i_list.append((round(p.coords[0][0], 5), round(p.coords[0][1], 5)))
+
+        # make sure no input inside twice. Has been observed where the point of intersection
+        # is the boundary between two linestrings
+        i_list = list(set(i_list))
+        i_list.sort()
+
+        # check that there are only two intersecting points otherwise something is wrong
+        if len(i_list) > 1:
+            i_list = i_list[0:2]
+        else:
+            return None
+
+        return i_list
+
+    def _calculate_strip_weight(self, b, s_yt, s_yb):
+        # intialize properties
+        W = 0.0  # kN
+        top = s_yt
+
+        # loop through materials noting that they are already sorted by depth
+        for m in self._materials:
+            # while layers are higher than the top of the slice ignore the material
+            if m.RL > s_yt:
+                continue
+            # while the bottom of layer is in the slice consider, go from the
+            # current top to the bottom of the layer
+            # this captures the case of the top of the strip being partially in a layer
+            elif m.RL < s_yt and m.RL > s_yb:
+                W += b * m.unit_weight * (top - m.RL)
+                top = m.RL
+            # in the case that the bottom of the strip is now outside the range
+            # we still have material between the current top and the bottom of the strip
+            # we capture it in this edge case and then break since everything below can be ignored
+            # we also grab the material properties at the base
+            else:
+                W += b * m.unit_weight * (top - s_yb)
+                top = m.RL
+                break
+
+        # check case that ran out of layers (loop terminated earlier than expected)
+        if top > s_yb:
+            m = self._materials[-1]
+            W += b * m.unit_weight * (top - s_yb)
+
+        return W
+
+    def _get_material_at_depth(self, s_yb):
+
+        # loop through all materials, if we have passed the bottom take the previous
+        for m in self._materials:
+            if m.RL < s_yb:
+                return m
+
+        return self._materials[-1]
+
+    def _calculate_strip_UDL_force(self, b, s_x):
+        W = 0
+
+        if self._load_magnitude:
+            load_xl, load_xr = self._load_location
+            strip_xl = s_x - (b / 2)
+            strip_xr = s_x + (b / 2)
+            # case 1 clearly no load
+            if load_xr <= strip_xl or load_xl >= strip_xr:
+                pass
+            # case 2 clearly load is completely inside
+            elif load_xl <= strip_xl and load_xr >= strip_xr:
+                W += b * self._load_magnitude
+            # case 3 on the left inside the load
+            elif strip_xl <= load_xl and strip_xr >= load_xl:
+                W += (strip_xr - load_xl) * self._load_magnitude
+
+            # case 4 on the right side of the load
+            elif strip_xl <= load_xr and strip_xr >= load_xr:
+                W += (load_xr - strip_xl) * self._load_magnitude
+
+            else:
+                raise ValueError("ummm is this actually a possible case?")
+
+        return W
+
+    def _calculate_strip_point_load(self, s_x):
+        return 0
+
+    def _calculate_number_points_slope(self, deep_seeded_only, point_combinations, GRADIENT_TOLERANCE, NUMBER_POINTS_SLOPE):
+        # if deep seeded or limits exclude
+        if deep_seeded_only or (
+            self._limits[0][1] < self._top_coord[0] and
+            self._limits[1][0] > self._bot_coord[0]
+            ):
+            NUMBER_POINTS = int(sqrt(point_combinations))
+
+        # if limits exclude slope only in one direction
+        elif (
+            self._limits[0][1] < self._top_coord[0] or
+            self._limits[1][0] > self._bot_coord[0]
+            ):
+            P = point_combinations
+            N = NUMBER_POINTS_SLOPE
+
+            NUMBER_POINTS = int((-N + sqrt( N**2 + 4 * P ))/2 )
+
+        else:
+            if self._gradient > GRADIENT_TOLERANCE:
+                NUMBER_POINTS = (
+                    int(
+                        (
+                            NUMBER_POINTS_SLOPE
+                            + sqrt(NUMBER_POINTS_SLOPE**2 + 4 * point_combinations)
+                        )
+                        / 2
+                    )
+                    - NUMBER_POINTS_SLOPE
+                )
+            else:
+                NUMBER_POINTS = int(sqrt(point_combinations)) - NUMBER_POINTS_SLOPE
+
+        return NUMBER_POINTS
+
 
     def get_min_FOS(self):
         return self._min_FOS_dict['FOS']
@@ -928,6 +941,34 @@ class Slope:
         l_c = self._min_FOS_location['l_c']
         r_c = self._min_FOS_location['r_c']
         return (l_c, r_c)
+
+    def get_external_y_intersection(self,x):
+        """ return y coordinate of intersection with boundary for a given x """
+        if x < 0 or x > self._external_length:
+            return None
+        # y is below the bottom of the slope
+        elif x <= self._top_coord[0]:
+            return self._top_coord[1]
+        elif x >= self._bot_coord[0]:
+            return self._bot_coord[1]
+        # y is above the bottom of the slope
+        else:
+            return self._top_coord[1] - (x - self._top_coord[0]) * self._gradient
+
+    def get_external_x_intersection(self,y):
+        """ return x coordinate of intersection with boundary for a given y """
+        # y is below the bottom of the slope
+        if y <= self._bot_coord[1]:
+            return self._external_length
+
+        # y is above the bottom of the slope
+        elif y <= self._external_height:
+            return self._top_coord[0] + (self._top_coord[1] - y) / self._gradient
+
+        else:
+            return None
+
+
 
     def plot_boundary(self):
         """Plot external boundary, materials, loading and water for model.
@@ -1053,6 +1094,48 @@ class Slope:
         fig = self._plot_annotate_FOS(fig, c_x, c_y, FOS)
         return fig
 
+    def plot_all_planes(self, max_fos: float = 10, full_paths_only = True):
+        """plot multiple failure planes in the same plot
+
+        Parameters
+        ----------
+        max_fos : float, optional
+            maximum factor of safety to display for planes, 
+            by default 10.
+
+        Returns
+        -------
+        plotly figure
+
+        """
+
+        fig = self.plot_boundary()
+        
+        assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
+
+        # yield ? 
+        for i in self._search:
+
+            FOS = i['FOS']
+            full_path = i['full_path']
+            
+            if FOS < max_fos:
+                if full_paths_only and not full_path:
+                    continue
+                
+                c_x = i['c_x']
+                c_y = i['c_y']
+                radius = i['radius']
+                l_c = i['l_c']
+                r_c = i['r_c']
+
+                fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c, r_c, FOS=v)
+    
+
+        fig = self._plot_FOS_legend(fig)
+
+        return fig
+  
     def _plot_annotate_FOS(self, fig, c_x: float, c_y: float, FOS: float):
         """Annotate FOS on figure.
 
@@ -1283,7 +1366,6 @@ class Slope:
 
         return fig
 
-
     def _plot_material_properties(self,fig):
         # loop through materials
         for i, m in enumerate(self._materials):
@@ -1306,9 +1388,6 @@ class Slope:
             )
 
         return fig
-
-
-    #NOTE: method not working well since scaling is off.
 
     def _plot_material_table(self, fig):
 
@@ -1585,75 +1664,6 @@ class Slope:
         )
 
         return fig
-
-    def plot_all_planes(self, max_fos: float = 10, full_paths_only = True):
-        """plot multiple failure planes in the same plot
-
-        Parameters
-        ----------
-        max_fos : float, optional
-            maximum factor of safety to display for planes, 
-            by default 10.
-
-        Returns
-        -------
-        plotly figure
-
-        """
-
-        fig = self.plot_boundary()
-        
-        assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
-
-        # yield ? 
-        for i in self._search:
-
-            FOS = i['FOS']
-            full_path = i['full_path']
-            
-            if FOS < max_fos:
-                if full_paths_only and not full_path:
-                    continue
-                
-                c_x = i['c_x']
-                c_y = i['c_y']
-                radius = i['radius']
-                l_c = i['l_c']
-                r_c = i['r_c']
-
-                fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c, r_c, FOS=v)
-    
-
-        fig = self._plot_FOS_legend(fig)
-
-        return fig
-
-    def get_external_y_intersection(self,x):
-        """ return y coordinate of intersection with boundary for a given x """
-        if x < 0 or x > self._external_length:
-            return None
-        # y is below the bottom of the slope
-        elif x <= self._top_coord[0]:
-            return self._top_coord[1]
-        elif x >= self._bot_coord[0]:
-            return self._bot_coord[1]
-        # y is above the bottom of the slope
-        else:
-            return self._top_coord[1] - (x - self._top_coord[0]) * self._gradient
-
-    def get_external_x_intersection(self,y):
-        """ return x coordinate of intersection with boundary for a given y """
-        # y is below the bottom of the slope
-        if y <= self._bot_coord[1]:
-            return self._external_length
-
-        # y is above the bottom of the slope
-        elif y <= self._external_height:
-            return self._top_coord[0] + (self._top_coord[1] - y) / self._gradient
-
-        else:
-            return None
-
 
 
 if __name__ == "__main__":
