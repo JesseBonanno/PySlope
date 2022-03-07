@@ -114,3 +114,6 @@ dmypy.json
 .pyre/
 test.html
 app/main.py
+
+
+.ss/
