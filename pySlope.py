@@ -40,30 +40,31 @@ class Material:
         return f"Material:{self.name}(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom}"
 
 @dataclass
-class UDL:
-    load_magnitude: float = 0
-    load_location: tuple = (0, 1)
+class Udl:
+    magnitude: float = 0
+    offset: float = 0
+    length: float = None
 
     def __post_init__(self):
-        assert_positive_number(self.load_magnitude, 'load magnitude')
-        assert_positive_number(self.load_location[0], 'load start location')
-        assert_positive_number(self.load_location[1], 'load end location')
-        assert_length(self.load_location, 2, 'load location tuple')
+        assert_positive_number(self.magnitude, 'load magnitude')
+        assert_positive_number(self.offset, 'load offset')
+        if self.length:
+            assert_positive_number(self.length, 'load length')
 
     def __repr__(self):
-        return f"UDL: {self.load_magnitude} kPa, from x = {self.load_location[0]} m to x = {self.load_location[1]} m"
+        return f"UDL: {self.magnitude} kPa, offset = {self.offset} m, load length = {self.length} m"
 
 @dataclass
 class PointLoad:
-    load_magnitude: float = 0
-    load_location: float = 0
+    magnitude: float = 0
+    offset: float = 0
 
     def __post_init__(self):
-        assert_positive_number(self.load_magnitude, 'load magnitude')
-        assert_positive_number(self.load_location, 'load location')
+        assert_positive_number(self.magnitude, 'load magnitude')
+        assert_positive_number(self.offset, 'load offset')
 
     def __repr__(self):
-        return f"UDL: {self.load_magnitude} kPa, from x = {self.load_location} m"
+        return f"Point: {self.magnitude} kN, offset = {self.offset} m"
 
 class Slope:
     """Slope object.
@@ -79,6 +80,12 @@ class Slope:
     """
 
     def __init__(self, height: float = 2, angle: int = 30, length: float = None):
+
+        # initialise empty properties used in other components of class
+        self._materials = []
+        self._water_RL = None
+        self._udls = []
+        self._pointLoads = []
         
         self._external_boundary = None
 
@@ -91,11 +98,6 @@ class Slope:
 
         # sets default analysis limits (ie no limit)
         self.reset_analysis_limits()
-
-        # initialise empty properties used in other components of class
-        self._materials = []
-        self._water_RL = None
-        self._load_magnitude = 0
 
     @reset_results
     def set_external_boundary(
@@ -167,6 +169,10 @@ class Slope:
         self._external_length = self._external_boundary.bounds[2]
         self._external_height = self._external_boundary.bounds[3]
 
+        # udl coordinates can be effected by external boundary modification
+        # need to update coordinates.
+        self.update_udl_coordinates()
+
     @reset_results
     def set_water_table(self, depth: int = 1):
         """set water table value"""
@@ -179,43 +185,55 @@ class Slope:
         self._water_RL = None
 
     @reset_results
-    def set_surcharge(self, offset: float = 0.0, load: float = 20.0, length: float = None
-    ):
-        """set a surface surcharge on top of the slope
+    def set_udls(self, *udls):
+        """set a surface surcharge on top of the slope"""
 
-        Parameters
-        ----------
-        offset : int, optional
-            offset from the crest of the slope in metres, by default 0
-        load : int, optional
-            load magnitude in kPa, by default 20
-        length : _type_, optional
-            length of the load across the model (perpendicular to slope
-            ) in metres. If length is None or length exceeds edge of model,
-            then length set to left edge of model, by default None
-        """
-        assert_positive_number(offset, "load offset")
-        assert_positive_number(load, "load")
-        if length is not None:
-            assert_positive_number(length, "load length")
+        for udl in udls:
+            if isinstance(udl, Udl):
+                self._udls.append(udl)
 
-        right_x = self._top_coord[0] - offset
-        if length:
-            left_x = max(0, right_x - length)
-        else:
-            left_x = 0
+        self.update_udl_coordinates()
 
-        # note that this is slightly different than most coordinates
-        # in that it isnt a LineString and doesnt have y coordinate
-        # also, could add functionality for different loads to apply
-        # in future
-        self._load_magnitude = load
-        self._load_location = [left_x, right_x]
+    # dont need to reset results since this only should be called
+    # as a part of resetting 
+    def update_udl_coordinates(self):
+
+        for udl in self._udls:
+            
+            right_x = self._top_coord[0] - udl.offset
+            if udl.length:
+                left_x = max(0, right_x - udl.length)
+            else:
+                left_x = 0
+            
+            udl.left = left_x
+            udl.right = right_x
 
     @reset_results
-    def remove_surcharge(self):
-        """Remove surcharge from model."""
-        self._load_magnitude = 0
+    def remove_udls(self, *udls, remove_all = False):
+        """Remove udl from model if associated with model."""
+
+        # this method might not capture the case that a user doesnt save a udl
+        # and needs to recreate it to remove it.
+        # might be better to rewrite a method that compares the values of the 
+        # objects rather than checks they are identical
+
+        # for udl in udls:
+        #     if udl in self._udls:
+        #         self._udls.remove(udl)
+
+        # can probably write this as O(n) rather than O(n^2)
+        for udl in udls:
+            for check_udl in self._udls:
+                if (
+                    check_udl.offset == udl.offset and
+                    check_udl.magnitude == udl.magnitude and
+                    check_udl.length == udl.length
+                ):
+                    self._udls.remove(check_udl)
+
+        if remove_all:
+            self._udls = []
 
     @reset_results
     def set_materials(self, *materials):
@@ -271,7 +289,7 @@ class Slope:
         self._materials = materials
 
     @reset_results
-    def remove_material(self, material: Material = None, depth: float = None):
+    def remove_material(self, material: Material = None, depth: float = None, remove_all=False):
         """Remove material from slope.
 
         Parameters
@@ -295,6 +313,9 @@ class Slope:
             for m in self._materials:
                 if m.depth_to_bottom == depth:
                     self._materials.remove(m)
+        
+        if remove_all:
+            self._materials = []
 
     @reset_results
     def update_water_analysis_options(self,auto : bool = True,H : int = 1):
@@ -493,11 +514,7 @@ class Slope:
 
         Returns
         ----------
-        Nothing but sets the following in the instance:
-
-        self._MIN_FOS
-        self._search
-        self._MIN_FOS_LOCATION
+        Nothing
 
         """
         # tolerance for when to stop adding points to slope
@@ -737,8 +754,9 @@ class Slope:
             cohesion = bottom_material.cohesion
             friction_angle = bottom_material.friction_angle
 
-            # if there is a UDL load on the strip apply it.
-            W += self._calculate_strip_UDL_force(b, s_x)
+            # if there is a udl load on the strip apply it.
+            for udl in self._udls:
+                W += self._calculate_strip_udl_force(b, s_x, udl)
 
             # if there is a point load on the strip apply it.
             W += self._calculate_strip_point_load(s_x)
@@ -863,29 +881,24 @@ class Slope:
 
         return self._materials[-1]
 
-    def _calculate_strip_UDL_force(self, b, s_x):
+    def _calculate_strip_udl_force(self, b, s_x, udl):
         W = 0
-
-        if self._load_magnitude:
-            load_xl, load_xr = self._load_location
+        
+        if udl.left < s_x < udl.right:
+            load_xl, load_xr = udl.left, udl.right
             strip_xl = s_x - (b / 2)
             strip_xr = s_x + (b / 2)
-            # case 1 clearly no load
-            if load_xr <= strip_xl or load_xl >= strip_xr:
-                pass
-            # case 2 clearly load is completely inside
-            elif load_xl <= strip_xl and load_xr >= strip_xr:
-                W += b * self._load_magnitude
-            # case 3 on the left inside the load
+
+            # case 1 clearly load is completely inside
+            if load_xl <= strip_xl and load_xr >= strip_xr:
+                W += b * udl.magnitude
+            # case 2 on the left inside the load
             elif strip_xl <= load_xl and strip_xr >= load_xl:
-                W += (strip_xr - load_xl) * self._load_magnitude
+                W += (strip_xr - load_xl) * udl.magnitude
 
-            # case 4 on the right side of the load
+            # case 3 on the right side of the load
             elif strip_xl <= load_xr and strip_xr >= load_xr:
-                W += (load_xr - strip_xl) * self._load_magnitude
-
-            else:
-                raise ValueError("ummm is this actually a possible case?")
+                W += (load_xr - strip_xl) * udl.magnitude
 
         return W
 
@@ -932,14 +945,14 @@ class Slope:
         return self._min_FOS_dict['FOS']
 
     def get_min_FOS_circle(self):
-        c_x = self._min_FOS_location['c_x']
-        c_y = self._min_FOS_location['c_y']
-        radius = self._min_FOS_location['radius']
+        c_x = self._min_FOS_dict['c_x']
+        c_y = self._min_FOS_dict['c_y']
+        radius = self._min_FOS_dict['radius']
         return (c_x, c_y, radius)
 
     def get_min_FOS_end_points(self):
-        l_c = self._min_FOS_location['l_c']
-        r_c = self._min_FOS_location['r_c']
+        l_c = self._min_FOS_dict['l_c']
+        r_c = self._min_FOS_dict['r_c']
         return (l_c, r_c)
 
     def get_external_y_intersection(self,x):
@@ -1061,8 +1074,8 @@ class Slope:
 
         fig = self._plot_material_table(fig)
 
-        if self._load_magnitude:
-            fig = self._plot_load(fig)
+        for udl in self._udls:
+            fig = self._plot_udl(fig, udl)
 
         if self._water_RL:
             fig = self._plot_water(fig)
@@ -1082,11 +1095,11 @@ class Slope:
         fig = self.plot_boundary()
 
         FOS = self._min_FOS_dict['FOS']
-        c_x = self._min_FOS_location['c_x']
-        c_y = self._min_FOS_location['c_y']
-        radius = self._min_FOS_location['radius']
-        l_c = self._min_FOS_location['l_c']
-        r_c = self._min_FOS_location['r_c']
+        c_x = self._min_FOS_dict['c_x']
+        c_y = self._min_FOS_dict['c_y']
+        radius = self._min_FOS_dict['radius']
+        l_c = self._min_FOS_dict['l_c']
+        r_c = self._min_FOS_dict['r_c']
 
         fig = self._plot_failure_plane(
             fig, c_x, c_y, radius, l_c, r_c, FOS=FOS, show_center=True
@@ -1286,7 +1299,7 @@ class Slope:
 
         return fig
 
-    def _plot_load(self, fig):
+    def _plot_udl(self, fig, udl):
         """Add load to plot"""
         # add in extra arrows, text, and hori line
 
@@ -1297,20 +1310,20 @@ class Slope:
         arrowwidth = 2
         arrowcolor = "red"
 
-        p = self._load_magnitude
+        p = udl.magnitude
 
         if p == 0:
             return fig
 
         y = self._external_height
-        l_x, r_x = self._load_location
+        l_x, r_x = udl.left, udl.right
 
         # add more arrows in if the load is longer than say 3
-        load_length = r_x - l_x
+        length = r_x - l_x
 
-        if load_length > 3:
-            spaces = divmod(load_length, 1.5)[0]
-            spacing = load_length / spaces
+        if length > 3:
+            spaces = divmod(length, 1.5)[0]
+            spacing = length / spaces
             arrows = [l_x + spacing * t for t in range(int(spaces + 1))]
         else:
             arrows = [l_x, (l_x + r_x) / 2, r_x]
@@ -1335,7 +1348,7 @@ class Slope:
 
         fig.add_annotation(
             y=y * ARROW_HEIGHT_FACTOR,
-            x=sum(self._load_location) / 2,
+            x=(l_x + r_x) / 2,
             text=f"{p} kPa",
             xref="x",
             yref="y",
@@ -1672,7 +1685,10 @@ if __name__ == "__main__":
     m1 = Material(20,35,5,1)
     m2 = Material(20,35,0,5)
 
-    s.set_surcharge(0.5,20)
+    u1 = Udl(1,1,1)
+    u3 = Udl(3,3,3)
+
+    s.set_udls(u1, u3)
 
     s.set_materials(m1,m2)
 
@@ -1687,10 +1703,11 @@ if __name__ == "__main__":
     s.set_water_table(1)
 
     print(s.get_min_FOS())
+    
+    f = s.plot_critical()
 
-
-    # f.update_layout(
-    #     width=2000,
-    #     height=1500
-    # )
-    # f.write_image('test.png')
+    f.update_layout(
+        width=2000,
+        height=1500
+    )
+    f.write_image('test.png')
