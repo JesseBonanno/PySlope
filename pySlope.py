@@ -85,7 +85,7 @@ class Slope:
         self._materials = []
         self._water_RL = None
         self._udls = []
-        self._pointLoads = []
+        self._pls = []
         
         self._external_boundary = None
 
@@ -172,6 +172,7 @@ class Slope:
         # udl coordinates can be effected by external boundary modification
         # need to update coordinates.
         self.update_udl_coordinates()
+        self.update_pl_coordinates()
 
     @reset_results
     def set_water_table(self, depth: int = 1):
@@ -234,6 +235,42 @@ class Slope:
 
         if remove_all:
             self._udls = []
+
+    
+    @reset_results
+    def set_pls(self, *pls):
+        """set a surface surcharge on top of the slope"""
+
+        for pl in pls:
+            if isinstance(udl, PointLoad):
+                self._pls.append(pl)
+
+        self.update_pl_coordinates()
+
+    # dont need to reset results since this only should be called
+    # as a part of resetting 
+    def update_pl_coordinates(self):
+
+        for pl in self._pls:
+            coord = max(0,self._top_coord[0]-pl.offset)
+            
+            pl.coord = coord
+
+    @reset_results
+    def remove_pls(self, *pls, remove_all = False):
+        """Remove udl from model if associated with model."""
+
+        # can probably write this as O(n) rather than O(n^2)
+        for pl in pls:
+            for check_pl in self._pls:
+                if (
+                    check_pl.offset == pl.offset and
+                    check_pl.magnitude == pl.magnitude and
+                ):
+                    self._pls.remove(check_pl)
+
+        if remove_all:
+            self._pls = []
 
     @reset_results
     def set_materials(self, *materials):
@@ -759,7 +796,8 @@ class Slope:
                 W += self._calculate_strip_udl_force(b, s_x, udl)
 
             # if there is a point load on the strip apply it.
-            W += self._calculate_strip_point_load(s_x)
+            for pl in self._pls:
+                W += self._calculate_strip_pl(b, s_x, pl)
 
             # consideration for water
             if self._water_RL:
@@ -883,27 +921,36 @@ class Slope:
 
     def _calculate_strip_udl_force(self, b, s_x, udl):
         W = 0
-        
-        if udl.left < s_x < udl.right:
-            load_xl, load_xr = udl.left, udl.right
-            strip_xl = s_x - (b / 2)
-            strip_xr = s_x + (b / 2)
+    
+        load_xl, load_xr = udl.left, udl.right
+        strip_xl = s_x - (b / 2)
+        strip_xr = s_x + (b / 2)
 
-            # case 1 clearly load is completely inside
-            if load_xl <= strip_xl and load_xr >= strip_xr:
-                W += b * udl.magnitude
-            # case 2 on the left inside the load
-            elif strip_xl <= load_xl and strip_xr >= load_xl:
-                W += (strip_xr - load_xl) * udl.magnitude
+        # case 1 clearly load is completely inside
+        if load_xl <= strip_xl and load_xr >= strip_xr:
+            W += b * udl.magnitude
+        # case 2 on the left inside the load
+        elif strip_xl <= load_xl and strip_xr >= load_xl:
+            W += (strip_xr - load_xl) * udl.magnitude
 
-            # case 3 on the right side of the load
-            elif strip_xl <= load_xr and strip_xr >= load_xr:
-                W += (load_xr - strip_xl) * udl.magnitude
+        # case 3 on the right side of the load
+        elif strip_xl <= load_xr and strip_xr >= load_xr:
+            W += (load_xr - strip_xl) * udl.magnitude
 
         return W
 
-    def _calculate_strip_point_load(self, s_x):
-        return 0
+    def _calculate_strip_pl(self, b, s_x, pl):
+
+        strip_xl = s_x - (b / 2)
+        strip_xr = s_x + (b / 2)
+
+        # Need just one comparison to be equal to or greater than so that
+        # in the case the point load is excatly at the boundary
+        # two adjcent strips wont double up or ignore completely.
+        if strip_xl <= pl.coord < strip_xr:
+            return udl.magnitude
+        else:
+            return 0
 
     def _calculate_number_points_slope(self, deep_seeded_only, point_combinations, GRADIENT_TOLERANCE, NUMBER_POINTS_SLOPE):
         # if deep seeded or limits exclude
