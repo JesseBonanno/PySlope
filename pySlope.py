@@ -17,6 +17,7 @@ from rich import print
 from data_validation import *
 from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_points, reset_results
 from utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
+from utilities import draw_arrow, draw_line
 
 @dataclass
 class Material:
@@ -44,6 +45,7 @@ class Udl:
     magnitude: float = 0
     offset: float = 0
     length: float = None
+    color: str = 'red'
 
     def __post_init__(self):
         assert_positive_number(self.magnitude, 'load magnitude')
@@ -58,6 +60,7 @@ class Udl:
 class PointLoad:
     magnitude: float = 0
     offset: float = 0
+    color: str = 'blue'
 
     def __post_init__(self):
         assert_positive_number(self.magnitude, 'load magnitude')
@@ -194,6 +197,7 @@ class Slope:
                 self._udls.append(udl)
 
         self.update_udl_coordinates()
+        self._udl_max = max(udl.magnitude for udl in self._udls)
 
     # dont need to reset results since this only should be called
     # as a part of resetting 
@@ -236,13 +240,15 @@ class Slope:
         if remove_all:
             self._udls = []
 
+        self._udl_max = max(self._udls, key=self._udls.magnitude)
+
     
     @reset_results
     def set_pls(self, *pls):
         """set a surface surcharge on top of the slope"""
 
         for pl in pls:
-            if isinstance(udl, PointLoad):
+            if isinstance(pl, PointLoad):
                 self._pls.append(pl)
 
         self.update_pl_coordinates()
@@ -265,7 +271,7 @@ class Slope:
             for check_pl in self._pls:
                 if (
                     check_pl.offset == pl.offset and
-                    check_pl.magnitude == pl.magnitude and
+                    check_pl.magnitude == pl.magnitude
                 ):
                     self._pls.remove(check_pl)
 
@@ -948,7 +954,7 @@ class Slope:
         # in the case the point load is excatly at the boundary
         # two adjcent strips wont double up or ignore completely.
         if strip_xl <= pl.coord < strip_xr:
-            return udl.magnitude
+            return pl.magnitude
         else:
             return 0
 
@@ -1189,7 +1195,7 @@ class Slope:
                 l_c = i['l_c']
                 r_c = i['r_c']
 
-                fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c, r_c, FOS=v)
+                fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c, r_c, FOS=FOS)
     
 
         fig = self._plot_FOS_legend(fig)
@@ -1350,79 +1356,129 @@ class Slope:
         """Add load to plot"""
         # add in extra arrows, text, and hori line
 
-        # arrow styling parameters
-        ARROW_HEIGHT_FACTOR = 1.1
-        arrowhead = 3
-        arrowsize = 2
-        arrowwidth = 2
-        arrowcolor = "red"
+        # # arrow styling parameters
+        # ARROW_HEIGHT_FACTOR = 1 + (udl.magnitude / self._udl_max)*0.1
+        # arrowhead = 3
+        # arrowsize = 2
+        # arrowwidth = 2
+        # arrowcolor = udl.color
 
-        p = udl.magnitude
+        # if udl.magnitude == 0:
+        #     return fig
 
-        if p == 0:
-            return fig
+        # y = self._external_height
+        # l_x, r_x = udl.left, udl.right
 
-        y = self._external_height
-        l_x, r_x = udl.left, udl.right
+        # # add more arrows in if the load is longer than say 3
+        # length = r_x - l_x
 
-        # add more arrows in if the load is longer than say 3
-        length = r_x - l_x
+        # if length > 3:
+        #     spaces = divmod(length, 1.5)[0]
+        #     spacing = length / spaces
+        #     arrows = [l_x + spacing * t for t in range(int(spaces + 1))]
+        # else:
+        #     arrows = [l_x, (l_x + r_x) / 2, r_x]
 
-        if length > 3:
-            spaces = divmod(length, 1.5)[0]
-            spacing = length / spaces
-            arrows = [l_x + spacing * t for t in range(int(spaces + 1))]
-        else:
-            arrows = [l_x, (l_x + r_x) / 2, r_x]
+        # for x in arrows:
+        #     fig.add_annotation(
+        #         y=y,
+        #         x=x,
+        #         ay=y * ARROW_HEIGHT_FACTOR,
+        #         ax=x + 0,
+        #         text="",
+        #         xref="x",
+        #         yref="y",
+        #         axref="x",
+        #         ayref="y",
+        #         showarrow=True,
+        #         arrowhead=arrowhead,
+        #         arrowsize=arrowsize,
+        #         arrowwidth=arrowwidth,
+        #         arrowcolor=arrowcolor,
+        #     )
 
-        for x in arrows:
-            fig.add_annotation(
-                y=y,
-                x=x,
-                ay=y * ARROW_HEIGHT_FACTOR,
-                ax=x + 0,
-                text="",
-                xref="x",
-                yref="y",
-                axref="x",
-                ayref="y",
-                showarrow=True,
-                arrowhead=arrowhead,
-                arrowsize=arrowsize,
-                arrowwidth=arrowwidth,
-                arrowcolor=arrowcolor,
-            )
+        # fig.add_annotation(
+        #     y=y * ARROW_HEIGHT_FACTOR,
+        #     x=(l_x + r_x) / 2,
+        #     text=f"{udl.magnitude} kPa",
+        #     xref="x",
+        #     yref="y",
+        #     axref="x",
+        #     ayref="y",
+        #     showarrow=False,
+        #     font_size=30,
+        #     yshift=30,
+        #     font_color=arrowcolor,
+        # )
 
-        fig.add_annotation(
-            y=y * ARROW_HEIGHT_FACTOR,
-            x=(l_x + r_x) / 2,
-            text=f"{p} kPa",
-            xref="x",
-            yref="y",
-            axref="x",
-            ayref="y",
-            showarrow=False,
-            font_size=30,
-            yshift=30,
-            font_color=arrowcolor,
+        # fig.add_annotation(
+        #     y=y * ARROW_HEIGHT_FACTOR,
+        #     x=l_x,
+        #     ay=y * ARROW_HEIGHT_FACTOR,
+        #     ax=r_x,
+        #     text="",
+        #     xref="x",
+        #     yref="y",
+        #     axref="x",
+        #     ayref="y",
+        #     showarrow=True,
+        #     arrowhead=0,
+        #     arrowsize=arrowsize,
+        #     arrowwidth=arrowwidth,
+        #     arrowcolor=arrowcolor,
+        # )
+
+        fig = draw_arrow(
+            fig,
+            angle = -90,
+            force = udl.magnitude,
+            x_sup = udl.left,
+            y_sup = self._top_coord[1],
+            color = udl.color,
+            arrowlength= 100 * (udl.magnitude / self._udl_max),
+            show_values = True,
+            units='kN',
+            arrowhead=10,
         )
 
-        fig.add_annotation(
-            y=y * ARROW_HEIGHT_FACTOR,
-            x=l_x,
-            ay=y * ARROW_HEIGHT_FACTOR,
-            ax=r_x,
-            text="",
-            xref="x",
-            yref="y",
-            axref="x",
-            ayref="y",
-            showarrow=True,
-            arrowhead=0,
-            arrowsize=arrowsize,
-            arrowwidth=arrowwidth,
-            arrowcolor=arrowcolor,
+        fig = draw_arrow(
+            fig,
+            angle = -90,
+            force = udl.magnitude,
+            x_sup = udl.right,
+            y_sup = self._top_coord[1],
+            color = udl.color,
+            arrowlength= 100 * (udl.magnitude / self._udl_max),
+            show_values = False,
+            units='kN',
+            arrowhead=10,
         )
+
+        # Draw in line above arrows
+        y0 = 100 * (udl.magnitude / self._udl_max)
+
+        shape = dict(
+            type="line",
+            xref="x", yref="y",
+            x0=udl.left, y0=y0, x1=udl.right, y1=y0,
+            line_color=udl.color, line_width=2,
+            ysizemode='pixel',
+            xanchor=udl.left, yanchor=self._top_coord[1])
+
+        fig.add_shape(shape)
+
+        # draw in rectangular area
+        shape = dict(
+            type="rect",
+            xref="x", yref="y",
+            x0=udl.left, y0=0, x1=udl.right, y1=y0,
+            fillcolor=udl.color, 
+            opacity=0.2,
+            line_width=2,
+            ysizemode='pixel',
+            xanchor=udl.left, yanchor=self._top_coord[1])
+
+        fig.add_shape(shape)
 
         return fig
 
@@ -1733,9 +1789,10 @@ if __name__ == "__main__":
     m2 = Material(20,35,0,5)
 
     u1 = Udl(1,1,1)
+    u2 = Udl(10,0)
     u3 = Udl(3,3,3)
 
-    s.set_udls(u1, u3)
+    s.set_udls(u1, u2, u3)
 
     s.set_materials(m1,m2)
 
@@ -1753,8 +1810,4 @@ if __name__ == "__main__":
     
     f = s.plot_critical()
 
-    f.update_layout(
-        width=2000,
-        height=1500
-    )
-    f.write_image('test.png')
+    f.write_html('test.html')

@@ -1,5 +1,5 @@
 # standard library imports
-from math import cos, sin, sqrt
+from math import cos, sin, sqrt, radians
 from shapely.geometry import Point
 from colour import Color
 from functools import wraps
@@ -72,6 +72,250 @@ COLOUR_FOS_DICT = create_fos_color_dictionary()
 
 
 
+def draw_line(fig, angle, x_sup, y_sup, length=-20, xoffset=0, yoffset=0,
+              color='red', line_width=2):
+    """Draw an anchored line on a plotly figure.
+
+    Parameters
+    ----------
+    fig : plotly figure
+        plotly figure to append line shape to.
+    angle : int
+        Angle of the line from the x-axis. Angle uses standard mathematical
+        cartesian convention.
+    x_sup : int
+        The x position for the line to be anchored to.
+    length : int, optional
+        the line length, by default -20
+    xoffset : int, optional
+        The x-offset of the start of the line from the anchor, by default 0
+    yoffset : int, optional
+        The y-offset of the start of the line from the anchor, by default 0
+    color : str, optional
+        Line color, by default 'red'
+    line_width : int, optional
+        Line width, by default 2
+
+    Returns
+    -------
+    plotly figure
+        Returns the plotly figure passed into function with the arrowhead
+        appended to it.
+    """
+    # Establish line start and end coordinates.
+    x0 = xoffset
+    y0 = yoffset
+    x1 = x0 + int(length * cos(radians(angle)) )
+    y1 = y0 + int(length * sin(radians(angle)) )
+
+    # Create dictionary for shape object representing line.
+    shape = dict(
+        type="line",
+        xref="x", yref="y",
+        x0=x0, y0=y0, x1=x1, y1=y1,
+        line_color=color, line_width=line_width,
+        xsizemode='pixel', ysizemode='pixel',
+        xanchor=x_sup, yanchor=y_sup)
+
+    # Append shape to plot or subplot
+    fig.add_shape(shape)
+
+    return fig
+
+
+def draw_arrowhead(fig, angle, x_sup, y_sup, length=5, xoffset=0, yoffset=0,
+                   color='red', line_width=2):
+    """Draw an anchored arrowhead on a plotly figure.
+
+    Parameters
+    ----------
+    fig : plotly figure
+        plotly figure to append arrowhead shape to.
+    angle : int
+        Angle of the arrowhead from the x-axis. Angle uses standard
+        mathematical cartesian convention.
+    x_sup : int
+        The x position for the arrowhead to be anchored to.
+    length : int, optional
+        the arrowhead length, by default 5
+    xoffset : int, optional
+        The x-offset of the start of the arrowhead from the anchor, by
+        default 0
+    yoffset : int, optional
+        The y-offset of the start of the arrowhead from the anchor, by
+        default 0
+    color : str, optional
+        arrowhead color, by default 'red'
+    line_width : int, optional
+        Line width, by default 2
+    row : int or None,
+        Row of subplot to draw line on. If None specified assumes a full plot,
+        by default None.
+    col : int or None,
+        Column of subplot to draw line on. If None specified assumes a full
+        plot, by default None.
+
+    Returns
+    -------
+    plotly figure
+        Returns the plotly figure passed into function with the arrowhead
+        appended to it.
+    """
+    # Holds lines 90 degrees apart to represent arrowhead. Constructed so 0
+    # degrees is pointing right, follows conventions in documentation for angle
+
+    # Angle conversion to allow for compatability with draw_line function
+    a1 = 225 + angle
+    a2 = 135 + angle
+
+    # Append line to figure (half of arrowhead)
+    fig = draw_line(
+        fig,
+        angle=a1,
+        x_sup=x_sup,
+        y_sup=y_sup,
+        length=length,
+        xoffset=xoffset,
+        yoffset=yoffset,
+        color=color,
+        line_width=line_width
+        )
+
+    # Append line to figure (half of arrowhead)
+    fig = draw_line(
+        fig,
+        angle=a2,
+        x_sup=x_sup,
+        y_sup=y_sup,
+        length=length,
+        xoffset=xoffset,
+        yoffset=yoffset,
+        color=color,
+        line_width=line_width,
+        )
+
+    return fig
+
+
+def draw_arrow(fig, angle, force, x_sup, y_sup, xoffset=0, yoffset=0, color='red',
+               line_width=2, arrowhead=5, arrowlength=40, show_values=True,
+               units="N", precision=3):
+    """Draw an anchored arrow on a plotly figure.
+
+    Parameters
+    ----------
+    fig : plotly figure
+        plotly figure to append arrow shape to.
+    angle : int
+        Angle of the arrow from the x-axis. Angle uses standard
+        mathematical cartesian convention.
+    force: int
+        force that the arrow will represent. Only need to know whether it
+        is positive or negative, but it generally is easiest to just parse
+        the whole force in.
+    x_sup : int
+        The x position for the arrow to be anchored to.
+    xoffset : int, optional
+        The x-offset of the start of the arrow from the anchor, by default 0
+    yoffset : int, optional
+        The y-offset of the start of the arrow from the anchor, by default 0
+    color : str, optional
+        arrow color, by default 'red'
+    line_width : int, optional
+        Line width, by default 2
+    arrowhead : int, optional
+        Size of the arrowhead lines, by default 5
+    arrowlength: int, optional
+        length of the arrow line, by default 30
+    show_values: bool,optional
+        If true annotates numerical force value next to arrow, by default True.
+    row : int or None,
+        Row of subplot to draw line on. If None specified assumes a full plot,
+        by default None.
+    col : int or None,
+        Column of subplot to draw line on. If None specified assumes a full
+        plot, by default None.
+    units: str,
+        The units suffix drawn with the force value.
+    precision: int,
+        The decimal precision to be displayed for annotations, by default 3.
+
+    Returns
+    -------
+    plotly figure
+        Returns the plotly figure passed into function with the arrow
+        appended to it.
+    """
+    # get precision as p
+    p = precision
+
+    # Factor to switch arrow direction based on force sign
+    if force > 0:
+        d = 1
+    elif force < 0:
+        d = -1
+    else:
+        return fig
+
+    # Draw arrowhead for force
+    fig = draw_arrowhead(
+        fig,
+        angle,
+        x_sup,
+        y_sup,
+        length=arrowhead * d,
+        xoffset=xoffset,
+        yoffset=yoffset,
+        color=color,
+        line_width=line_width,
+        )
+
+    # Draw arrowline for force
+    fig = draw_line(
+        fig,
+        angle,
+        x_sup,
+        y_sup,
+        length=-1 * arrowlength * d,
+        xoffset=xoffset,
+        yoffset=yoffset,
+        color=color,
+        line_width=line_width,
+        )
+
+    if show_values:
+        # determine start and end of arrow
+        x0 = xoffset + x_sup
+        y0 = yoffset + y_sup
+        x1 = (
+            int(-arrowlength * d * cos(radians(angle)))
+            ) * 1.1
+        y1 = (
+            int(-arrowlength * d * sin(radians(angle)))
+            ) * 1.3
+
+        # make so text doesnt intersect x axis
+        if abs(y1) < 5:
+            if y1 >= 0:
+                y1 = 10
+            else:
+                y1 = -10
+
+        annotation = dict(
+            xref="x", yref="y",
+            x=x0,
+            y=y0,
+            xshift=x1,
+            yshift=y1,
+            text=f"{force:.{p}f} {units}",
+            font_color=color,
+            showarrow=False,
+        )
+
+        # Append shape to plot or subplot
+        fig.add_annotation(annotation)
+
+    return fig
 
 
     
