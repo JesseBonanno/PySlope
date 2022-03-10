@@ -70,7 +70,18 @@ def create_fos_color_dictionary():
 
 COLOUR_FOS_DICT = create_fos_color_dictionary()
 
-
+def get_precision(n):
+# determine the precision of the value entered
+    mag = str(n)
+    if '.' not in mag:
+        return 0
+    else:
+        decimals = mag.split('.')[1]
+        for i in range(len(decimals)-3):
+            if decimals[i] == decimals[i+1] == decimals [i+2] == '0':
+                return i
+        
+    return len(decimals)
 
 def draw_line(fig, angle, x_sup, y_sup, length=-20, xoffset=0, yoffset=0,
               color='red', line_width=2):

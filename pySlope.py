@@ -17,7 +17,7 @@ from rich import print
 from data_validation import *
 from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_points, reset_results
 from utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
-from utilities import draw_arrow, draw_line
+from utilities import draw_arrow, draw_line, get_precision
 
 @dataclass
 class Material:
@@ -53,6 +53,14 @@ class Udl:
         if self.length:
             assert_positive_number(self.length, 'load length')
 
+        self.precision = get_precision(self.magnitude)
+
+        try:
+            color = Color(self.color)
+            self.color = color.hex
+        except:
+            self.color = 'red'
+
     def __repr__(self):
         return f"UDL: {self.magnitude} kPa, offset = {self.offset} m, load length = {self.length} m"
 
@@ -66,8 +74,16 @@ class PointLoad:
         assert_positive_number(self.magnitude, 'load magnitude')
         assert_positive_number(self.offset, 'load offset')
 
+        self.precision = get_precision(self.magnitude)
+
+        try:
+            color = Color(self.color)
+            self.color = color.hex
+        except:
+            self.color = 'blue'
+
     def __repr__(self):
-        return f"Point: {self.magnitude} kN, offset = {self.offset} m"
+        return f"Point: {self.magnitude} kN/m, offset = {self.offset} m"
 
 class Slope:
     """Slope object.
@@ -1130,6 +1146,9 @@ class Slope:
         for udl in self._udls:
             fig = self._plot_udl(fig, udl)
 
+        for pl in self._pls:
+            fig = self._plot_pl(fig, pl)
+
         if self._water_RL:
             fig = self._plot_water(fig)
 
@@ -1352,81 +1371,42 @@ class Slope:
 
         return fig
 
+    def _plot_pl(self, fig, pl):
+        """Add pl to plot"""
+
+        
+        fig = draw_arrow(
+            fig,
+            angle = -90,
+            force = pl.magnitude,
+            x_sup = pl.coord,
+            y_sup = self._top_coord[1],
+            color = 'black',
+            arrowlength= 150,
+            show_values = True,
+            precision= pl.precision,
+            units='kN',
+            arrowhead=10,
+        )
+
+        fig = draw_arrow(
+            fig,
+            angle = -90,
+            force = pl.magnitude,
+            x_sup = pl.coord,
+            y_sup = self._top_coord[1],
+            color = pl.color,
+            arrowlength= 150,
+            show_values = False,
+            units='kN',
+            arrowhead=10,
+        )
+
+
+        return fig
+
     def _plot_udl(self, fig, udl):
         """Add load to plot"""
-        # add in extra arrows, text, and hori line
-
-        # # arrow styling parameters
-        # ARROW_HEIGHT_FACTOR = 1 + (udl.magnitude / self._udl_max)*0.1
-        # arrowhead = 3
-        # arrowsize = 2
-        # arrowwidth = 2
-        # arrowcolor = udl.color
-
-        # if udl.magnitude == 0:
-        #     return fig
-
-        # y = self._external_height
-        # l_x, r_x = udl.left, udl.right
-
-        # # add more arrows in if the load is longer than say 3
-        # length = r_x - l_x
-
-        # if length > 3:
-        #     spaces = divmod(length, 1.5)[0]
-        #     spacing = length / spaces
-        #     arrows = [l_x + spacing * t for t in range(int(spaces + 1))]
-        # else:
-        #     arrows = [l_x, (l_x + r_x) / 2, r_x]
-
-        # for x in arrows:
-        #     fig.add_annotation(
-        #         y=y,
-        #         x=x,
-        #         ay=y * ARROW_HEIGHT_FACTOR,
-        #         ax=x + 0,
-        #         text="",
-        #         xref="x",
-        #         yref="y",
-        #         axref="x",
-        #         ayref="y",
-        #         showarrow=True,
-        #         arrowhead=arrowhead,
-        #         arrowsize=arrowsize,
-        #         arrowwidth=arrowwidth,
-        #         arrowcolor=arrowcolor,
-        #     )
-
-        # fig.add_annotation(
-        #     y=y * ARROW_HEIGHT_FACTOR,
-        #     x=(l_x + r_x) / 2,
-        #     text=f"{udl.magnitude} kPa",
-        #     xref="x",
-        #     yref="y",
-        #     axref="x",
-        #     ayref="y",
-        #     showarrow=False,
-        #     font_size=30,
-        #     yshift=30,
-        #     font_color=arrowcolor,
-        # )
-
-        # fig.add_annotation(
-        #     y=y * ARROW_HEIGHT_FACTOR,
-        #     x=l_x,
-        #     ay=y * ARROW_HEIGHT_FACTOR,
-        #     ax=r_x,
-        #     text="",
-        #     xref="x",
-        #     yref="y",
-        #     axref="x",
-        #     ayref="y",
-        #     showarrow=True,
-        #     arrowhead=0,
-        #     arrowsize=arrowsize,
-        #     arrowwidth=arrowwidth,
-        #     arrowcolor=arrowcolor,
-        # )
 
         fig = draw_arrow(
             fig,
@@ -1436,9 +1416,25 @@ class Slope:
             y_sup = self._top_coord[1],
             color = udl.color,
             arrowlength= 100 * (udl.magnitude / self._udl_max),
-            show_values = True,
+            show_values = False,
             units='kN',
             arrowhead=10,
+            precision=udl.precision,
+        )
+
+        fig = draw_arrow(
+            fig,
+            angle = -90,
+            force = udl.magnitude,
+            x_sup = (udl.left+udl.right)/2,
+            y_sup = self._top_coord[1],
+            color = 'black',
+            arrowlength= 100 * (udl.magnitude / self._udl_max)+10,
+            show_values = True,
+            precision=udl.precision,
+            units='kPa',
+            arrowhead=0,
+            line_width=0,
         )
 
         fig = draw_arrow(
@@ -1786,25 +1782,24 @@ if __name__ == "__main__":
     s = Slope(height=3, angle=30, length=None)
 
     m1 = Material(20,35,5,1)
-    m2 = Material(20,35,0,5)
+    m2 = Material(20,35,5,5)
 
-    u1 = Udl(1,1,1)
-    u2 = Udl(10,0)
-    u3 = Udl(3,3,3)
+    u1 = Udl(1.364,1,1)
+    u2 = Udl(0.77,0, color='dark red')
+    u3 = Udl(20.5753645,3,3)
+
+    p1 = PointLoad(100,1)
 
     s.set_udls(u1, u2, u3)
+    s.set_pls(p1)
 
     s.set_materials(m1,m2)
 
-    s.set_water_table(0)
+    s.set_water_table(5)
 
     s.update_water_analysis_options(auto=True)
 
     s.analyse_slope()
-    
-    print(s.get_min_FOS())
-
-    s.set_water_table(1)
 
     print(s.get_min_FOS())
     
