@@ -17,7 +17,7 @@ from rich import print
 from data_validation import *
 from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_points, reset_results
 from utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
-from utilities import draw_arrow, draw_line, get_precision
+from utilities import draw_arrow, draw_line, get_precision, is_color
 
 @dataclass
 class Material:
@@ -55,11 +55,8 @@ class Udl:
 
         self.precision = get_precision(self.magnitude)
 
-        try:
-            color = Color(self.color)
-            self.color = color.hex
-        except:
-            self.color = 'red'
+        if not is_color(self.color):
+            self.color ='red'
 
     def __repr__(self):
         return f"UDL: {self.magnitude} kPa, offset = {self.offset} m, load length = {self.length} m"
@@ -76,11 +73,8 @@ class PointLoad:
 
         self.precision = get_precision(self.magnitude)
 
-        try:
-            color = Color(self.color)
-            self.color = color.hex
-        except:
-            self.color = 'blue'
+        if not is_color(self.color):
+            self.color ='blue'
 
     def __repr__(self):
         return f"Point: {self.magnitude} kN/m, offset = {self.offset} m"
@@ -1388,7 +1382,7 @@ class Slope:
             arrowlength= 150,
             show_values = True,
             precision= pl.precision,
-            units='kN',
+            units='kN/m',
             arrowhead=10,
         )
 
@@ -1401,7 +1395,7 @@ class Slope:
             color = pl.color,
             arrowlength= 150,
             show_values = False,
-            units='kN',
+            units='kN/m',
             arrowhead=10,
         )
 
@@ -1806,6 +1800,7 @@ if __name__ == "__main__":
 
     print(s.get_min_FOS())
     
-    f = s.plot_all_planes()
+    f = s.plot_critical()
+    f.update_layout(width=2000,height=1000)
 
-    f.write_html('test.html')
+    f.write_image('test.png')

@@ -17,6 +17,14 @@ def reset_results(method):
         return method_output
     return _impl
 
+def is_color(color):
+    try:
+        color = Color(color)
+        c = color.hex
+        return True
+    except:
+        return False
+
 
 def mid_coord(p1 : Point, p2 : Point) -> Point:
     return [(a + b) / 2 for a, b in zip(p1, p2)]
@@ -319,11 +327,11 @@ def draw_arrow(fig, angle, force, x_sup, y_sup, xoffset=0, yoffset=0, color='red
             xshift=x1,
             yshift=y1,
             text=f"{force:.{p}f} {units}",
-            font_color=color,
             showarrow=False,
+            font=dict(family="sans serif", size=20, color=color),
         )
 
-        # Append shape to plot or subplot
+        # Append shape to plot or esubplot
         fig.add_annotation(annotation)
 
     return fig
