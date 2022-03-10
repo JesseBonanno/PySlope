@@ -734,8 +734,11 @@ class Slope:
                     'c_x': c_x,
                     'c_y': c_y,
                     'radius': radius,
-                    'full_path' : l_c == i_l and r_c == i_r,
-                     }]
+                    'full_path' : (
+                        round(l_c[0],1) == round(i_l[0],1) and
+                        round(r_c[0],1) == round(i_r[0],1)
+                    ),
+                    }]
             else:
                 break
 
@@ -1803,6 +1806,6 @@ if __name__ == "__main__":
 
     print(s.get_min_FOS())
     
-    f = s.plot_critical()
+    f = s.plot_all_planes()
 
     f.write_html('test.html')
