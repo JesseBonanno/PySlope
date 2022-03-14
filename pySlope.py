@@ -4,23 +4,21 @@ import time
 from dataclasses import dataclass
 from functools import wraps
 
-# import concurrent.futures
-from colour import Color
-
 # third party imports
 import plotly.graph_objects as go
 from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
 from tqdm import tqdm
-from rich import print
+from colour import Color
 
 # local imports
 from data_validation import *
-from utilities import mid_coord, circle_radius_from_abcd, circle_centre, dist_points, reset_results
+from utilities import (mid_coord, circle_radius_from_abcd, circle_centre, dist_points, 
+reset_results, draw_arrow, draw_line, get_precision, is_color)
 from utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
-from utilities import draw_arrow, draw_line, get_precision, is_color
 
 @dataclass
 class Material:
+    "Class representing geological material unit"
     unit_weight: float = 20
     friction_angle: int = 35
     cohesion: int = 2
@@ -36,12 +34,20 @@ class Material:
         assert(isinstance(self.name, str))
         assert(isinstance(self.color, str))
 
+        # need to define seperate to color since color property is changed
+        # when user defined color doesnt exist. There was a define floor
+        # previously since when removing materials the color for adjecent
+        # materials could become the same.
+        # Comment from Jesse B, 14.03.22
+        self.user_defined_color = self.color
+
 
     def __repr__(self):
         return f"Material:{self.name}(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom}"
 
 @dataclass
 class Udl:
+    "Class representing uniformly distributed surface pressure in kPa"
     magnitude: float = 0
     offset: float = 0
     length: float = None
@@ -63,6 +69,7 @@ class Udl:
 
 @dataclass
 class PointLoad:
+    "Class representing line load in kN/m"
     magnitude: float = 0
     offset: float = 0
     color: str = 'blue'
@@ -105,7 +112,7 @@ class Slope:
         # intialise options
         self.update_boundary_options(MIN_EXT_H=6, MIN_EXT_L=10)
         self.set_external_boundary(height=height, angle=angle, length=length)
-        self.update_analysis_options(slices=50, iterations=2500, min_failure_dist = 0)
+        self.update_analysis_options(slices=50, iterations=2500, min_failure_dist = 0, gradient_tolerance=8)
 
         self.update_water_analysis_options(auto=True)
 
@@ -212,6 +219,7 @@ class Slope:
     # dont need to reset results since this only should be called
     # as a part of resetting 
     def update_udl_coordinates(self):
+        "Update coordinates for left and right of udl based on external boundary and Udl object"
 
         for udl in self._udls:
             
@@ -226,18 +234,14 @@ class Slope:
 
     @reset_results
     def remove_udls(self, *udls, remove_all = False):
-        """Remove udl from model if associated with model."""
+        """Remove udl from model if associated with model.
 
-        # this method might not capture the case that a user doesnt save a udl
-        # and needs to recreate it to remove it.
-        # might be better to rewrite a method that compares the values of the 
-        # objects rather than checks they are identical
+        Parameters
+        ----------
+        remove_all : bool, optional
+            If true remove all udls, by default False
+        """
 
-        # for udl in udls:
-        #     if udl in self._udls:
-        #         self._udls.remove(udl)
-
-        # can probably write this as O(n) rather than O(n^2)
         for udl in udls:
             for check_udl in self._udls:
                 if (
@@ -266,6 +270,7 @@ class Slope:
     # dont need to reset results since this only should be called
     # as a part of resetting 
     def update_pl_coordinates(self):
+        "Update coordinates for point load based on external boundary and PointLoad object"
 
         for pl in self._pls:
             coord = max(0,self._top_coord[0]-pl.offset)
@@ -274,7 +279,13 @@ class Slope:
 
     @reset_results
     def remove_pls(self, *pls, remove_all = False):
-        """Remove udl from model if associated with model."""
+        """Remove udl from model if associated with model.
+
+        Parameters
+        ----------
+        remove_all : bool, optional
+            if true remove all pls, by default False
+        """
 
         # can probably write this as O(n) rather than O(n^2)
         for pl in pls:
@@ -306,6 +317,7 @@ class Slope:
             If non-unique material depths then error is raised.
         """
 
+        # check material object entered
         for material in materials:
             if not isinstance(material, Material):
                 raise ValueError(
@@ -320,22 +332,20 @@ class Slope:
 
         depths = [material.depth_to_bottom for material in materials]
 
+        # if geological unit deeper than model than extend model to fit materials
         if depths[-1] > self._external_height:
             self.update_boundary_options(MIN_EXT_H=depths[-1])
 
+        # check material depth unique
         if len(depths) > len(set(depths)):
             raise ValueError("The same material depth has been input twice")
 
-        # define RL for each material
+        # define RL for each material and color for each material
         for i, material in enumerate(materials):
             material.RL = self._external_height - material.depth_to_bottom
 
-            if material.color:
-                try:
-                    color = Color(material.color)
-                    material.color = color.hex
-                except:
-                    material.color = MATERIAL_COLORS[i%10]
+            if is_color(material.user_defined_color):
+                material.color = material.user_defined_color
             else:
                 material.color = MATERIAL_COLORS[i%10]
 
@@ -353,19 +363,26 @@ class Slope:
         depth : float, optional
             depth in metres of material object. If not None and material found
             at indicated depth then will remove the material, by default None
+        remove_all : Boolean, optional
+            if true all materials removed, default false
 
         """
-        # if material defined and material type and material in list then remove it
+        # general note: depth used to remove object rather than directly removing
+        # even when material class provided because a user might reinitialise
+        # an object with the same details but if the pointer is changed than
+        # it might be confusing for the user as to why they cant remove.
+        # Comment by Jesse B, 14.03.2022.
+
+        # if material defined and material type is Material set depth to be depth of material
         if material and isinstance(material, Material):
             depth = material.depth_to_bottom
 
-        # if depth specified and had no luck removing material
-        # try find the depth for a material in the list and then remove it
+        # if depth specified adopt
         if depth:
-            assert_positive_number(depth, "material depth")
             for m in self._materials:
                 if m.depth_to_bottom == depth:
                     self._materials.remove(m)
+                    break
         
         if remove_all:
             self._materials = []
@@ -402,7 +419,8 @@ class Slope:
         self,
         slices: int = None,
         iterations: int = None,
-        min_failure_dist: int = None
+        min_failure_dist: int = None,
+        gradient_tolerance : int = None,
     ):
         """Function to update analysis modelling options.
 
@@ -414,6 +432,9 @@ class Slope:
         iterations : int, optional
             Approximate number of potential slopes to check.
             If None doesnt update the parameter, by default None
+        min_failure_distance : int, optional
+            If specified only failure slopes with a distance greater than the
+            min failure distance will be assessed, by default None.
         """
         if slices:
             assert_range(slices, "slices", 10, 500)
@@ -426,6 +447,10 @@ class Slope:
             if min_failure_dist > self._external_length:
                 print('min failure distance should not be greater than the length of the model. Check Value.')
             self._min_failure_distance = min(min_failure_dist, self._external_length * 0.9)
+        if gradient_tolerance and isinstance(gradient_tolerance, int):
+            assert_positive_number(gradient_tolerance, 'gradient tolerance')
+            self._gradient_tolerance = gradient_tolerance
+            
 
     @reset_results
     def update_boundary_options(
@@ -457,6 +482,7 @@ class Slope:
             self._MIN_EXT_L = MIN_EXT_L
 
         # if the external boundary has been set this call is after init. Can update the boundary.
+        # otherwise will get an error
         if self._external_boundary is not None:
             self.set_external_boundary(height=self._height, length=self._length)
 
@@ -556,22 +582,8 @@ class Slope:
             self._number_limits = 4
 
 
-    def analyse_slope(self, deep_seeded_only=False):
-        """Analyse many possible failure planes for a slope.
-
-        Parameters
-        ----------
-        deep_seeded_only : bool, optional
-            If true doesnt define failures through the slope,
-            only around the slope, by default False.
-
-        Returns
-        ----------
-        Nothing
-
-        """
-        # tolerance for when to stop adding points to slope
-        GRADIENT_TOLERANCE = 8
+    def analyse_slope(self):
+        """Analyse many possible failure planes for a slope.  """
 
         # Approximate number of runs and distribution of searches
         ITERATIONS = self._iterations
@@ -583,7 +595,7 @@ class Slope:
         # generate coordinates for left of slope
         point_combinations = ITERATIONS / NUMBER_CIRCLES
 
-        NUMBER_POINTS = self._calculate_number_points_slope(deep_seeded_only, point_combinations, GRADIENT_TOLERANCE, NUMBER_POINTS_SLOPE)
+        NUMBER_POINTS = self._calculate_number_points_slope(point_combinations, NUMBER_POINTS_SLOPE)
 
         x1, x2, x3, x4 = (
             min(self._top_coord[0], self._limits[0][0]),
@@ -609,32 +621,32 @@ class Slope:
         else:
             right_coords =[]
 
-        if self._gradient > GRADIENT_TOLERANCE:
+        # ignore crest if too steep (gradient tolerance exceeded)
+        if self._gradient > self._gradient_tolerance:
             left_coords = left_coords[:-1]
 
-        # if not deepseeded only add points for the slope
-        if not deep_seeded_only:
-            # get limits on bounds of slope
-            # not some limits might still stretch off slope
-            # but <= check later considers this.
-            x1, x2, x3, x4 = (
-                max(self._top_coord[0], self._limits[0][0]),
-                min(self._bot_coord[0], self._limits[0][1]),
-                max(self._top_coord[0], self._limits[1][0]),
-                min(self._bot_coord[0], self._limits[1][1]),
-            )
+    
+        # get limits on bounds of slope
+        # not some limits might still stretch off slope
+        # but <= check later considers this.
+        x1, x2, x3, x4 = (
+            max(self._top_coord[0], self._limits[0][0]),
+            min(self._bot_coord[0], self._limits[0][1]),
+            max(self._top_coord[0], self._limits[1][0]),
+            min(self._bot_coord[0], self._limits[1][1]),
+        )
 
-            # only want lines from mid to right for a not very steep gradient
-            # if x2 ! > x1 then limit off of slope
-            # NOTE: we dont want the end points since we already grabbed those in left and right coords.
-            if self._gradient < GRADIENT_TOLERANCE and x2 >= x1:
-                left_mid_coords = [x1 + (x2-x1)*(i/(NUMBER_POINTS_SLOPE+1)) for i in range(1,NUMBER_POINTS_SLOPE+1)]
-                left_coords += [(x, self.get_external_y_intersection(x)) for x in left_mid_coords]
+        # only want lines from mid to right for a not very steep gradient
+        # if x2 ! > x1 then limit off of slope
+        # NOTE: we dont want the end points since we already grabbed those in left and right coords.
+        if self._gradient < self._gradient_tolerance and x2 >= x1:
+            left_mid_coords = [x1 + (x2-x1)*(i/(NUMBER_POINTS_SLOPE+1)) for i in range(1,NUMBER_POINTS_SLOPE+1)]
+            left_coords += [(x, self.get_external_y_intersection(x)) for x in left_mid_coords]
 
-            # if x4 ! > x3 then limit off of slope
-            if x4 >= x3:
-                right_mid_coords = [x3 + (x4-x3)*(i/(NUMBER_POINTS_SLOPE+1)) for i in range(1,NUMBER_POINTS_SLOPE+1)]
-                right_coords += [(x, self.get_external_y_intersection(x)) for x in right_mid_coords]
+        # if x4 ! > x3 then limit off of slope
+        if x4 >= x3:
+            right_mid_coords = [x3 + (x4-x3)*(i/(NUMBER_POINTS_SLOPE+1)) for i in range(1,NUMBER_POINTS_SLOPE+1)]
+            right_coords += [(x, self.get_external_y_intersection(x)) for x in right_mid_coords]
 
         search = []
 
@@ -777,7 +789,7 @@ class Slope:
         # width of a slice
         b = dist / SLICES
 
-        # initialise left point of first slice
+        # initialise centre point of first slice
         s_x = i_list[0][0] + b / 2
 
         # intialise the push and resistance components for FOS before looping
@@ -849,6 +861,23 @@ class Slope:
 
 
     def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float):
+        """Get intersection points of a circle with external boundary
+
+        Parameters
+        ----------
+        c_x : float
+            circle x coodinate
+        c_y : float
+            circle y coordinate
+        radius : float
+            circle radius
+
+        Returns
+        -------
+        tuple 
+            tuple of two coordinates (left coordinate, right coordinate)
+        """
+
         # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
         # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
         p = Point(c_x, c_y)
@@ -897,7 +926,24 @@ class Slope:
 
         return i_list
 
-    def _calculate_strip_weight(self, b, s_yt, s_yb):
+    def _calculate_strip_weight(self, b : float, s_yt : float, s_yb : float):
+        """calculates the weight of a strip.
+
+        Parameters
+        ----------
+        b : float
+            strip width in metres
+        s_yt : float
+            strip y coordinate at top of strip
+        s_yb : _type_
+            strip y coordinate at bottom of strip
+
+        Returns
+        -------
+        float
+            Weight of strip in kN.
+        """
+
         # intialize properties
         W = 0.0  # kN
         top = s_yt
@@ -930,6 +976,18 @@ class Slope:
         return W
 
     def _get_material_at_depth(self, s_yb):
+        """Return the material class at a specified depth.
+
+        Parameters
+        ----------
+        s_yb : float
+            strip y coordinate at bottom of strip
+
+        Returns
+        -------
+        Material
+            material object at the specified depth.
+        """
 
         # loop through all materials, if we have passed the bottom take the previous
         for m in self._materials:
@@ -939,6 +997,22 @@ class Slope:
         return self._materials[-1]
 
     def _calculate_strip_udl_force(self, b, s_x, udl):
+        """Calculates the udl force over strip.
+
+        Parameters
+        ----------
+        b : float,
+            strip width in m
+        s_x : float,
+            strip x coordinate (for center of strip)
+        udl : Udl object,
+            udl object
+
+        Returns
+        -------
+        float
+            udl force on strip in kN
+        """
         W = 0
     
         load_xl, load_xr = udl.left, udl.right
@@ -959,6 +1033,22 @@ class Slope:
         return W
 
     def _calculate_strip_pl(self, b, s_x, pl):
+        """Calculates the pl force over strip.
+
+        Parameters
+        ----------
+        b : float,
+            strip width in m
+        s_x : float,
+            strip x coordinate (for center of strip)
+        pl : PointLoad object,
+            PointLoad object
+
+        Returns
+        -------
+        float
+            udl force on strip in kN
+        """
 
         strip_xl = s_x - (b / 2)
         strip_xr = s_x + (b / 2)
@@ -971,9 +1061,24 @@ class Slope:
         else:
             return 0
 
-    def _calculate_number_points_slope(self, deep_seeded_only, point_combinations, GRADIENT_TOLERANCE, NUMBER_POINTS_SLOPE):
-        # if deep seeded or limits exclude
-        if deep_seeded_only or (
+    def _calculate_number_points_slope(self, point_combinations, NUMBER_POINTS_SLOPE):
+        """_summary_
+
+        Parameters
+        ----------
+        point_combinations : int
+            total number of slope coordinate groups to reach target number
+            of iterations
+        NUMBER_POINTS_SLOPE : int
+            number of points to be added to slope
+
+        Returns
+        -------
+        int
+            number points for top and bottom of slope
+        """
+        # if deep seeded or limits exclude the slope
+        if (
             self._limits[0][1] < self._top_coord[0] and
             self._limits[1][0] > self._bot_coord[0]
             ):
@@ -990,7 +1095,7 @@ class Slope:
             NUMBER_POINTS = int((-N + sqrt( N**2 + 4 * P ))/2 )
 
         else:
-            if self._gradient > GRADIENT_TOLERANCE:
+            if self._gradient > self._gradient_tolerance:
                 NUMBER_POINTS = (
                     int(
                         (
@@ -1008,15 +1113,36 @@ class Slope:
 
 
     def get_min_FOS(self):
+        """Get min factor of safety for slope model.
+
+        Returns
+        -------
+        float
+            critical factor of safety
+        """
         return self._min_FOS_dict['FOS']
 
     def get_min_FOS_circle(self):
+        """Get the properties of the circle that gave the critical factor of safety.
+
+        Returns
+        -------
+        tuple
+            tuple containing (circle x coordinate, circle y coordinate, circle radius)
+        """
         c_x = self._min_FOS_dict['c_x']
         c_y = self._min_FOS_dict['c_y']
         radius = self._min_FOS_dict['radius']
         return (c_x, c_y, radius)
 
     def get_min_FOS_end_points(self):
+        """Get the external boundary intersection for the slope that gave the critical factor of safety.
+
+        Returns
+        -------
+        tuple
+            tuple containing (left coordinate, right coordinate)
+        """
         l_c = self._min_FOS_dict['l_c']
         r_c = self._min_FOS_dict['r_c']
         return (l_c, r_c)
@@ -1046,7 +1172,6 @@ class Slope:
 
         else:
             return None
-
 
 
     def plot_boundary(self):
@@ -1313,6 +1438,7 @@ class Slope:
         return fig
 
     def _plot_limits(self, fig):
+        """Add analysis limits to plot """
 
         l1_x, l2_x = self._limits[0]
         r1_x, r2_x = self._limits[1]
@@ -1369,7 +1495,7 @@ class Slope:
         return fig
 
     def _plot_pl(self, fig, pl):
-        """Add pl to plot"""
+        """Add pointload to plot"""
 
         
         fig = draw_arrow(
@@ -1403,7 +1529,7 @@ class Slope:
         return fig
 
     def _plot_udl(self, fig, udl):
-        """Add load to plot"""
+        """Add Uniform load to plot"""
 
         fig = draw_arrow(
             fig,
@@ -1475,30 +1601,8 @@ class Slope:
 
         return fig
 
-    def _plot_material_properties(self,fig):
-        # loop through materials
-        for i, m in enumerate(self._materials):
-            # get reference level (y coordinate) for material
-            y = m.RL
-
-            text = f"<b>{m.name.upper()}<b>;  γ = {m.unit_weight} kN/m3, φ = {m.friction_angle}, c' = {m.cohesion} kPa, d = {m.depth_to_bottom} m"
-
-            fig.add_annotation(
-                xref="x", yref="y",
-                xanchor='left',
-                x=0,
-                y=y,
-                text=text,
-                showarrow=False,
-                yshift=20,
-                xshift=20,
-                font_size=15,
-                font_color="black",
-            )
-
-        return fig
-
     def _plot_material_table(self, fig):
+        """Plot table of material properties"""
 
         header_h = 0.05
         row_h = 0.035
@@ -1616,6 +1720,7 @@ class Slope:
         return fig
 
     def _plot_FOS_legend(self, fig):
+        """Plot color legend for factor of safety colors"""
 
         yi = 0.9
         yf = 0.5
@@ -1779,7 +1884,7 @@ if __name__ == "__main__":
     s = Slope(height=3, angle=30, length=None)
 
     m1 = Material(20,35,5,1)
-    m2 = Material(20,35,5,5)
+    m2 = Material(20,35,0,5)
 
     u1 = Udl(1.364,1,1)
     u2 = Udl(0.77,0, color='dark red')
@@ -1800,7 +1905,7 @@ if __name__ == "__main__":
 
     print(s.get_min_FOS())
     
-    f = s.plot_critical()
-    f.update_layout(width=2000,height=1000)
+    f = s.plot_all_planes(2)
+    f.update_layout(width=2000,height=1100)
 
-    f.write_image('test.png')
+    f.write_html('test.html')

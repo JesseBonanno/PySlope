@@ -1,5 +1,4 @@
 colour
 plotly
 shapely
-rich
 tqdm
