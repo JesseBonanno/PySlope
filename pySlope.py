@@ -1778,29 +1778,32 @@ class Slope:
 if __name__ == "__main__":
     s = Slope(height=3, angle=30, length=None)
 
-    m1 = Material(20,35,5,1)
-    m2 = Material(20,35,5,5)
+    m1 = Material(unit_weight=20,friction_angle=35,cohesion=3,depth_to_bottom=1, name='Fill')
+    m2 = Material(20,30,0,5, name = 'sand')
 
-    u1 = Udl(1.364,1,1)
-    u2 = Udl(0.77,0, color='dark red')
-    u3 = Udl(20.5753645,3,3)
+    u1 = Udl(magnitude = 100, offset=2, length=5)
+    u2 = Udl(magnitude = 20, color='dark red')
 
-    p1 = PointLoad(100,1)
+    p1 = PointLoad(10,3)
 
-    s.set_udls(u1, u2, u3)
+    s.set_udls(u1, u2)
     s.set_pls(p1)
 
     s.set_materials(m1,m2)
 
-    s.set_water_table(5)
+    s.set_water_table(4)
 
     s.update_water_analysis_options(auto=True)
 
     s.analyse_slope()
 
-    print(s.get_min_FOS())
-    
     f = s.plot_critical()
-    f.update_layout(width=2000,height=1000)
+    f.update_layout(width=2000,height=1100)
 
-    f.write_image('test.png')
+    f.write_image('critical.png')
+
+    f = s.plot_all_planes(max_fos=2)
+
+    f.update_layout(width=2000,height=1100)
+
+    f.write_image('all_planes.png')
