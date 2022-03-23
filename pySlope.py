@@ -3,6 +3,7 @@ from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
 from functools import wraps
+import numpy as np
 
 # third party imports
 import plotly.graph_objects as go
@@ -52,6 +53,7 @@ class Udl:
     offset: float = 0
     length: float = None
     color: str = 'red'
+    dynamic_offset : bool = False
 
     def __post_init__(self):
         assert_positive_number(self.magnitude, 'load magnitude')
@@ -73,6 +75,7 @@ class PointLoad:
     magnitude: float = 0
     offset: float = 0
     color: str = 'blue'
+    dynamic_offset : bool = False
 
     def __post_init__(self):
         assert_positive_number(self.magnitude, 'load magnitude')
@@ -214,6 +217,7 @@ class Slope:
                 self._udls.append(udl)
 
         self.update_udl_coordinates()
+
         self._udl_max = max(udl.magnitude for udl in self._udls)
 
     # dont need to reset results since this only should be called
@@ -251,10 +255,13 @@ class Slope:
                 ):
                     self._udls.remove(check_udl)
 
+        self._udl_max = max(self._udls, key= lambda x : x.magnitude)
+
         if remove_all:
             self._udls = []
+            self._udl_max = 0
 
-        self._udl_max = max(self._udls, key=self._udls.magnitude)
+        
 
     
     @reset_results
@@ -344,7 +351,7 @@ class Slope:
         for i, material in enumerate(materials):
             material.RL = self._external_height - material.depth_to_bottom
 
-            if is_color(material.user_defined_color):
+            if is_color(material.user_defined_color) and material.user_defined_color!='':
                 material.color = material.user_defined_color
             else:
                 material.color = MATERIAL_COLORS[i%10]
@@ -858,6 +865,95 @@ class Slope:
             return None
 
         return (resisting / pushing, i_list[0], i_list[1])
+
+    def analyse_dynamic(self, critical_fos=1.3):
+        """Analyse slope and offset dynamic loads until critical FOS is achieved
+
+        Parameters
+        ----------
+        critical_fos : float, optional
+            minimum required factor of safety, by default 1.3
+        """
+        self._dynamic_results = {}
+
+        # check case for load at right and load at left before
+        # trying to converge on position
+        right = 0
+        left = self._length-0.01
+
+        # check for extreme case with loads at crest (right)
+        # if slope is safe (FOS high) then return
+        self._set_dynamic_offset(right)
+        self.analyse_slope()
+        fos = self.get_min_FOS()
+        self._dynamic_results[right] = fos
+        if fos > critical_fos:
+            return 0
+
+        # check for extreme case with loads at end of slope as far away from crest (left)
+        # If slope is unsafe (FOS still low) then return
+        self._set_dynamic_offset(left)
+        self.analyse_slope()
+        fos = self.get_min_FOS()
+        self._dynamic_results[left] = fos
+        if fos < critical_fos:
+            return 1
+
+        # If neither of the previous results was true find the intermediate point
+        # where the critical FOS is reached
+        # offset for left shouldnt be more then the point that the slope started failing from
+        # in the worse case
+        #left = self.get_min_FOS_end_points()[0][0]
+
+        previous_fos = 0
+
+        # converge
+        for _ in range(10):
+            # # check midpoint for FOS
+            # midpoint = (left + right) / 2
+
+            # let midpoint be weighted value based on FOS
+            left_fos = self._dynamic_results[left]
+            right_fos = self._dynamic_results[right]
+
+            m = (left_fos - right_fos)/(left-right)
+            midpoint = right + (critical_fos-right_fos) / m
+
+            self._set_dynamic_offset(midpoint)
+            self.analyse_slope()
+            fos = self.get_min_FOS()
+            self._dynamic_results[midpoint] = fos
+
+            if abs(previous_fos - fos) <= 0.01 and round(fos,3) >= critical_fos:
+                return 2
+
+            # If FOS high then move closer to cliff
+            if fos < critical_fos:
+                right = midpoint
+            else:
+                left = midpoint
+
+            previous_fos = fos
+
+    def _set_dynamic_offset(self, offset):
+        # remember default values?
+        udls = self._udls
+        pls = self._pls
+
+        # remove loads
+        self.remove_udls(remove_all=True)
+        self.remove_pls(remove_all=True)
+
+        # update loads
+        for udl in udls:
+            if udl.dynamic_offset:
+                udl.offset = offset
+            self.set_udls(udl)
+
+        for pl in pls:
+            if pl.dynamic_offset:
+                pl.offset = offset
+            self.set_pls(pl)
 
 
     def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float):
@@ -1883,13 +1979,13 @@ class Slope:
 if __name__ == "__main__":
     s = Slope(height=3, angle=30, length=None)
 
-    m1 = Material(unit_weight=20,friction_angle=35,cohesion=3,depth_to_bottom=1, name='Fill')
-    m2 = Material(20,30,0,5, name = 'sand')
+    m1 = Material(unit_weight=20,friction_angle=45,cohesion=2,depth_to_bottom=2, name='Fill', color='blue')
+    m2 = Material(20,30,2,5, name = 'sand', color='orange')
 
-    u1 = Udl(magnitude = 100, offset=2, length=5)
-    u2 = Udl(magnitude = 20, color='dark red')
+    u1 = Udl(magnitude = 100, offset=2, length=1, dynamic_offset=True, color='red')
+    u2 = Udl(magnitude = 20, color='green')
 
-    p1 = PointLoad(10,3)
+    p1 = PointLoad(10,3, 'purple')
 
     s.set_udls(u1, u2)
     s.set_pls(p1)
@@ -1900,15 +1996,9 @@ if __name__ == "__main__":
 
     s.update_water_analysis_options(auto=True)
 
-    s.analyse_slope()
+    s.analyse_dynamic(1.05)
 
     f = s.plot_critical()
-    f.update_layout(width=2000,height=1100)
 
-    f.write_image('critical.png')
-
-    f = s.plot_all_planes(max_fos=2)
-
-    f.update_layout(width=2000,height=1100)
-
-    f.write_image('all_planes.png')
+    from rich import print
+    print(s._dynamic_results)
