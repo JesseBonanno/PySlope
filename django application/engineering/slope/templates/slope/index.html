@@ -1,0 +1,105 @@
+{% extends "slope/layout.html" %}
+{% load static %}
+
+{% block head %}
+  <title>pySlope</title>
+  <link rel='stylesheet' href="{% static 'slope/styles.css' %}">
+  <script src="{% static 'slope/add_rows.js' %}"></script>
+{% endblock %}
+
+{% block body %}
+  
+  <!-- TO DO: Maybe can reflect on the layout of the existing app-->
+  <!-- Alert is a to do item -->
+  <div id="outer-flex-container"><!-- primary flex container -->
+    <h1>pySlope</h1>
+  
+    <div id="inner-flex-container"><!-- flex item #2 -->
+
+      <div id="mainpanel">
+
+          <div class = 'row'>
+              
+                <form action="{% url 'index' %}" method = 'post' id='mainform'>
+
+                {% csrf_token %}
+                <input type='submit' class="btn btn-primary" value="Analyse">
+                
+                <!--Main app navigation tab-->
+                <ul class="nav nav-tabs flex-nowrap" id="myTab" role="tablist">
+                    {% for name, form, type in forms %}
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="{{name}}-tab" data-bs-toggle="tab" data-bs-target="#{{name}}" type="button" role="tab" aria-controls="{{name}}" aria-selected="true">{{name.capitalize}}</button>
+                        </li>
+                    {% endfor %}
+                </ul>
+    
+                <!-- Content for main app navigation tab-->
+                <br>
+                <div class="card tab-content" id="myTabContent">
+                    {% for name, forms, type in forms %}
+                        
+                        <div class="tab-pane fade" id={{name}} role="tabpanel" aria-labelledby="{{name}}-tab">
+                          {% csrf_token %}
+                          {% if type == 'formset' %}
+                              {{ forms.management_form }}
+                              {{ forms.non_form_errors.as_ul }}
+                                  <table id="formset-{{name}}" class="form" >
+                                  {% for form in forms.forms %}
+                                    {% if forloop.first %}
+                                    <thead><tr>
+                                      {% for field in form.visible_fields %}
+                                          <th class="{{field.label}}">{{ field.label|capfirst }}</th>
+                                      {% endfor %}
+                                    </tr></thead>
+                                    {% endif %}
+                                    <tr class='formset-row-{{name}} formset-row' style='max-width: 150px;'>
+                                    {% for field in form.visible_fields %}
+                                      <td>
+                                      {% if forloop.first %}
+                                        {% for hidden in form.hidden_fields %}
+                                        {{ hidden }}
+                                        {% endfor %}
+                                      {% endif %}
+                                        {{ field.errors.as_ul }}
+                                        {{ field }}
+                                      </td>
+                                                                           
+                                    {% endfor %}
+                                    <td><button class="align-self-center btn btn-danger delete-{{name}}-form" style="padding:1px 8px">X</button></td>
+                                    </tr>
+                                    <div class='end-row-{{name}}'></div>
+                                  {% endfor %}
+                                  </table>
+                                  
+                            <button id='add-{{name}}-form' class = 'btn btn-primary my-3'>Add another row</button>
+
+                          {% else %}
+                            
+                            {% for field in forms  %}
+                              <div class = '{{name}}-div'>
+                                  <div class = "align-self-center col-3 col-form-label" style='display:inline-block' id='{{name}}-{{field.label}}'>{{ field.label_tag }}</div>
+                                  <div class = "col-8" style='display:inline-block'>{{ field }}</div>
+                                  <br>
+                              </div>
+                            {% endfor %}
+
+                          {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </form>
+        </div>
+      </div>
+
+      <div class ='card' id="aside">
+        {{plot|safe}}
+      </div>
+
+      
+    </div><!-- end #inner-flex-container -->
+
+</div><!-- end #outer-flex-container -->
+
+
+{% endblock %}
