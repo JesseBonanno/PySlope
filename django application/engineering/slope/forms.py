@@ -73,3 +73,18 @@ class PointLoadForm(forms.ModelForm):
             'color' : 'color (optional)',
             'dynamic_offset': 'dynamic load',
         }
+
+
+class AnalysisOptionsForm(forms.Form):
+    plot_choices = [('plot_critical','Plot Critical Failure'),('plot_all_planes','Plot All Failure Planes')]
+    analysis_choices = [('normal','Normal Bishop Analysis'),('dynamic', 'Dynamic Bishop Analysis')]
+    slope_choices = [('length','Length'),('angle', 'Angle')]
+
+    plot_choice = forms.ChoiceField(choices=plot_choices, label='Plotting Choices', initial=plot_choices[0])
+    analysis_choice = forms.ChoiceField(choices=analysis_choices, label='Analysis Choices', initial=analysis_choices[0])
+    slope_choice = forms.ChoiceField(choices=slope_choices, label='Define Slope By:', initial=analysis_choices[0])
+
+    critical_FOS = forms.FloatField(min_value=0,max_value = 5, required=True, label = 'critical FOS', initial = 1.30)
+    max_display_FOS = forms.FloatField(min_value=0,max_value = 5, required=True, label = 'max display FOS', initial = 3)
+
+    prefix = 'options'

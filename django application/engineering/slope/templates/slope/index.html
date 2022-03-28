@@ -5,6 +5,7 @@
   <title>pySlope</title>
   <link rel='stylesheet' href="{% static 'slope/styles.css' %}">
   <script src="{% static 'slope/add_rows.js' %}"></script>
+  <script src="{% static 'slope/analysis_loading.js' %}"></script>
 {% endblock %}
 
 {% block body %}
@@ -23,7 +24,7 @@
                 <form action="{% url 'index' %}" method = 'post' id='mainform'>
 
                 {% csrf_token %}
-                <input type='submit' class="btn btn-primary" value="Analyse">
+                <input type='submit' class="btn btn-primary" value="Analyse" id="analysis_button">
                 
                 <!--Main app navigation tab-->
                 <ul class="nav nav-tabs flex-nowrap" id="myTab" role="tablist">

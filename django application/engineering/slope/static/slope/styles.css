@@ -20,11 +20,11 @@ h1 {
     margin-bottom: 40px;
     margin-right: 40px;
     align-items: center;
-    width: 1000px;
+    width: 2000px;
 }
 
 #aside {
-    width: 1000px;
+    width: 2000px;
     align-items: center;
 }
 .tab-content {
@@ -54,4 +54,14 @@ h1 {
 
 label {
     font-weight: bold;
+}
+
+th {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+td {
+    padding-left: 15px;
+    padding-right: 15px;
 }
