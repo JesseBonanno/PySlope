@@ -14,12 +14,12 @@ from colour import Color
 # local imports, not sure how to set this up to work properly
 if __name__ == "__main__":
     from data_validation import *
-    from utilities import (mid_coord, circle_radius_from_abcd, circle_centre, dist_points, 
+    from utilities import (mid_coord, circle_radius_from_abcd, circle_centre, dist_points,
     reset_results, draw_arrow, draw_line, get_precision, is_color)
     from utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
 else:
     from .data_validation import *
-    from .utilities import (mid_coord, circle_radius_from_abcd, circle_centre, dist_points, 
+    from .utilities import (mid_coord, circle_radius_from_abcd, circle_centre, dist_points,
     reset_results, draw_arrow, draw_line, get_precision, is_color)
     from .utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
 
@@ -118,7 +118,7 @@ class Slope:
         self._water_RL = None
         self._udls = []
         self._pls = []
-        
+
         self._external_boundary = None
 
         # intialise options
@@ -230,7 +230,7 @@ class Slope:
         self._udl_max = max(udl.magnitude for udl in self._udls)
 
     # dont need to reset results since this only should be called
-    # as a part of resetting 
+    # as a part of resetting
     def update_udl_coordinates(self):
         "Update coordinates for left and right of udl based on external boundary and Udl object"
 
@@ -284,13 +284,13 @@ class Slope:
         self.update_pl_coordinates()
 
     # dont need to reset results since this only should be called
-    # as a part of resetting 
+    # as a part of resetting
     def update_pl_coordinates(self):
         "Update coordinates for point load based on external boundary and PointLoad object"
 
         for pl in self._pls:
             coord = max(0,self._top_coord[0]-pl.offset)
-            
+
             pl.coord = coord
 
     @reset_results
@@ -399,7 +399,7 @@ class Slope:
                 if m.depth_to_bottom == depth:
                     self._materials.remove(m)
                     break
-        
+
         if remove_all:
             self._materials = []
 
@@ -410,10 +410,10 @@ class Slope:
         Parameters
         ----------
         auto : bool, optional
-            If true calculates pressure head automatically (factor is cos(a)**2 where a is 
+            If true calculates pressure head automatically (factor is cos(a)**2 where a is
             the angle of slope). If False takes manual factor (H). by default True
         H : int, optional
-            factor on water pressure. If 1 water head equals distance between water 
+            factor on water pressure. If 1 water head equals distance between water
             table and bottom of slice. If 0 no water pressure is considered. By default 1.
         """
 
@@ -427,9 +427,9 @@ class Slope:
                 H = 1
             elif H < 0:
                 H = 0
-        
+
         self._water_analysis_H = H
-    
+
     @reset_results
     def update_analysis_options(
         self,
@@ -466,7 +466,7 @@ class Slope:
         if gradient_tolerance and isinstance(gradient_tolerance, int):
             assert_positive_number(gradient_tolerance, 'gradient tolerance')
             self._gradient_tolerance = gradient_tolerance
-            
+
 
     @reset_results
     def update_boundary_options(
@@ -511,7 +511,7 @@ class Slope:
             right_x = self._external_length,
             left_x_right = self._external_length,
         )
-    
+
     @reset_results
     def set_analysis_limits(
         self,
@@ -604,8 +604,10 @@ class Slope:
         # Approximate number of runs and distribution of searches
         ITERATIONS = self._iterations
 
+        # number of different radii to consider for the same end points
         NUMBER_CIRCLES = max(5, int(ITERATIONS / 1000))
 
+        # number of different end points to consider
         NUMBER_POINTS_SLOPE = max(5, int(ITERATIONS / 800))
 
         # generate coordinates for left of slope
@@ -641,7 +643,7 @@ class Slope:
         if self._gradient > self._gradient_tolerance:
             left_coords = left_coords[:-1]
 
-    
+
         # get limits on bounds of slope
         # not some limits might still stretch off slope
         # but <= check later considers this.
@@ -756,10 +758,6 @@ class Slope:
                     'c_x': c_x,
                     'c_y': c_y,
                     'radius': radius,
-                    'full_path' : (
-                        round(l_c[0],1) == round(i_l[0],1) and
-                        round(r_c[0],1) == round(i_r[0],1)
-                    ),
                     }]
             else:
                 break
@@ -964,7 +962,6 @@ class Slope:
                 pl.offset = offset
             self.set_pls(pl)
 
-
     def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float):
         """Get intersection points of a circle with external boundary
 
@@ -979,9 +976,38 @@ class Slope:
 
         Returns
         -------
-        tuple 
+        tuple
             tuple of two coordinates (left coordinate, right coordinate)
         """
+        # first section deals with simple case of circle not intersecting slope and going
+        # past toe, use analytical equations
+        # otherwise just solve with shapely
+
+        # (x-a)^2 + (y-b)^2 = r^2
+        # (x-c_x)^2 + (y-c_y)^2 = radius ^2
+
+        # get intersecting points with top of slope
+        # let y = self._top[1]
+        # is sub in a known y value then circle equation is as follows
+        # x = c_x +/- sqrt(radius ^2 - (y-c_y)^2)
+        # for the top of the slope we only care about left coordinate
+        # since slope always left to right
+        if (
+            self._top_coord[1] < c_y + radius and
+            self._top_coord[1] > c_y - radius and
+            self._bot_coord[1] < c_y + radius and
+            self._bot_coord[1] > c_y - radius
+            ):
+
+            top_x = c_x - sqrt( radius ** 2 - abs( self._top_coord[1] - c_y ) ** 2 )
+            bot_x_left = c_x - sqrt( radius ** 2 - abs( self._bot_coord[1] - c_y ) ** 2 )
+            bot_x_right = c_x + sqrt( radius ** 2 - abs( self._bot_coord[1] - c_y ) ** 2 )
+
+            if top_x <= self._top_coord[0] and bot_x_left < self._bot_coord[0] and bot_x_right >= self._bot_coord[0]:
+                return [
+                    (top_x, self._top_coord[1] ),
+                    (bot_x_right, self._bot_coord[1] )
+                ]
 
         # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
         # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
@@ -1119,7 +1145,7 @@ class Slope:
             udl force on strip in kN
         """
         W = 0
-    
+
         load_xl, load_xr = udl.left, udl.right
         strip_xl = s_x - (b / 2)
         strip_xr = s_x + (b / 2)
@@ -1406,13 +1432,13 @@ class Slope:
         fig = self._plot_annotate_FOS(fig, c_x, c_y, FOS)
         return fig
 
-    def plot_all_planes(self, max_fos: float = 10, full_paths_only = True):
+    def plot_all_planes(self, max_fos: float = 5):
         """plot multiple failure planes in the same plot
 
         Parameters
         ----------
         max_fos : float, optional
-            maximum factor of safety to display for planes, 
+            maximum factor of safety to display for planes,
             by default 10.
 
         Returns
@@ -1422,19 +1448,16 @@ class Slope:
         """
 
         fig = self.plot_boundary()
-        
+
         assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
 
-        # yield ? 
+        # yield ?
+        # paths = filter(lambda a : a['FOS'] < max_fos, self._search)
         for i in self._search:
 
             FOS = i['FOS']
-            full_path = i['full_path']
-            
             if FOS < max_fos:
-                if full_paths_only and not full_path:
-                    continue
-                
+
                 c_x = i['c_x']
                 c_y = i['c_y']
                 radius = i['radius']
@@ -1442,12 +1465,12 @@ class Slope:
                 r_c = i['r_c']
 
                 fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c, r_c, FOS=FOS)
-    
+
 
         fig = self._plot_FOS_legend(fig)
 
         return fig
-  
+
     def _plot_annotate_FOS(self, fig, c_x: float, c_y: float, FOS: float):
         """Annotate FOS on figure.
 
@@ -1602,7 +1625,7 @@ class Slope:
     def _plot_pl(self, fig, pl):
         """Add pointload to plot"""
 
-        
+
         fig = draw_arrow(
             fig,
             angle = -90,
@@ -1696,7 +1719,7 @@ class Slope:
             type="rect",
             xref="x", yref="y",
             x0=udl.left, y0=0, x1=udl.right, y1=y0,
-            fillcolor=udl.color, 
+            fillcolor=udl.color,
             opacity=0.2,
             line_width=2,
             ysizemode='pixel',
@@ -1944,18 +1967,17 @@ class Slope:
         else:
             color = COLOUR_FOS_DICT[round(FOS, 1)]
 
-        # generate points for circle
+        # generate points for circle, will always generate 64 points (65 in list since start and end are same)
         p = Point(c_x, c_y)
         x, y = p.buffer(radius).boundary.coords.xy
-
-        x = list(x)
-        y = list(y)
 
         # empty vectors for circle points that we will actually include
         x_ = []
         y_ = []
 
-        for i in range(len(x)):
+        # 65 long list but the last half of points are for the top half of
+        # circle and so will never actually be required.
+        for i in range(34):
             # x coordinate should be between left and right
             # note for y, should be less than left y but can stoop
             # below right i
@@ -1970,6 +1992,9 @@ class Slope:
             x_ = [r_c[0]] + x_ + [l_c[0]]
             y_ = [r_c[1]] + y_ + [l_c[1]]
 
+        # THIS IS TOO SLOW (in experimentation the real
+        # problem is with plotly, even with minimal data
+        # adding everything in is slow)
         fig.add_trace(
             go.Scatter(
                 x=x_,
@@ -1986,6 +2011,7 @@ class Slope:
 
 
 if __name__ == "__main__":
+    start = time.time()
     s = Slope(height=3, angle=30, length=None)
 
     m1 = Material(unit_weight=20,friction_angle=45,cohesion=2,depth_to_bottom=2, name='Fill', color='blue')
@@ -2005,9 +2031,12 @@ if __name__ == "__main__":
 
     s.update_water_analysis_options(auto=True)
 
-    s.analyse_dynamic(1.05)
+    s.analyse_slope()
 
-    f = s.plot_critical()
+    print(start- time.time())
+    print('fos:',s.get_min_FOS())
 
-    from rich import print
-    print(s._dynamic_results)
+    start = time.time()
+    fig = s.plot_all_planes()
+    print('takes this long to make graph:')
+    print(time.time()-start)
