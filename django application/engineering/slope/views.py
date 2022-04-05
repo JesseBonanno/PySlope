@@ -44,6 +44,7 @@ def index(request):
         slope.set_materials(Material())
         plot = slope.plot_boundary().update_layout(height=1200,width=2000).to_html()
 
+
         return render(request, 'slope/index.html', {
                 'slope_form' : slope_form,
                 'material_formset' : material_formset,
@@ -99,7 +100,16 @@ def index(request):
 
             plot = plot.update_layout(width=2000, height = 1200).to_html()
 
+            print(material_formset)
+
+
+            # Stevan 31/03/22 - I needed to return some more information here for charting
             return render(request, 'slope/index.html', {
+                    'fos': slope._min_FOS_dict['FOS'],
+                    'slope_coords': slope.coords,
+                    'radius': slope._min_FOS_dict['radius'],
+                    'x': slope._min_FOS_dict['c_x'],
+                    'y': slope._min_FOS_dict['c_y'],
                     'slope_form' : slope_form,
                     'material_formset' : material_formset,
                     'udl_formset' : udl_formset,

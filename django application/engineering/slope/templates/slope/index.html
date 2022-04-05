@@ -6,10 +6,22 @@
   <link rel='stylesheet' href="{% static 'slope/styles.css' %}">
   <script src="{% static 'slope/add_rows.js' %}"></script>
   <script src="{% static 'slope/analysis_loading.js' %}"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.3.2/chart.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.0.0/chartjs-plugin-datalabels.min.js" integrity="sha512-R/QOHLpV1Ggq22vfDAWYOaMd5RopHrJNMxi8/lJu8Oihwi4Ho4BRFeiMiCefn9rasajKjnx9/fTQ/xkWnkDACg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-trendline"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.0.2/chartjs-plugin-annotation.min.js" integrity="sha512-FuXN8O36qmtA+vRJyRoAxPcThh/1KJJp7WSRnjCpqA+13HYGrSWiyzrCHalCWi42L5qH1jt88lX5wy5JyFxhfQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
 {% endblock %}
 
 {% block body %}
-  
+{{ radius|json_script:"radius" }}
+{{ x|json_script:"x" }}
+{{ y|json_script:"y" }}
+{{ slope_coords|json_script:"slope_coords" }}
+{{ fos|json_script:"fos" }}
+
+
   <!-- TO DO: Maybe can reflect on the layout of the existing app-->
   <!-- Alert is a to do item -->
   <div id="outer-flex-container"><!-- primary flex container -->
@@ -92,6 +104,11 @@
             </form>
         </div>
       </div>
+
+      <div id="chart_holder" class="border" style="width: 100%; max-width: 600px;">
+        <canvas style="width: 100%;" id="soil_profile"></canvas>
+      </div>
+      
 
       <div class ='card' id="aside">
         {{plot|safe}}

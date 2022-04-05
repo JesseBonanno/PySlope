@@ -175,6 +175,10 @@ class Slope:
         top = (dx, tot_h)
         bot = (dx + length, tot_h - height)
 
+
+        # Stevan Added 31/03/22 - need this for front end charting
+        self.coords = [(0, top[1]), top, bot, (tot_l, bot[1]), (tot_l, 0)]
+
         # set up external boundary as a shapely LinearRing
         self._external_boundary = LinearRing(
             [(0, 0), (0, top[1]), top, bot, (tot_l, bot[1]), (tot_l, 0), (0, 0)]
