@@ -3,11 +3,14 @@ from django.shortcuts import render
 from django.forms import modelformset_factory
 from django.http import Http404, HttpResponse
 
-from .pySlope import (
+# import backend section of code
+import os, sys
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+from pySlope.pySlope import (
     Slope,
     Material,
     Udl,
-    PointLoad,
+    PointLoad
 )
 
 from .models import (

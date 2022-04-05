@@ -11,11 +11,17 @@ from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
 from tqdm import tqdm
 from colour import Color
 
-# local imports
-from data_validation import *
-from utilities import (mid_coord, circle_radius_from_abcd, circle_centre, dist_points, 
-reset_results, draw_arrow, draw_line, get_precision, is_color)
-from utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
+# local imports, not sure how to set this up to work properly
+if __name__ == "__main__":
+    from data_validation import *
+    from utilities import (mid_coord, circle_radius_from_abcd, circle_centre, dist_points, 
+    reset_results, draw_arrow, draw_line, get_precision, is_color)
+    from utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
+else:
+    from .data_validation import *
+    from .utilities import (mid_coord, circle_radius_from_abcd, circle_centre, dist_points, 
+    reset_results, draw_arrow, draw_line, get_precision, is_color)
+    from .utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
 
 @dataclass
 class Material:
