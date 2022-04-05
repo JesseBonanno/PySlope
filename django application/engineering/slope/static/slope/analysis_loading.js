@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
         min_y = center_y-radius
         max_y = center_y+radius
 
-
+        //Stevan 05/04/22 this annotation for the ellipse isn't needed, just leaving it in for now incase I change my mind
         holder =             
             {box0: {
                 type: 'ellipse',
@@ -96,6 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
         soil_dict.push(soil_dict_holder)
 
 
+        //Stevan 05/04/22 iterarting through the django form which is brought to the front end to build the chart
 
         for (let i = 0; i < soil_count; i++) {
             soil_number = i+1
@@ -170,8 +171,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             soil_dict.push(model_bottom)
 
-            Chart.register(ChartDataLabels);
 
+            //Stevan 05/04/22 marking the centre of the slip surface and labelling it with the FOS
+
+            Chart.register(ChartDataLabels);
             Chart.defaults.set('plugins.datalabels', {
                 display: false
               });
@@ -203,8 +206,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
               })
 
-              circle_coords = []
 
+              //Stevan 05/04/22 using this function below to generate the slip surface. This might be buggy I didnt check it properly yet
+              circle_coords = []
               circle_coords.push(({'x': center_x, 'y':center_y}))
 
               var items = 100;
