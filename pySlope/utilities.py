@@ -14,6 +14,14 @@ def reset_results(method):
         self._search = []
         self._min_FOS = 0
         self._min_FOS_location = []
+        self._min_FOS_dict = {
+                    'FOS': 0,
+                    'l_c': 0,
+                    'r_c': 0,
+                    'c_x': 0,
+                    'c_y': 0,
+                    'radius': 0,
+                    }
         return method_output
     return _impl
 

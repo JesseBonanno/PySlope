@@ -12,16 +12,11 @@ from tqdm import tqdm
 from colour import Color
 
 # local imports, not sure how to set this up to work properly
-if __name__ == "__main__":
-    from data_validation import *
-    from utilities import (mid_coord, circle_radius_from_abcd, circle_centre, dist_points,
-    reset_results, draw_arrow, draw_line, get_precision, is_color)
-    from utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
-else:
-    from .data_validation import *
-    from .utilities import (mid_coord, circle_radius_from_abcd, circle_centre, dist_points,
-    reset_results, draw_arrow, draw_line, get_precision, is_color)
-    from .utilities import COLOUR_FOS_DICT, MATERIAL_COLORS
+
+import data_validation
+import utilities
+
+COLOUR_FOS_DICT, MATERIAL_COLORS = utilities.COLOUR_FOS_DICT, utilities.MATERIAL_COLORS
 
 @dataclass
 class Material:
@@ -34,10 +29,10 @@ class Material:
     color: str = ''
 
     def __post_init__(self):
-        assert_range(self.unit_weight, 'unit weight', 1, 50)
-        assert_positive_number(self.friction_angle, 'friction_angle')
-        assert_positive_number(self.cohesion, 'cohesion')
-        assert_positive_number(self.depth_to_bottom, 'depth to bottom')
+        data_validation.assert_range(self.unit_weight, 'unit weight', 1, 50)
+        data_validation.assert_positive_number(self.friction_angle, 'friction_angle')
+        data_validation.assert_positive_number(self.cohesion, 'cohesion')
+        data_validation.assert_positive_number(self.depth_to_bottom, 'depth to bottom')
         assert(isinstance(self.name, str))
         assert(isinstance(self.color, str))
 
@@ -62,17 +57,17 @@ class Udl:
     dynamic_offset : bool = False
 
     def __post_init__(self):
-        assert_positive_number(self.magnitude, 'load magnitude')
-        assert_positive_number(self.offset, 'load offset')
+        data_validation.assert_positive_number(self.magnitude, 'load magnitude')
+        data_validation.assert_positive_number(self.offset, 'load offset')
         if self.length:
-            assert_positive_number(self.length, 'load length')
+            data_validation.assert_positive_number(self.length, 'load length')
         else:
             # make none if length = 0?
             self.length = None
 
-        self.precision = get_precision(self.magnitude)
+        self.precision = utilities.get_precision(self.magnitude)
 
-        if not is_color(self.color):
+        if not utilities.is_color(self.color):
             self.color ='red'
 
     def __repr__(self):
@@ -87,12 +82,12 @@ class PointLoad:
     dynamic_offset : bool = False
 
     def __post_init__(self):
-        assert_positive_number(self.magnitude, 'load magnitude')
-        assert_positive_number(self.offset, 'load offset')
+        data_validation.assert_positive_number(self.magnitude, 'load magnitude')
+        data_validation.assert_positive_number(self.offset, 'load offset')
 
-        self.precision = get_precision(self.magnitude)
+        self.precision = utilities.get_precision(self.magnitude)
 
-        if not is_color(self.color):
+        if not utilities.is_color(self.color):
             self.color ='blue'
 
     def __repr__(self):
@@ -131,7 +126,7 @@ class Slope:
         # sets default analysis limits (ie no limit)
         self.reset_analysis_limits()
 
-    @reset_results
+    @utilities.reset_results
     def set_external_boundary(
         self, height: float = 2, angle: int = 30, length: float = None
     ):
@@ -155,12 +150,12 @@ class Slope:
         """
 
         # validate inputs
-        assert_strictly_positive_number(height, "height")
+        data_validation.assert_strictly_positive_number(height, "height")
         if angle is not None:
             # is allowed to be 90 but not 0
-            assert_range(angle, "angle", 0, 90, not_low=True)
+            data_validation.assert_range(angle, "angle", 0, 90, not_low=True)
         if length is not None:
-            assert_positive_number(length, "length")
+            data_validation.assert_positive_number(length, "length")
 
         # if angle assigned instead of length work out the model length
         if length is None:
@@ -206,18 +201,21 @@ class Slope:
         self.update_udl_coordinates()
         self.update_pl_coordinates()
 
-    @reset_results
+    @utilities.reset_results
     def set_water_table(self, depth: int = 1):
         """set water table value"""
-        assert_positive_number(depth, "water depth")
-        self._water_RL = max(0, self._top_coord[1] - depth)
+        if depth is None:
+            self.remove_water_table()
+        else:
+            data_validation.assert_positive_number(depth, "water depth")
+            self._water_RL = max(0, self._top_coord[1] - depth)
 
-    @reset_results
+    @utilities.reset_results
     def remove_water_table(self):
         """Remove water table from model"""
         self._water_RL = None
 
-    @reset_results
+    @utilities.reset_results
     def set_udls(self, *udls):
         """set a surface surcharge on top of the slope"""
 
@@ -245,7 +243,7 @@ class Slope:
             udl.left = left_x
             udl.right = right_x
 
-    @reset_results
+    @utilities.reset_results
     def remove_udls(self, *udls, remove_all = False):
         """Remove udl from model if associated with model.
 
@@ -270,10 +268,9 @@ class Slope:
             self._udls = []
             self._udl_max = 0
 
-        
 
     
-    @reset_results
+    @utilities.reset_results
     def set_pls(self, *pls):
         """set a surface surcharge on top of the slope"""
 
@@ -293,7 +290,7 @@ class Slope:
 
             pl.coord = coord
 
-    @reset_results
+    @utilities.reset_results
     def remove_pls(self, *pls, remove_all = False):
         """Remove udl from model if associated with model.
 
@@ -315,7 +312,7 @@ class Slope:
         if remove_all:
             self._pls = []
 
-    @reset_results
+    @utilities.reset_results
     def set_materials(self, *materials):
         """Assign material instances to the slope instance.
 
@@ -360,14 +357,14 @@ class Slope:
         for i, material in enumerate(materials):
             material.RL = self._external_height - material.depth_to_bottom
 
-            if is_color(material.user_defined_color) and material.user_defined_color!='':
+            if utilities.is_color(material.user_defined_color) and material.user_defined_color!='':
                 material.color = material.user_defined_color
             else:
                 material.color = MATERIAL_COLORS[i%10]
 
         self._materials = materials
 
-    @reset_results
+    @utilities.reset_results
     def remove_material(self, material: Material = None, depth: float = None, remove_all=False):
         """Remove material from slope.
 
@@ -403,7 +400,7 @@ class Slope:
         if remove_all:
             self._materials = []
 
-    @reset_results
+    @utilities.reset_results
     def update_water_analysis_options(self,auto : bool = True,H : int = 1):
         """Update analysis options regarding how water is treated.
 
@@ -422,7 +419,7 @@ class Slope:
             H = cos(a)**2
 
         else:
-            assert_number(H, 'H')
+            data_validation.assert_number(H, 'H')
             if H > 1:
                 H = 1
             elif H < 0:
@@ -430,7 +427,7 @@ class Slope:
 
         self._water_analysis_H = H
 
-    @reset_results
+    @utilities.reset_results
     def update_analysis_options(
         self,
         slices: int = None,
@@ -453,22 +450,22 @@ class Slope:
             min failure distance will be assessed, by default None.
         """
         if slices:
-            assert_range(slices, "slices", 10, 500)
+            data_validation.assert_range(slices, "slices", 10, 500)
             self._slices = slices
         if iterations:
-            assert_range(iterations, "iterations", 1000, 100000)
+            data_validation.assert_range(iterations, "iterations", 1000, 100000)
             self._iterations = iterations
         if min_failure_dist is not None:
-            assert_positive_number(min_failure_dist, 'min failure distance')
+            data_validation.assert_positive_number(min_failure_dist, 'min failure distance')
             if min_failure_dist > self._external_length:
                 print('min failure distance should not be greater than the length of the model. Check Value.')
             self._min_failure_distance = min(min_failure_dist, self._external_length * 0.9)
         if gradient_tolerance and isinstance(gradient_tolerance, int):
-            assert_positive_number(gradient_tolerance, 'gradient tolerance')
+            data_validation.assert_positive_number(gradient_tolerance, 'gradient tolerance')
             self._gradient_tolerance = gradient_tolerance
 
 
-    @reset_results
+    @utilities.reset_results
     def update_boundary_options(
         self,
         MIN_EXT_L: float = None,
@@ -487,12 +484,12 @@ class Slope:
         """
 
         if MIN_EXT_H:
-            assert_strictly_positive_number(
+            data_validation.assert_strictly_positive_number(
                 MIN_EXT_H, "Minimum external model height (MIN_EXT_H)"
             )
             self._MIN_EXT_H = MIN_EXT_H
         if MIN_EXT_L:
-            assert_strictly_positive_number(
+            data_validation.assert_strictly_positive_number(
                 MIN_EXT_L, "Minimum external model length (MIN_EXT_H)"
             )
             self._MIN_EXT_L = MIN_EXT_L
@@ -502,7 +499,7 @@ class Slope:
         if self._external_boundary is not None:
             self.set_external_boundary(height=self._height, length=self._length)
 
-    @reset_results
+    @utilities.reset_results
     def reset_analysis_limits(self):
         """Reset analysis limits to default (no limits). """
         self.set_analysis_limits(
@@ -512,7 +509,7 @@ class Slope:
             left_x_right = self._external_length,
         )
 
-    @reset_results
+    @utilities.reset_results
     def set_analysis_limits(
         self,
         left_x: float = None,
@@ -557,10 +554,10 @@ class Slope:
             right_x = self._limits[1][1]
 
         # check correct value entered
-        assert_positive_number(left_x, "left_x limit")
-        assert_strictly_positive_number(right_x, "right_x_limit")
-        assert_strictly_positive_number(right_x_left, "right_x left coordinate")
-        assert_strictly_positive_number(left_x_right, "left_x right coordinate")
+        data_validation.assert_positive_number(left_x, "left_x limit")
+        data_validation.assert_strictly_positive_number(right_x, "right_x_limit")
+        data_validation.assert_strictly_positive_number(right_x_left, "right_x left coordinate")
+        data_validation.assert_strictly_positive_number(left_x_right, "left_x right coordinate")
 
         # check the numbers are in the correct ascending order.
         # note: it is okay for the inner limits to overlap. They look at seperate things.
@@ -579,15 +576,15 @@ class Slope:
                 f"left_x ({left_x}) should be less than left_x right ({left_x_right}), i cant assign these limits"
             )
 
-        # check that the left x is on top slope
-        if left_x > self._top_coord[0]:
+        # check that the left x is on slope
+        if left_x >= self._bot_coord[0]:
             raise ValueError(
-                f"left_x ({left_x}) should be < top of slope coordinate ({self._top_coord[0]}"
+                f"left_x ({left_x}) should be < bottom of slope coordinate ({self._bot_coord[0]}"
             )
-        # check that righ x is on bottom slope
-        if right_x < self._bot_coord[0]:
+        # check that righ x is on bottom slope or slope
+        if right_x <= self._top_coord[0]:
             raise ValueError(
-                f"right_x ({right_x}) should be < bottom slope coordinate ({self._bot_coord[0]})"
+                f"right_x ({right_x}) should be > top slope coordinate ({self._top_coord[0]})"
             )
 
         self._limits = [(left_x, left_x_right), (right_x_left, right_x)]
@@ -676,7 +673,7 @@ class Slope:
 
         for l_c in tqdm(left_coords):
             for r_c in right_coords:
-                if dist_points(l_c, r_c) > min_dist:
+                if utilities.dist_points(l_c, r_c) > min_dist:
                     search += self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
 
         self._search = search
@@ -706,11 +703,11 @@ class Slope:
         """
 
         # data validation
-        assert_strictly_positive_number(NUMBER_CIRCLES, "NUMBER_CIRCLES")
+        data_validation.assert_strictly_positive_number(NUMBER_CIRCLES, "NUMBER_CIRCLES")
         NUMBER_CIRCLES = int(NUMBER_CIRCLES)
 
-        assert_length(l_c, 2, "l_c")
-        assert_length(r_c, 2, "r_c")
+        data_validation.assert_length(l_c, 2, "l_c")
+        data_validation.assert_length(r_c, 2, "r_c")
 
         # assume a starting circle that has a straight vertical slope down at the top of the slope
         # this means the centre of the circle is in line with the top of the slope
@@ -740,10 +737,10 @@ class Slope:
 
             # doesnt include going all the way in which we dont want to do anyways
             chord_to_edge = start_chord_to_edge * (NUMBER_CIRCLES - i) / NUMBER_CIRCLES
-            radius = circle_radius_from_abcd(chord_to_edge, C)
-            centre = circle_centre(
+            radius = utilities.circle_radius_from_abcd(chord_to_edge, C)
+            centre = utilities.circle_centre(
                 beta=beta,
-                chord_intersection=mid_coord(l_c, r_c),
+                chord_intersection=utilities.mid_coord(l_c, r_c),
                 chord_to_centre=radius - chord_to_edge,
             )
             c_x, c_y = centre
@@ -785,9 +782,9 @@ class Slope:
 
         """
         # data validation
-        assert_strictly_positive_number(c_x, "c_x (circle x coordinate)")
-        assert_strictly_positive_number(c_y, "c_y (circle y coordinate)")
-        assert_strictly_positive_number(radius, "radius")
+        data_validation.assert_strictly_positive_number(c_x, "c_x (circle x coordinate)")
+        data_validation.assert_strictly_positive_number(c_y, "c_y (circle y coordinate)")
+        data_validation.assert_strictly_positive_number(radius, "radius")
 
         i_list = self._get_circle_external_intersection(c_x,c_y,radius)
 
@@ -931,8 +928,11 @@ class Slope:
             fos = self.get_min_FOS()
             self._dynamic_results[midpoint] = fos
 
-            if abs(previous_fos - fos) <= 0.01 and round(fos,3) >= critical_fos:
-                return 2
+            # check if load is within the zone of influence, if last two FOS are identical
+            # then probably not
+            if previous_fos != fos:
+                if abs(previous_fos - fos) <= 0.01 and round(fos,3) >= critical_fos and abs(fos-critical_fos)<=0.03:
+                    return 2
 
             # If FOS high then move closer to cliff
             if fos < critical_fos:
@@ -1242,6 +1242,9 @@ class Slope:
 
         return NUMBER_POINTS
 
+    def get_dynamic_results(self):
+        return self._dynamic_results
+
 
     def get_min_FOS(self):
         """Get min factor of safety for slope model.
@@ -1316,6 +1319,8 @@ class Slope:
         # draw the external boundary
         x_, y_ = self._external_boundary.coords.xy
         fig = go.Figure(go.Scatter(x=list(x_), y=list(y_), mode="lines",name=''))
+
+        fig.update_layout(width=2000, height=1200)
 
         # following makes sure x and y are scaled the same, so that
         # model can be interpretted properly
@@ -1449,7 +1454,7 @@ class Slope:
 
         fig = self.plot_boundary()
 
-        assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
+        data_validation.assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
 
         # yield ?
         # paths = filter(lambda a : a['FOS'] < max_fos, self._search)
@@ -1490,9 +1495,9 @@ class Slope:
         """
 
         # validate inputs
-        assert_strictly_positive_number(c_x, "circle center x coordinate")
-        assert_strictly_positive_number(c_y, "circle center y coordinate")
-        assert_strictly_positive_number(FOS, "Factor of safety")
+        data_validation.assert_strictly_positive_number(c_x, "circle center x coordinate")
+        data_validation.assert_strictly_positive_number(c_y, "circle center y coordinate")
+        data_validation.assert_strictly_positive_number(FOS, "Factor of safety")
 
         if FOS > 3:
             color = COLOUR_FOS_DICT[3.0]
@@ -1626,7 +1631,7 @@ class Slope:
         """Add pointload to plot"""
 
 
-        fig = draw_arrow(
+        fig = utilities.draw_arrow(
             fig,
             angle = -90,
             force = pl.magnitude,
@@ -1640,7 +1645,7 @@ class Slope:
             arrowhead=10,
         )
 
-        fig = draw_arrow(
+        fig = utilities.draw_arrow(
             fig,
             angle = -90,
             force = pl.magnitude,
@@ -1659,7 +1664,7 @@ class Slope:
     def _plot_udl(self, fig, udl):
         """Add Uniform load to plot"""
 
-        fig = draw_arrow(
+        fig = utilities.draw_arrow(
             fig,
             angle = -90,
             force = udl.magnitude,
@@ -1673,7 +1678,7 @@ class Slope:
             precision=udl.precision,
         )
 
-        fig = draw_arrow(
+        fig = utilities.draw_arrow(
             fig,
             angle = -90,
             force = udl.magnitude,
@@ -1688,7 +1693,7 @@ class Slope:
             line_width=0,
         )
 
-        fig = draw_arrow(
+        fig = utilities.draw_arrow(
             fig,
             angle = -90,
             force = udl.magnitude,
@@ -1955,12 +1960,12 @@ class Slope:
         """
 
         # data validation
-        assert_strictly_positive_number(c_x, "circle center x coordinate")
-        assert_strictly_positive_number(c_y, "circle center y coordinate")
-        assert_strictly_positive_number(radius, "radius")
-        assert_length(l_c, 2, "l_c")
-        assert_length(r_c, 2, "r_c")
-        assert_strictly_positive_number(FOS, "Factor of safety")
+        data_validation.assert_strictly_positive_number(c_x, "circle center x coordinate")
+        data_validation.assert_strictly_positive_number(c_y, "circle center y coordinate")
+        data_validation.assert_strictly_positive_number(radius, "radius")
+        data_validation.assert_length(l_c, 2, "l_c")
+        data_validation.assert_length(r_c, 2, "r_c")
+        data_validation.assert_strictly_positive_number(FOS, "Factor of safety")
 
         if FOS > 3:
             color = COLOUR_FOS_DICT[3.0]
@@ -2012,6 +2017,7 @@ class Slope:
 
 if __name__ == "__main__":
     start = time.time()
+
     s = Slope(height=3, angle=30, length=None)
 
     m1 = Material(unit_weight=20,friction_angle=45,cohesion=2,depth_to_bottom=2, name='Fill', color='blue')
@@ -2025,18 +2031,19 @@ if __name__ == "__main__":
     s.set_udls(u1, u2)
     s.set_pls(p1)
 
-    s.set_materials(m1,m2)
+    # s.set_materials(m1,m2)
 
-    s.set_water_table(4)
+    # s.set_water_table(4)
 
-    s.update_water_analysis_options(auto=True)
+    # s.update_water_analysis_options(auto=True)
 
-    s.analyse_slope()
+    # s.analyse_slope()
 
-    print(start- time.time())
-    print('fos:',s.get_min_FOS())
+    # print(start- time.time())
+    # print('fos:',s.get_min_FOS())
 
-    start = time.time()
-    fig = s.plot_all_planes()
-    print('takes this long to make graph:')
-    print(time.time()-start)
+    # start = time.time()
+    # fig = s.plot_all_planes()
+    # print('takes this long to make graph:')
+    # print(time.time()-start)
+
