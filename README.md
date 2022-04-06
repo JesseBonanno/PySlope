@@ -22,9 +22,7 @@ The purpose of this project is two fold:
    1. Create a free online slope stability software
    2. Provide a pythonic solution to implementing Bishop's method based on object oriented coding principles
 
-Performing a slope stability calculation by hand is extremely uneconimical and time consuming. 
-
-The problem involves a lot of geometrical mathematics which can make the calculation hard to achieve with only excel. Python packages exist for geometrical mathematics which makes it well suited to implementing a slope stability analysis package. There is however, no well-documented open-source slope stability software that can currently be found online. This package aims to fill that gap.
+Performing a slope stability calculation by hand is extremely uneconimical and time consuming. The problem involves a lot of geometrical mathematics which can make the calculation hard to achieve with only excel. Python packages exist for geometrical mathematics which makes Python well suited for implementing a slope stability analysis package. There is however, no well-documented open-source slope stability software that can currently be found online. This package aims to fill that gap.
 
 ## Functionality and usage
 
