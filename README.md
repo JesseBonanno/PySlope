@@ -24,9 +24,7 @@ The purpose of this project is two fold:
    1. Create a free online slope stability software
    2. Provide a pythonic solution to implementing Bishop's method based on object oriented coding principles
 
-Performing a slope stability calculation by hand is extremely uneconimical and time consuming. 
-
-The problem involves a lot of geometrical mathematics which can make the calculation hard to achieve with only excel. Python packages exist for geometrical mathematics which makes it well suited to implementing a slope stability analysis package. There is however, no well-documented open-source slope stability software that can currently be found online. This package aims to fill that gap.
+Performing a slope stability calculation by hand is extremely uneconimical and time consuming. The problem involves a lot of geometrical mathematics which can make the calculation hard to achieve with only excel. Python packages exist for geometrical mathematics which makes Python well suited for implementing a slope stability analysis package. There is however, no well-documented open-source slope stability software that can currently be found online. This package aims to fill that gap.
 
 ## Functionality and usage
 
@@ -159,6 +157,7 @@ A more useful output might be a plot. Currently there are 3 main plots that can 
 s.plot_boundary()  # plots only the boundary
 s.plot_critical()  # plots the boundary with the critical failure of the slope
 s.plot_all_planes(max_fos=i) # plots boundary with all slope failures below fos i (where i is number)
+```
 
 Examples of the plots are shown below. 
 
@@ -195,13 +194,13 @@ for k,v in s.get_dynamic_results().items():
 
 From this we get the following output results:
 
-Offset: 0  m, FOS: 1.016
-Offset: 5.186  m, FOS: 1.471
-Offset: 2.098  m, FOS: 1.26
-Offset: 1.584  m, FOS: 1.232
-Offset: 1.352  m, FOS: 1.204
-Offset: 1.324  m, FOS: 1.198
-Offset: 1.332  m, FOS: 1.2
+- Offset: 0  m, FOS: 1.016
+- Offset: 5.186  m, FOS: 1.471
+- Offset: 2.098  m, FOS: 1.26
+- Offset: 1.584  m, FOS: 1.232
+- Offset: 1.352  m, FOS: 1.204
+- Offset: 1.324  m, FOS: 1.198
+- Offset: 1.332  m, FOS: 1.2
 
 We can also get a plot as after running dynamic analysis all plots are based on the final iteration of the dynamic analysis.
 
