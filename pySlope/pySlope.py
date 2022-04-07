@@ -3,7 +3,6 @@ from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
 from functools import wraps
-import numpy as np
 
 # third party imports
 import plotly.graph_objects as go
@@ -124,7 +123,7 @@ class Slope:
         self.update_water_analysis_options(auto=True)
 
         # sets default analysis limits (ie no limit)
-        self.reset_analysis_limits()
+        self.remove_analysis_limits()
 
     @utilities.reset_results
     def set_external_boundary(
@@ -198,8 +197,8 @@ class Slope:
 
         # udl coordinates can be effected by external boundary modification
         # need to update coordinates.
-        self.update_udl_coordinates()
-        self.update_pl_coordinates()
+        self._update_udl_coordinates()
+        self._update_pl_coordinates()
 
     @utilities.reset_results
     def set_water_table(self, depth: int = 1):
@@ -223,13 +222,13 @@ class Slope:
             if isinstance(udl, Udl):
                 self._udls.append(udl)
 
-        self.update_udl_coordinates()
+        self._update_udl_coordinates()
 
         self._udl_max = max(udl.magnitude for udl in self._udls)
 
     # dont need to reset results since this only should be called
     # as a part of resetting
-    def update_udl_coordinates(self):
+    def _update_udl_coordinates(self):
         "Update coordinates for left and right of udl based on external boundary and Udl object"
 
         for udl in self._udls:
@@ -278,11 +277,11 @@ class Slope:
             if isinstance(pl, PointLoad):
                 self._pls.append(pl)
 
-        self.update_pl_coordinates()
+        self._update_pl_coordinates()
 
     # dont need to reset results since this only should be called
     # as a part of resetting
-    def update_pl_coordinates(self):
+    def _update_pl_coordinates(self):
         "Update coordinates for point load based on external boundary and PointLoad object"
 
         for pl in self._pls:
@@ -500,7 +499,7 @@ class Slope:
             self.set_external_boundary(height=self._height, length=self._length)
 
     @utilities.reset_results
-    def reset_analysis_limits(self):
+    def remove_analysis_limits(self):
         """Reset analysis limits to default (no limits). """
         self.set_analysis_limits(
             left_x = 0,
