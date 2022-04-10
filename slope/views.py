@@ -1,11 +1,11 @@
-from logging import critical
 from django.shortcuts import render
 from django.forms import modelformset_factory
 from django.http import Http404, HttpResponse
 
 # import backend section of code
 import os, sys
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, os.path.abspath('../pySlope'))
+
 from pySlope.pySlope import (
     Slope,
     Material,

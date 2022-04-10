@@ -10,10 +10,13 @@ from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
 from tqdm import tqdm
 from colour import Color
 
-# local imports, not sure how to set this up to work properly
+# have to do this to allow for relative imports
+# have to allow for relative imports so also works with django
+import os, sys
+sys.path.insert(0, os.path.abspath('.'))
 
-import data_validation
-import utilities
+from . import utilities
+from . import data_validation
 
 COLOUR_FOS_DICT, MATERIAL_COLORS = utilities.COLOUR_FOS_DICT, utilities.MATERIAL_COLORS
 
@@ -32,6 +35,12 @@ class Material:
         data_validation.assert_positive_number(self.friction_angle, 'friction_angle')
         data_validation.assert_positive_number(self.cohesion, 'cohesion')
         data_validation.assert_positive_number(self.depth_to_bottom, 'depth to bottom')
+
+        if self.name is None:
+            self.name = ''
+        if self.color is None:
+            self.color =''
+        
         assert(isinstance(self.name, str))
         assert(isinstance(self.color, str))
 

@@ -13,7 +13,7 @@ class SlopeForm(forms.ModelForm):
 
         labels = {
             'height':'Height (m)',
-            'angle':'angle (deg)',
+            'angle':'Angle (deg)',
             'length':'Length (m)'
         }
 
@@ -32,10 +32,10 @@ class MaterialForm(forms.ModelForm):
         labels = {
             'unit_weight' : 'Unit Weight (kN/m3)',
             'friction_angle': 'Friction Angle (deg)',
-            'cohesion' : 'cohesion (kPa)',
-            'depth_to_bottom' : 'depth to bottom strata (m)',
-            'name' : 'name (optional)',
-            'color' : 'color (optional)',
+            'cohesion' : 'Cohesion (kPa)',
+            'depth_to_bottom' : 'Depth to bottom strata (m)',
+            'name' : 'Name (optional)',
+            'color' : 'Color (optional)',
         }
 
 class UdlForm(forms.ModelForm):
@@ -84,7 +84,7 @@ class AnalysisOptionsForm(forms.Form):
     analysis_choice = forms.ChoiceField(choices=analysis_choices, label='Analysis Choices', initial=analysis_choices[0])
     slope_choice = forms.ChoiceField(choices=slope_choices, label='Define Slope By:', initial=analysis_choices[0])
 
-    critical_FOS = forms.FloatField(min_value=0,max_value = 5, required=True, label = 'critical FOS', initial = 1.30)
-    max_display_FOS = forms.FloatField(min_value=0,max_value = 5, required=True, label = 'max display FOS', initial = 3)
+    critical_FOS = forms.FloatField(min_value=0,max_value = 5, required=True, label = 'Critical FOS', initial = 1.30)
+    max_display_FOS = forms.FloatField(min_value=0,max_value = 5, required=True, label = 'Max display FOS', initial = 3)
 
     prefix = 'options'
