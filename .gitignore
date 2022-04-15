@@ -118,3 +118,5 @@ app/main.py
 
 .ss/
 django application/engineering/.vscode/launch.json
+.vscode/launch.json
+*.json

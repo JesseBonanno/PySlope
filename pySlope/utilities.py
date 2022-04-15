@@ -55,7 +55,39 @@ def circle_centre(beta, chord_intersection, chord_to_centre):
 
     return [a + b for a, b in zip(chord_intersection, (dx, dy))]
 
+def cirle_line_intersection(top_coord,bot_coord,cx,cy,r):
+    # Based on https://mathworld.wolfram.com/Circle-LineIntersection.html
+    #  shift so 0,0 is datum
+    top_coord = [(top_coord[0]-cx), (top_coord[1]-cy)]
+    bot_coord = [(bot_coord[0]-cx), (bot_coord[1]-cy)]
 
+    dx = bot_coord[0] - top_coord[0]
+    dy = bot_coord[1] - top_coord[1]
+    dr = sqrt(dx**2 + dy**2)
+
+    D = top_coord[0] * bot_coord[1] - bot_coord[0] * top_coord[1]
+
+    disc = abs(r**2 * dr**2) - abs(D**2)
+
+    if disc < 0 :
+        return []
+
+    if dy < 0:
+        m = -1
+    else:
+        m = 1
+
+    x1 = (D * dy + m * dx * sqrt(disc)) / dr**2 + cx
+    x2 = (D * dy -  m * dx * sqrt(disc)) / dr**2 + cx
+
+    y1 = ((- (D * dx)) + abs(dy) * sqrt(disc)) / dr**2 + cy
+    y2 = ((- (D * dx)) - abs(dy) * sqrt(disc)) / dr**2 + cy
+
+    if disc == 0:
+        return [(x1,y1)]
+    else:
+        return [(x1,y1), (x2,y2)]
+        
 def create_fos_color_dictionary():
     colors = [
         (0,'red'),

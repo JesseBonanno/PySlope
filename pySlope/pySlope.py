@@ -12,21 +12,48 @@ from colour import Color
 
 # have to do this to allow for relative imports
 # have to allow for relative imports so also works with django
-import os, sys
-sys.path.insert(0, os.path.abspath('.'))
 
-from . import utilities
-from . import data_validation
+# if using this file or sphinx, cant be relative
+if __name__ == "__main__" or __name__ == "pySlope":
+    import data_validation
+    import utilities
+# if running from django need to use relative
+else:
+    from . import data_validation
+    from . import utilities
 
 COLOUR_FOS_DICT, MATERIAL_COLORS = utilities.COLOUR_FOS_DICT, utilities.MATERIAL_COLORS
 
 @dataclass
 class Material:
-    "Class representing geological material unit"
+    """Class representing geological material unit.
+
+        Parameters
+        ----------
+        unit_weight : float
+            material unit weight in kN/m3, by default 20
+        friction_angle: int
+            material friction angle in degrees, by default 35
+        cohesion : int
+            material cohesion in kPa, by default 2
+        depth_to_bottom : float
+            depth to the bottom of the material strata from the top 
+            of the slope, by default 5. Note, materials assigned to
+            a slope must have a unique depth_to_bottom or an error
+            will be raised.
+        name : str (optional)
+            name of the strata
+        color : str (optional)
+            color to be used to represent the strata when plotting. Color
+            may be provided as a string, standard 3 hex digit or 6 hex digit
+            web compatible representation. If not provided color automatically
+            assigned.        
+        
+        """
     unit_weight: float = 20
     friction_angle: int = 35
     cohesion: int = 2
-    depth_to_bottom: int = 5
+    depth_to_bottom: float = 5
     name : str = ''
     color: str = ''
 
@@ -57,7 +84,29 @@ class Material:
 
 @dataclass
 class Udl:
-    "Class representing uniformly distributed surface pressure in kPa"
+    """Class representing uniformly distributed surface pressure in kPa
+    
+        Parameters
+        ----------
+        magnitude : float
+            magnitude of UDL force in kPa
+        offset : float
+            offset of load from slope in m
+        length : float
+            length of load in m, if 0 or None then assumed continuous.
+            By default None.
+        color : str (optional)
+            color to be used to represent the strata when plotting. Color
+            may be provided as a string, standard 3 hex digit or 6 hex digit
+            web compatible representation. If not provided color automatically
+            assigned.
+        dynamic_offset : bool   
+            If True then the load offset will be dynamically moved if a "dynamic
+            analysis" is run. (For a standard analysis the offset value is still used).
+            By default False.       
+            
+            
+    """
     magnitude: float = 0
     offset: float = 0
     length: float = None
@@ -83,7 +132,27 @@ class Udl:
 
 @dataclass
 class PointLoad:
-    "Class representing line load in kN/m"
+    """Class representing line load in kN/m
+    
+        Parameters
+        ----------
+        magnitude : float
+            magnitude of UDL force in kPa
+        offset : float
+            offset of load from slope in m
+        length : float
+            length of load in m, if 0 or None then assumed continuous.
+            By default None.
+        color : str (optional)
+            color to be used to represent the strata when plotting. Color
+            may be provided as a string, standard 3 hex digit or 6 hex digit
+            web compatible representation. If not provided color automatically
+            assigned.
+        dynamic_offset : bool   
+            If True then the load offset will be dynamically moved if a "dynamic
+            analysis" is run. (For a standard analysis the offset value is still used).
+            By default False.    
+    """
     magnitude: float = 0
     offset: float = 0
     color: str = 'blue'
@@ -142,12 +211,12 @@ class Slope:
 
         Parameters
         ----------
-        height : int, optional
+        height : float, optional
             height of slope in metres, by default 2
         angle : int, optional
             angle of slope in degrees (may be left as none if slope
             is instead expressed by length of slope), by default 30
-        length : int, optional
+        length : float, optional
             length of slope in metres (may be left as none if slope
             is instead expressed by angle of slope), by default None
 
@@ -210,8 +279,15 @@ class Slope:
         self._update_pl_coordinates()
 
     @utilities.reset_results
-    def set_water_table(self, depth: int = 1):
-        """set water table value"""
+    def set_water_table(self, depth: float):
+        """set water table value.
+        
+        Parameters
+        ----------
+        depth : float
+            depth of water from top of slope.
+        """
+
         if depth is None:
             self.remove_water_table()
         else:
@@ -225,15 +301,24 @@ class Slope:
 
     @utilities.reset_results
     def set_udls(self, *udls):
-        """set a surface surcharge on top of the slope"""
+        """set a surface surcharge on top of the slope.
+
+        Parameters
+        ----------
+        *udls : Udl objects
+            Udl object to be assigned to the slope object.
+        """
+
 
         for udl in udls:
             if isinstance(udl, Udl):
-                self._udls.append(udl)
+                if udl.magnitude > 0:
+                    self._udls.append(udl)
 
         self._update_udl_coordinates()
-
-        self._udl_max = max(udl.magnitude for udl in self._udls)
+        
+        if self._udls:
+            self._udl_max = max(udl.magnitude for udl in self._udls)
 
     # dont need to reset results since this only should be called
     # as a part of resetting
@@ -257,6 +342,8 @@ class Slope:
 
         Parameters
         ----------
+        *udls : Udl objects
+            Udl object to be removed from the slope object.
         remove_all : bool, optional
             If true remove all udls, by default False
         """
@@ -275,16 +362,20 @@ class Slope:
         if remove_all:
             self._udls = []
             self._udl_max = 0
-
-
-    
+   
     @utilities.reset_results
     def set_pls(self, *pls):
-        """set a surface surcharge on top of the slope"""
+        """set a surface surcharge on top of the slope
+        
+        *pls : PointLoad objects
+            PointLoad object to be assigned to the slope object.
+            
+        """
 
         for pl in pls:
             if isinstance(pl, PointLoad):
-                self._pls.append(pl)
+                if pl.magnitude > 0:
+                    self._pls.append(pl)
 
         self._update_pl_coordinates()
 
@@ -304,6 +395,8 @@ class Slope:
 
         Parameters
         ----------
+        *pls : PointLoad objects
+            PointLoad object to be removed from the slope object.
         remove_all : bool, optional
             if true remove all pls, by default False
         """
@@ -361,6 +454,7 @@ class Slope:
         if len(depths) > len(set(depths)):
             raise ValueError("The same material depth has been input twice")
 
+        material_refined = []
         # define RL for each material and color for each material
         for i, material in enumerate(materials):
             material.RL = self._external_height - material.depth_to_bottom
@@ -370,7 +464,9 @@ class Slope:
             else:
                 material.color = MATERIAL_COLORS[i%10]
 
-        self._materials = materials
+            material_refined.append(material)
+
+        self._materials = material_refined
 
     @utilities.reset_results
     def remove_material(self, material: Material = None, depth: float = None, remove_all=False):
@@ -456,6 +552,9 @@ class Slope:
         min_failure_distance : int, optional
             If specified only failure slopes with a distance greater than the
             min failure distance will be assessed, by default None.
+        gradient_tolerance : int, none
+            The maximum value of gradient denominator allowed before failure is 
+            no longer considered from the top of the slope, by default None.
         """
         if slices:
             data_validation.assert_range(slices, "slices", 10, 500)
@@ -753,7 +852,7 @@ class Slope:
             )
             c_x, c_y = centre
 
-            result = self.analyse_circular_failure(c_x, c_y, radius)
+            result = self.analyse_circular_failure(c_x, c_y, radius, l_c, r_c)
             if result:
                 FOS, i_l, i_r = result
                 search += [{
@@ -769,7 +868,7 @@ class Slope:
 
         return search
 
-    def analyse_circular_failure(self, c_x: float, c_y: float, radius: float):
+    def analyse_circular_failure(self, c_x: float, c_y: float, radius: float, l_c = None, r_c = None):
         """Calculate factor of safety for a circular failure plane through the slope.
 
         Parameters
@@ -780,6 +879,13 @@ class Slope:
             circle center y coordinate
         radius : float
             circle radius
+        l_c : tuple, optional
+            coordinates of left intersection between boundary and
+            failure plane if already known, by default None.
+        r_c : tuple, optional
+            coordinates of left intersection between boundary and
+            failure plane if already known, by default None.
+
 
         Returns
         -------
@@ -794,11 +900,9 @@ class Slope:
         data_validation.assert_strictly_positive_number(c_y, "c_y (circle y coordinate)")
         data_validation.assert_strictly_positive_number(radius, "radius")
 
-        i_list = self._get_circle_external_intersection(c_x,c_y,radius)
-
-        if not i_list:
+        i_list = self._get_circle_external_intersection(c_x, c_y, radius, l_c, r_c)
+        if len(i_list) < 2:
             return None
-
         # total number of slices
         SLICES = self._slices
 
@@ -807,6 +911,9 @@ class Slope:
 
         # width of a slice
         b = dist / SLICES
+
+        if b <= 0.000001:
+            return None
 
         # initialise centre point of first slice
         s_x = i_list[0][0] + b / 2
@@ -822,6 +929,10 @@ class Slope:
 
             # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
+            
+            # out of bounds
+            if s_yt is None:
+                return None
 
             # get alpha, dy always positive, dx negative to right (uphill), dx positive to left
             # note alpha in radians by default
@@ -970,7 +1081,7 @@ class Slope:
                 pl.offset = offset
             self.set_pls(pl)
 
-    def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float):
+    def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float, l_c = None, r_c = None):
         """Get intersection points of a circle with external boundary
 
         Parameters
@@ -981,89 +1092,80 @@ class Slope:
             circle y coordinate
         radius : float
             circle radius
+        l_c : tuple, optional
+            coordinates of left intersection between boundary and
+            failure plane if already known, by default None.
+        r_c : tuple, optional
+            coordinates of left intersection between boundary and
+            failure plane if already known, by default None.
 
         Returns
         -------
         tuple
             tuple of two coordinates (left coordinate, right coordinate)
         """
-        # first section deals with simple case of circle not intersecting slope and going
-        # past toe, use analytical equations
-        # otherwise just solve with shapely
+        # if left and right intersection provided only need to check if cuts through middle of
+        # the slope.
+        if l_c and r_c:
+            i_list = [l_c, r_c]
+            mid_intersection = utilities.cirle_line_intersection(self._top_coord, self._bot_coord,c_x,c_y,radius)
+            for a in mid_intersection:
+                if a[0] >= self._top_coord[0] and a[0] <= self._bot_coord[0]:
+                    if abs(a[0]-l_c[0]) > 0.1:
+                        i_list.append(a)
 
-        # (x-a)^2 + (y-b)^2 = r^2
-        # (x-c_x)^2 + (y-c_y)^2 = radius ^2
-
-        # get intersecting points with top of slope
-        # let y = self._top[1]
-        # is sub in a known y value then circle equation is as follows
-        # x = c_x +/- sqrt(radius ^2 - (y-c_y)^2)
-        # for the top of the slope we only care about left coordinate
-        # since slope always left to right
-        if (
-            self._top_coord[1] < c_y + radius and
-            self._top_coord[1] > c_y - radius and
-            self._bot_coord[1] < c_y + radius and
-            self._bot_coord[1] > c_y - radius
-            ):
-
-            top_x = c_x - sqrt( radius ** 2 - abs( self._top_coord[1] - c_y ) ** 2 )
-            bot_x_left = c_x - sqrt( radius ** 2 - abs( self._bot_coord[1] - c_y ) ** 2 )
-            bot_x_right = c_x + sqrt( radius ** 2 - abs( self._bot_coord[1] - c_y ) ** 2 )
-
-            if top_x <= self._top_coord[0] and bot_x_left < self._bot_coord[0] and bot_x_right >= self._bot_coord[0]:
-                return [
-                    (top_x, self._top_coord[1] ),
-                    (bot_x_right, self._bot_coord[1] )
-                ]
-
-        # get circle for analysis, note circle is actually a 64 sided polygon (not exact but close enough for calc)
-        # https://stackoverflow.com/questions/30844482/what-is-most-efficient-way-to-find-the-intersection-of-a-line-and-a-circle-in-py
-        p = Point(c_x, c_y)
-        c = p.buffer(radius).boundary
-
-        # find intersection points with boundary if any, else return None
-        if c.intersects(self._external_boundary):
-            i = c.intersection(self._external_boundary)
-        else:
-            return None
-
-        # list for intersecting points between circle and external boundary
+            i_list.sort(key=lambda x : x[0])
+            return i_list
+        
         i_list = []
+        
+        top_intersection = utilities.cirle_line_intersection(
+            (0,self._top_coord[1]), 
+            self._top_coord,
+            c_x, c_y, radius
+            )
 
-        # loop through each point in the intersection list
-        if not isinstance(i, MultiPoint):
-            # something is wrong should be multipoint
-            return None
+        # only care about left of circle for top intersection
+        # since failure from left to right always
+        if top_intersection:
+            top_intersection.sort()
+            top_intersection = top_intersection[0]
+            if top_intersection[0] >= 0 and top_intersection[0] <= self._top_coord[0]:
+                i_list.append(top_intersection)
 
-        for p in i.geoms:
-            # if point append x,y to list
-            if isinstance(p, Point):
-                if p.y < self._bot_coord[1]:
-                    return None
-                i_list.append((round(p.x, 5), round(p.y, 5)))
+        bot_intersection = utilities.cirle_line_intersection(
+            self._bot_coord, 
+            (self._external_length, self._bot_coord[1]),
+            c_x, c_y, radius
+            )
 
-            # might actually give a line string of the tiniest length
-            # could happen due to 64 sided polygon if the circle is close to intersecting
-            # at its end. In this case just use the first point of the line
-            # since the points are close together anyways
-            elif isinstance(p, LineString):
-                if p[0][1] < self._bot_coord[1]:
-                    return None
-                i_list.append((round(p.coords[0][0], 5), round(p.coords[0][1], 5)))
+        # only care about right of circle for bottom intersection
+        # since failure will always be to right of cirle on bottom
+        # unless failure cuts through slope (in which case value of toe
+        # will be picked up for mid intersection anyways)
+        if bot_intersection:
+            bot_intersection.sort()
+            bot_intersection = bot_intersection[-1]       
+            if bot_intersection[0] >= self._bot_coord[0] and bot_intersection[0] <= self._external_length:
+                i_list.append(bot_intersection)
 
-        # make sure no input inside twice. Has been observed where the point of intersection
-        # is the boundary between two linestrings
-        i_list = list(set(i_list))
-        i_list.sort()
+        mid_intersection = utilities.cirle_line_intersection(self._top_coord, self._bot_coord,c_x,c_y,radius)
 
-        # check that there are only two intersecting points otherwise something is wrong
-        if len(i_list) > 1:
-            i_list = i_list[0:2]
-        else:
-            return None
+        for a in mid_intersection:
+            if a[0] >= self._top_coord[0] and a[0] <= self._bot_coord[0]:
+                i_list.append(a)
 
-        return i_list
+        # remove any close points
+        i_list.sort(key=lambda x : x[0])
+        unique_list = []
+        x = -1
+        for i in i_list:
+            if abs(i[0] - x) > 0.1:
+                unique_list.append(i)
+            x = i[0]
+
+        return unique_list
+
 
     def _calculate_strip_weight(self, b : float, s_yt : float, s_yb : float):
         """calculates the weight of a strip.
@@ -1074,7 +1176,7 @@ class Slope:
             strip width in metres
         s_yt : float
             strip y coordinate at top of strip
-        s_yb : _type_
+        s_yb : float
             strip y coordinate at bottom of strip
 
         Returns
@@ -1253,6 +1355,9 @@ class Slope:
     def get_dynamic_results(self):
         return self._dynamic_results
 
+    def print_dynamic_results(self):
+        for k,v in self.get_dynamic_results().items():
+            print('Offset:', round(k,3), ' m, FOS:', round(v,3))
 
     def get_min_FOS(self):
         """Get min factor of safety for slope model.
@@ -1305,19 +1410,24 @@ class Slope:
     def get_external_x_intersection(self,y):
         """ return x coordinate of intersection with boundary for a given y """
         # y is below the bottom of the slope
-        if y <= self._bot_coord[1]:
+        if y < self._bot_coord[1]:
             return self._external_length
 
         # y is above the bottom of the slope
-        elif y <= self._external_height:
+        elif y < self._external_height:
             return self._top_coord[0] + (self._top_coord[1] - y) / self._gradient
+
+        elif y == self._bot_coord[1]:
+            return self._bot_coord[0]
+        
+        elif y == self._top_coord[1]:
+            return self._top_coord[0]
 
         else:
             return None
 
-
     def plot_boundary(self):
-        """Plot external boundary, materials, loading and water for model.
+        """Plot external boundary, materials, limits, loading and water for model.
 
         Returns
         -------
@@ -1369,7 +1479,7 @@ class Slope:
 
             is_last = i == num_materials - 1
 
-            if (top[1][1] > self._bot_coord[1] and line[1][1] < self._bot_coord[1]) or (
+            if (top[1][1] >= self._bot_coord[1] and line[1][1] < self._bot_coord[1]) or (
                 is_last and top[1][1] > self._bot_coord[1]
             ):
                 top.append(self._bot_coord)
@@ -1424,7 +1534,7 @@ class Slope:
         return fig
 
     def plot_critical(self):
-        """Plot critical slope (ie slope with lowest FOS)
+        """Plot critical slope (i.e. slope with lowest FOS)
 
         Returns
         -------
@@ -1445,7 +1555,7 @@ class Slope:
         fig = self._plot_annotate_FOS(fig, c_x, c_y, FOS)
         return fig
 
-    def plot_all_planes(self, max_fos: float = 5):
+    def plot_all_planes(self, max_fos: float = 10):
         """plot multiple failure planes in the same plot
 
         Parameters
@@ -1466,7 +1576,7 @@ class Slope:
 
         # yield ?
         # paths = filter(lambda a : a['FOS'] < max_fos, self._search)
-        for i in self._search:
+        for i in tqdm(self._search):
 
             FOS = i['FOS']
             if FOS < max_fos:
@@ -2023,35 +2133,47 @@ class Slope:
         return fig
 
 
-if __name__ == "__main__":
-    start = time.time()
+# if __name__ == "__main__":
 
-    s = Slope(height=3, angle=30, length=None)
 
-    m1 = Material(unit_weight=20,friction_angle=45,cohesion=2,depth_to_bottom=2, name='Fill', color='blue')
-    m2 = Material(20,30,2,5, name = 'sand', color='orange')
+#     start = time.time()
 
-    u1 = Udl(magnitude = 100, offset=2, length=1, dynamic_offset=True, color='red')
-    u2 = Udl(magnitude = 20, color='green')
+#     s = Slope(height=3, angle=30, length=None)
 
-    p1 = PointLoad(10,3, 'purple')
+#     m1 = Material(unit_weight=20,friction_angle=45,cohesion=2,depth_to_bottom=2, name='Fill', color='blue')
+#     m2 = Material(20,30,2,5, name = 'sand', color='orange')
 
-    s.set_udls(u1, u2)
-    s.set_pls(p1)
+#     u1 = Udl(magnitude = 100, offset=2, length=1, dynamic_offset=True, color='red')
+#     u2 = Udl(magnitude = 20, color='green')
 
-    # s.set_materials(m1,m2)
+#     p1 = PointLoad(10,3, 'purple')
 
-    # s.set_water_table(4)
+#     s.set_udls(u1, u2)
+#     s.set_pls(p1)
 
-    # s.update_water_analysis_options(auto=True)
+#     s.set_materials(m1,m2)
 
-    # s.analyse_slope()
+#     s.set_water_table(4)
 
-    # print(start- time.time())
-    # print('fos:',s.get_min_FOS())
+#     s.update_water_analysis_options(auto=True)
 
-    # start = time.time()
-    # fig = s.plot_all_planes()
-    # print('takes this long to make graph:')
-    # print(time.time()-start)
+#     s.update_analysis_options(slices=50, iterations=10000)    
+
+#     print('takes this long to initialise:')
+#     print(time.time()-start)
+#     start = time.time()
+    
+    
+#     start = time.time()
+#     s.analyse_slope()
+#     print('takes this long to analyse:')
+#     print(time.time()-start)
+
+#     print('fos', s.get_min_FOS())
+#     print('search:', len(s._search))
+
+#     start = time.time()
+#     s.plot_all_planes()
+#     print('takes this long to plot:')
+#     print(time.time()-start)
 

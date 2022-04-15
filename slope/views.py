@@ -4,7 +4,7 @@ from django.http import Http404, HttpResponse
 
 # import backend section of code
 import os, sys
-sys.path.insert(0, os.path.abspath('../pySlope'))
+sys.path.insert(0, os.path.abspath('../../'))
 
 from pySlope.pySlope import (
     Slope,
@@ -31,7 +31,7 @@ from .forms import (
 def index(request):
 
     #create formsets
-    MaterialFormSet = modelformset_factory(MaterialModel, form=MaterialForm, extra=1)
+    MaterialFormSet = modelformset_factory(MaterialModel, MaterialForm, extra=1)
     UdlFormSet = modelformset_factory(UdlModel, UdlForm, extra = 1)
     PointLoadFormSet = modelformset_factory(PointLoadModel, PointLoadForm, extra=1)
 
@@ -85,7 +85,6 @@ def index(request):
         # check is valid
         valid = True
         for a in form_list:
-            print(a.errors)
             valid *= a.is_valid()
         
         # if form is valid
@@ -142,43 +141,77 @@ def create_slope(
         )
 
     # add materials to slope
-    for material_form in material_formset.cleaned_data:
+    if material_formset.cleaned_data != [{}]:
+        for material_form in material_formset.cleaned_data:
+            slope.set_materials(
+                Material(
+                    unit_weight=material_form['unit_weight'],
+                    friction_angle=material_form['friction_angle'],
+                    cohesion=material_form['cohesion'],
+                    depth_to_bottom=material_form['depth_to_bottom'],
+                    name=material_form['name'],
+                    color=material_form['color'],
+                )
+            )
+    else:
         slope.set_materials(
             Material(
-                unit_weight=material_form['unit_weight'],
-                friction_angle=material_form['friction_angle'],
-                cohesion=material_form['cohesion'],
-                depth_to_bottom=material_form['depth_to_bottom'],
-                name=material_form['name'],
-                color=material_form['color'],
+                unit_weight = MaterialModel._meta.get_field('unit_weight').get_default(),
+                friction_angle = MaterialModel._meta.get_field('friction_angle').get_default(),
+                cohesion = MaterialModel._meta.get_field('cohesion').get_default(),
+                depth_to_bottom = MaterialModel._meta.get_field('depth_to_bottom').get_default(),
+                name = MaterialModel._meta.get_field('name').get_default(),
+                color = MaterialModel._meta.get_field('color').get_default(),
             )
         )
 
     # add point loads to slope
-    for point_load_form in point_load_formset.cleaned_data:
-        if point_load_form:
-            slope.set_pls(
-                PointLoad(
-                    magnitude = point_load_form['magnitude'],
-                    offset= point_load_form['offset'],
-                    color = point_load_form['color'],
-                    dynamic_offset = point_load_form['dynamic_offset'],
+    if point_load_formset.cleaned_data != [{}]:
+        for point_load_form in point_load_formset.cleaned_data:
+            if point_load_form:
+                slope.set_pls(
+                    PointLoad(
+                        magnitude = point_load_form['magnitude'],
+                        offset= point_load_form['offset'],
+                        color = point_load_form['color'],
+                        dynamic_offset = point_load_form['dynamic_offset'],
+                    )
                 )
+    else:
+        slope.set_pls(
+            PointLoad(
+                magnitude = PointLoadModel._meta.get_field('magnitude').get_default(),
+                offset= PointLoadModel._meta.get_field('offset').get_default(),
+                color = PointLoadModel._meta.get_field('color').get_default(),
+                dynamic_offset = PointLoadModel._meta.get_field('dynamic_offset').get_default(),
             )
+        )
+
 
     # add uniform loads to slope
-    for udl_form in udl_formset.cleaned_data:
-        if udl_form:
-            slope.set_udls(
-                Udl(
-                    magnitude = udl_form['magnitude'],
-                    offset = udl_form['offset'],
-                    length = udl_form['length'],
-                    color = udl_form['color'],
-                    dynamic_offset = udl_form['dynamic_offset'],
+    if udl_formset.cleaned_data != [{}]:
+        for udl_form in udl_formset.cleaned_data:
+            if udl_form:
+                slope.set_udls(
+                    Udl(
+                        magnitude = udl_form['magnitude'],
+                        offset = udl_form['offset'],
+                        length = udl_form['length'],
+                        color = udl_form['color'],
+                        dynamic_offset = udl_form['dynamic_offset'],
+                    )
                 )
+    else:
+        slope.set_udls(
+            Udl(
+                magnitude = UdlModel._meta.get_field('magnitude').get_default(),
+                offset = UdlModel._meta.get_field('offset').get_default(),
+                length = UdlModel._meta.get_field('length').get_default(),
+                color = UdlModel._meta.get_field('color').get_default(),
+                dynamic_offset = UdlModel._meta.get_field('dynamic_offset').get_default(),
             )
-    
+        )
+
     if options_form.cleaned_data['analysis_choice'] == 'normal':
         slope.analyse_slope()
     else:
