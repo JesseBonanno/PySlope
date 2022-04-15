@@ -31,7 +31,7 @@ DEBUG = False
 if DEBUG:
     ALLOWED_HOSTS = []
 else:
-    ALLOWED_HOSTS = ['https://pyslope.herokuapp.com/']
+    ALLOWED_HOSTS = ['https://pyslope.herokuapp.com/','.pyslope.com','pyslope.herokuapp.com']
 
 
 # Application definition
