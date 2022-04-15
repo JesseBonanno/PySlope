@@ -1,6 +1,9 @@
 from django.shortcuts import render
 from django.forms import modelformset_factory
 from django.http import Http404, HttpResponse
+from shapely.geometry import Point
+import time
+import json
 
 # import backend section of code
 import os, sys
@@ -60,7 +63,8 @@ def index(request):
                     ('Udls', udl_formset, 'formset'),
                     ('PointLoads', point_load_formset, 'formset'),
                     ('OptionsForm', options_form, 'form'),
-                ]
+                ],
+                'search' : "[]",
             })
     
     elif request.method == 'POST':
@@ -90,7 +94,36 @@ def index(request):
         # if form is valid
         if valid:
 
+
             slope = create_slope(*form_list)
+
+            #return color_dictionary
+            start = time.time()
+            # add coordinates of failure planes to information that gets passed back.
+            for s in slope._search:
+                p = Point(s['c_x'],s['c_y'])
+                x, y = p.buffer(s['radius']).boundary.coords.xy
+
+                # empty vectors for circle points that we will actually include
+                x_ = []
+                y_ = []
+
+                # generate points for circle, will always generate 64 points (65 in list since start and end are same)
+
+                # 65 long list but the last half of points are for the top half of
+                # circle and so will never actually be required.
+                for i in range(34):
+                    # x coordinate should be between left and right
+                    # note for y, should be less than left y but can stoop
+                    # below right i
+                    if x[i] <= s['r_c'][0] and x[i] >= s['l_c'][0] and y[i] <= s['l_c'][1]:
+                        x_.append(x[i])
+                        y_.append(y[i])
+
+                s['x'] = x_
+                s['y'] = y_
+
+            print(start-time.time())
 
             if options_form.cleaned_data['plot_choice'] == 'plot_critical':
                 plot = slope.plot_critical()
@@ -100,6 +133,9 @@ def index(request):
                 )
 
             plot = plot.update_layout(width=2000, height = 1200).to_html()
+
+            search = slope._search[::]
+            search.sort(key=lambda x : x['FOS'])
 
             return render(request, 'slope/index.html', {
                     'slope_form' : slope_form,
@@ -114,7 +150,8 @@ def index(request):
                         ('Udls', udl_formset, 'formset'),
                         ('PointLoads', point_load_formset, 'formset'),
                         ('OptionsForm', options_form, 'form'),
-                    ]
+                    ],
+                    'search' : search,
                 })
     
     return HttpResponse('erroer')

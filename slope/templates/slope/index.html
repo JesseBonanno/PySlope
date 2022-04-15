@@ -7,6 +7,11 @@
   <script src="{% static 'slope/add_rows.js' %}"></script>
   <script src="{% static 'slope/analysis_loading.js' %}"></script>
   <script src="{% static 'slope/slope_angle_length.js' %}"></script>
+  <script src="{% static 'slope/focus_form.js' %}"></script>
+  {{ search|json_script:"search" }}
+  <script type="text/javascript"> let myArray = JSON.parse(document.getElementById('search').textContent);</script>
+  
+  
 {% endblock %}
 
 {% block body %}
@@ -15,7 +20,7 @@
   <!-- Alert is a to do item -->
   <div id="outer-flex-container"><!-- primary flex container -->
     <h1>pySlope</h1>
-  
+
     <div id="inner-flex-container"><!-- flex item #2 -->
 
       <div id="mainpanel">
@@ -25,7 +30,13 @@
                 <form action="{% url 'index' %}" method = 'post' id='mainform'>
 
                 {% csrf_token %}
-                <input type='submit' class="btn btn-primary" value="Analyse" id="analysis_button">
+                <button class="btn btn-primary" type="submit" value="Analyse" id="analysis_button">
+                  <div id="loading_text">
+                    <span class="spinner-border spinner-border-sm loader" role="status" aria-hidden="true"></span>
+                    <span class="loader">Loading...</span>
+                  </div>
+                  <span id="analyse_text">Analyse</span>
+                </button>
                 
                 <!--Main app navigation tab-->
                 <ul class="nav nav-tabs flex-nowrap" id="myTab" role="tablist">
@@ -98,10 +109,10 @@
         {{plot|safe}}
       </div>
 
+
       
     </div><!-- end #inner-flex-container -->
 
 </div><!-- end #outer-flex-container -->
-
 
 {% endblock %}
