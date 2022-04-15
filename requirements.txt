@@ -4,3 +4,4 @@ shapely
 tqdm
 gunicorn
 django
+whitenoise
