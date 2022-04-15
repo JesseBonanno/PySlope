@@ -19,7 +19,7 @@ You can follow along with examples online: |binder|
 
 Let's walk through a typical use case to investigate the slope shown in the figure below.
 
-.. figure:: examples/readme_example_plot_boundary.png
+.. figure:: ../../pySlope/examples/readme_example_plot_boundary.png
   :width: 700
   :alt: slope_boundary_plot
 
@@ -54,8 +54,4 @@ Code
 +++++++++++++++++++
 
 ``s = Slope(height=3, angle=30, length=None)``
-
-::
-
-s = Slope(height=3, angle=30, length=None)
 
