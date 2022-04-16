@@ -8,7 +8,11 @@
   <script src="{% static 'slope/analysis_loading.js' %}"></script>
   <script src="{% static 'slope/slope_angle_length.js' %}"></script>
   <script src="{% static 'slope/focus_form.js' %}"></script>
+  <script src="{% static 'slope/charting.js' %}"></script>
+
   {{ search|json_script:"search" }}
+  {{ plot_json|json_script:"plot_json" }}
+
   <script type="text/javascript"> let myArray = JSON.parse(document.getElementById('search').textContent);</script>
   
   
@@ -105,9 +109,15 @@
         </div>
       </div>
 
+      <div>
+        <!-- This is the plotly js chart -->
+        <div class="border" id="slope_profile"></div>
+      </div>
+
       <div class ='card' id="aside">
         {{plot|safe}}
       </div>
+
 
 
       
