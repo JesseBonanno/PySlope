@@ -48,7 +48,14 @@ def index(request):
 
         slope = Slope()
         slope.set_materials(Material())
-        plot = slope.plot_boundary().update_layout(height=1200,width=2000).to_html()
+
+        #stevan added 16/04/22 for plotly js
+        plot_holder = slope.plot_boundary()
+        plot = plot_holder.update_layout(height=1200,width=2000).to_html()
+
+        #stevan added 16/04/22 for plotly js
+        plot_json = plot_holder.to_json()
+
 
         return render(request, 'slope/index.html', {
                 'slope_form' : slope_form,
@@ -57,6 +64,7 @@ def index(request):
                 'point_load_formset' : point_load_formset,
                 'options_form' : options_form,
                 'plot' : plot,
+                'plot_json':plot_json,
                 'forms' : [
                     ('Slope', slope_form, 'form'),
                     ('Materials', material_formset, 'formset'),
@@ -131,7 +139,10 @@ def index(request):
                 plot = slope.plot_all_planes(
                     max_fos = options_form.cleaned_data['max_display_FOS']
                 )
-
+            
+            #stevan added 16/04/22 for plotly js
+            plot_json = plot.to_json()
+            
             plot = plot.update_layout(width=2000, height = 1200).to_html()
 
             search = slope._search[::]
@@ -144,6 +155,7 @@ def index(request):
                     'point_load_formset' : point_load_formset,
                     'options_form' : options_form,
                     'plot' : plot,
+                    'plot_json':plot_json,
                     'forms' : [
                         ('Slope', slope_form, 'form'),
                         ('Materials', material_formset, 'formset'),
