@@ -5,8 +5,10 @@ document.addEventListener("DOMContentLoaded", () => {
     plot_height = window.innerHeight
     plot_width = window.innerWidth
 
-    plot.layout.height = plot_height*0.8
-    plot.layout.width = plot_width*0.8
+    plot.layout.height = plot_height*1
+    plot.layout.width = plot_width*1
+
+    console.log(plot)
 
     Plotly.newPlot('slope_profile', plot.data, plot.layout);
 
