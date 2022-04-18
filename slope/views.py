@@ -48,9 +48,11 @@ def index(request):
 
         slope = Slope()
         slope.set_materials(Material())
+        plot_json = slope.plot_boundary().update_layout(height=1200,width=2000).to_json()
         plot = slope.plot_boundary().update_layout(height=1200,width=2000).to_html()
 
         return render(request, 'slope/index.html', {
+                "plot_json": plot_json,
                 'slope_form' : slope_form,
                 'material_formset' : material_formset,
                 'udl_formset' : udl_formset,
@@ -132,12 +134,14 @@ def index(request):
                     max_fos = options_form.cleaned_data['max_display_FOS']
                 )
 
+            plot_json = plot.update_layout(width=2000, height = 1200).to_json()
             plot = plot.update_layout(width=2000, height = 1200).to_html()
 
             search = slope._search[::]
             search.sort(key=lambda x : x['FOS'])
 
             return render(request, 'slope/index.html', {
+                    'plot_json':plot_json,
                     'slope_form' : slope_form,
                     'material_formset' : material_formset,
                     'udl_formset' : udl_formset,

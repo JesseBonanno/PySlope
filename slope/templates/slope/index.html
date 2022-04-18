@@ -8,7 +8,12 @@
   <script src="{% static 'slope/analysis_loading.js' %}"></script>
   <script src="{% static 'slope/slope_angle_length.js' %}"></script>
   <script src="{% static 'slope/focus_form.js' %}"></script>
+  <script src="{% static 'slope/charting.js' %}"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.8.0/plotly.min.js"></script>
+
   {{ search|json_script:"search" }}
+  {{ plot_json|json_script:"plot_json" }}
+
   <script type="text/javascript"> let myArray = JSON.parse(document.getElementById('search').textContent);</script>
   
   
@@ -18,38 +23,40 @@
   
   <!-- TO DO: Maybe can reflect on the layout of the existing app-->
   <!-- Alert is a to do item -->
-  <div id="outer-flex-container"><!-- primary flex container -->
+  <div> <!--id="outer-flex-container"> primary flex container - Stevan commented this out as I was trying to optimise the chart for smaller screens -->
     <h1>pySlope</h1>
 
-    <div id="inner-flex-container"><!-- flex item #2 -->
+    <div> <!-- id="inner-flex-container"> flex item #2 - Stevan commented this out as I was trying to optimise the chart for smaller screens -->
 
-      <div id="mainpanel">
+      <div id="mainpanel" class="container" style="max-width: 100%;">
 
           <div class = 'row'>
               
                 <form action="{% url 'index' %}" method = 'post' id='mainform'>
-
+                <div style="overflow-x: auto; max-width: 100%;">
                 {% csrf_token %}
-                <button class="btn btn-primary" type="submit" value="Analyse" id="analysis_button">
-                  <div id="loading_text">
-                    <span class="spinner-border spinner-border-sm loader" role="status" aria-hidden="true"></span>
-                    <span class="loader">Loading...</span>
-                  </div>
-                  <span id="analyse_text">Analyse</span>
-                </button>
-                
+                  <button class="btn btn-primary" type="submit" value="Analyse" id="analysis_button">
+                    <div id="loading_text">
+                      <span class="spinner-border spinner-border-sm loader" role="status" aria-hidden="true"></span>
+                      <span class="loader">Loading...</span>
+                    </div>
+                    <span id="analyse_text">Analyse</span>
+                  </button>
                 <!--Main app navigation tab-->
-                <ul class="nav nav-tabs flex-nowrap" id="myTab" role="tablist">
+                <div class="border mt-2" style="display: flex; overflow-x: auto; max-width: 100%;">
+                <ul class="nav nav-tabs flex-nowrap py-2" id="myTab" role="tablist">
                     {% for name, form, type in forms %}
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="{{name}}-tab" data-bs-toggle="tab" data-bs-target="#{{name}}" type="button" role="tab" aria-controls="{{name}}" aria-selected="true">{{name.capitalize}}</button>
                         </li>
                     {% endfor %}
                 </ul>
-    
+                </div>
                 <!-- Content for main app navigation tab-->
                 <br>
-                <div class="card tab-content" id="myTabContent">
+                </div>
+
+                <div class="card tab-content" id="myTabContent" style="display: flex; overflow-x: auto; max-width: 100%;">
                     {% for name, forms, type in forms %}
                         
                         <div class="tab-pane fade" id={{name}} role="tabpanel" aria-labelledby="{{name}}-tab">
@@ -101,14 +108,25 @@
                         </div>
                     {% endfor %}
                 </div>
+
             </form>
         </div>
       </div>
 
+      <div style="max-width:1200px; max-height: 100%; height: 100%">
+      <div id ='plotly_js' style="width: 100%;"></div>
+      </div>
+
+
+      <div style="max-width:1200px; max-height: 100%; height: 100%">
+        <div id ='plotly_js_all' style="width: 100%;"></div>
+        </div>      
+
+      <!-- 
       <div class ='card' id="aside">
         {{plot|safe}}
       </div>
-
+    -->
 
       
     </div><!-- end #inner-flex-container -->
