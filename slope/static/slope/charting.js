@@ -1,8 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
 
     // grabbing the JSON data
-    plot = JSON.parse(JSON.parse(document.getElementById('plot_json').textContent))
-    search = JSON.parse(document.getElementById('search').textContent)
+    const plot = JSON.parse(JSON.parse(document.getElementById('plot_json').textContent))
+    const search = JSON.parse(document.getElementById('search').textContent)
+    const COLOUR_FOS_DICT = JSON.parse(document.getElementById('COLOUR_FOS_DICT').textContent)
+    let max_display_fos = document.getElementById('id_options-max_display_FOS').value
 
     // some values for styling
     var config = {responsive: true}
@@ -19,29 +21,50 @@ document.addEventListener("DOMContentLoaded", () => {
     },
 
     // create plotly chart for critical FOS
-    Plotly.newPlot('plotly_js', plot.data, plot.layout, config);
+    Plotly.react('plotly_js', plot.data, plot.layout, config);
 
 
     // check if first load or not and generate the failure surface if not. I used a step of 10 as there were a lot of traces which need to be loaded and it was taking a while
-    // maybe it would be better to load the first chart and then do this one afterwards, like 'lazy loading' or use a range slider to move through the results and load them one by one?
-    search_length =search.length
-    if (search_length>2){
+    // maybe it would be better to load the first chart and then do this one afterwards, like 'lazy loading' or use a range slider to move through the results and load them one by one? 
+    search_length = search.length
+
     document.getElementById('plotly_js_all').style.display = 'block'
     Plotly.newPlot('plotly_js_all', plot.data, plot.layout, config)
     plot_data = []
     plot_all = document.getElementById('plotly_js_all')
 
-        for (var i = 0; i < search_length; i += 10) {
-            Plotly.addTraces(plot_all, {
+    // define traces at higher level so can use outside for loop scope
+    let traces = [];
+
+    for (var i = 0; i < search_length; i += 1) {
+        let color;
+        let fos;
+        if (search[i].FOS < max_display_fos) {
+
+            fos = Math.min(Math.round(search[i].FOS*10)/10,3.0).toString()
+            if (fos.length < 2) {
+                fos+=".0";
+            }
+            color = COLOUR_FOS_DICT[fos];
+
+            traces.push({
                 'mode':"lines",
+                // can probably add a name to help with 'removing' (or making invisible if possible)
+                // name proabably related to id in search list.
                 'name':"",
-                'type':"scatter",
+                'type':"scattergl",
                 x:search[i].x,
-                y:search[i].y
-            })
+                y:search[i].y,
+                meta:[Math.round(search[i].FOS*10)/10],
+                // hovertemplate not really working at the moment (as only shows for the last
+                // node and not all nodes)
+                hovertemplate:[`%{meta[0]}`],
+                marker : {'color': `${color}`},
+            });
         }
-    }
-    else{
-        document.getElementById('plotly_js_all').style.display = 'none'
-    }
-})
+        else {
+            Plotly.addTraces(plot_all, traces);
+            break
+        }
+    };
+});

@@ -4,8 +4,8 @@
 {% block head %}
   <title>pySlope</title>
   <link rel='stylesheet' href="{% static 'slope/styles.css' %}">
-  <script src="{% static 'slope/add_rows.js' %}"></script>
   <script src="{% static 'slope/analysis_loading.js' %}"></script>
+  <script src="{% static 'slope/add_rows.js' %}"></script>
   <script src="{% static 'slope/slope_angle_length.js' %}"></script>
   <script src="{% static 'slope/focus_form.js' %}"></script>
   <script src="{% static 'slope/charting.js' %}"></script>
@@ -13,6 +13,7 @@
 
   {{ search|json_script:"search" }}
   {{ plot_json|json_script:"plot_json" }}
+  {{ COLOUR_FOS_DICT|json_script:"COLOUR_FOS_DICT" }}
 
   <script type="text/javascript"> let myArray = JSON.parse(document.getElementById('search').textContent);</script>
   

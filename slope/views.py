@@ -13,7 +13,8 @@ from pySlope.pySlope import (
     Slope,
     Material,
     Udl,
-    PointLoad
+    PointLoad,
+    COLOUR_FOS_DICT,
 )
 
 from .models import (
@@ -58,7 +59,6 @@ def index(request):
                 'udl_formset' : udl_formset,
                 'point_load_formset' : point_load_formset,
                 'options_form' : options_form,
-                'plot' : plot,
                 'forms' : [
                     ('Slope', slope_form, 'form'),
                     ('Materials', material_formset, 'formset'),
@@ -67,6 +67,7 @@ def index(request):
                     ('OptionsForm', options_form, 'form'),
                 ],
                 'search' : "[]",
+                'COLOUR_FOS_DICT' : COLOUR_FOS_DICT,
             })
     
     elif request.method == 'POST':
@@ -122,20 +123,14 @@ def index(request):
                         x_.append(x[i])
                         y_.append(y[i])
 
-                s['x'] = x_
-                s['y'] = y_
+                # need to add left and right points to capture the ends in the slope (JB 19/04/22)
+                s['x'] = [s['r_c'][0]] + x_ + [s['l_c'][0]]
+                s['y'] = [s['r_c'][1]] + y_ + [s['l_c'][1]]
 
             print(start-time.time())
 
-            if options_form.cleaned_data['plot_choice'] == 'plot_critical':
-                plot = slope.plot_critical()
-            else:
-                plot = slope.plot_all_planes(
-                    max_fos = options_form.cleaned_data['max_display_FOS']
-                )
-
+            plot = slope.plot_all_planes(0)
             plot_json = plot.update_layout(width=2000, height = 1200).to_json()
-            plot = plot.update_layout(width=2000, height = 1200).to_html()
 
             search = slope._search[::]
             search.sort(key=lambda x : x['FOS'])
@@ -147,7 +142,6 @@ def index(request):
                     'udl_formset' : udl_formset,
                     'point_load_formset' : point_load_formset,
                     'options_form' : options_form,
-                    'plot' : plot,
                     'forms' : [
                         ('Slope', slope_form, 'form'),
                         ('Materials', material_formset, 'formset'),
@@ -156,6 +150,7 @@ def index(request):
                         ('OptionsForm', options_form, 'form'),
                     ],
                     'search' : search,
+                    'COLOUR_FOS_DICT' : COLOUR_FOS_DICT,
                 })
     
     return HttpResponse('erroer')
