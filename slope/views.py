@@ -129,7 +129,16 @@ def index(request):
 
             print(start-time.time())
 
-            plot = slope.plot_all_planes(0)
+            if options_form.cleaned_data['plot_choice'] == 'plot_critical':
+                plot = slope.plot_critical()
+                print("plot critical")
+            else:
+                plot = slope.plot_all_planes(
+                    max_fos = options_form.cleaned_data['max_display_FOS']
+                )
+                print("plot all")
+
+
             plot_json = plot.update_layout(width=2000, height = 1200).to_json()
 
             search = slope._search[::]
