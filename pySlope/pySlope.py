@@ -1574,8 +1574,13 @@ class Slope:
 
         data_validation.assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
 
-        # yield ?
-        # paths = filter(lambda a : a['FOS'] < max_fos, self._search)
+        fig = self._plot_FOS_legend(fig)
+
+        # JB 20.04.22 - 'hacked' into how plotly works to make faster
+        # ultimately not very readible approach compared to the old approach
+        # however old approach was too slow
+        traces = []
+
         for i in tqdm(self._search):
 
             FOS = i['FOS']
@@ -1587,12 +1592,53 @@ class Slope:
                 l_c = i['l_c']
                 r_c = i['r_c']
 
-                fig = self._plot_failure_plane(fig, c_x, c_y, radius, l_c, r_c, FOS=FOS)
+                    
+                if FOS > 3:
+                    color = COLOUR_FOS_DICT[3.0]
+                else:
+                    color = COLOUR_FOS_DICT[round(FOS, 1)]
 
+                # generate points for circle, will always generate 64 points (65 in list since start and end are same)
+                p = Point(c_x, c_y)
+                x, y = p.buffer(radius).boundary.coords.xy
 
-        fig = self._plot_FOS_legend(fig)
+                # empty vectors for circle points that we will actually include
+                x_ = []
+                y_ = []
 
-        return fig
+                # 65 long list but the last half of points are for the top half of
+                # circle and so will never actually be required.
+                for i in range(34):
+                    # x coordinate should be between left and right
+                    # note for y, should be less than left y but can stoop
+                    # below right i
+                    if x[i] <= r_c[0] and x[i] >= l_c[0] and y[i] <= l_c[1]:
+                        x_.append(x[i])
+                        y_.append(y[i])
+
+                x_ = [r_c[0]] + x_ + [l_c[0]]
+                y_ = [r_c[1]] + y_ + [l_c[1]]
+
+                traces.append(
+                    {
+                        'hovertemplate': '%{meta[0]}',
+                        'line': {'color': color},
+                        'meta': [round(FOS,3)],
+                        'mode': 'lines',
+                        'name': '',
+                        'x': x_,
+                        'y': y_,
+                        'type': 'scatter'
+                    }
+                )
+
+       
+
+        temp = fig.to_dict()
+        temp['data'] = tuple(list(temp['data']) + traces)
+       
+        return go.Figure(temp)
+
 
     def _plot_annotate_FOS(self, fig, c_x: float, c_y: float, FOS: float):
         """Annotate FOS on figure.
@@ -2176,4 +2222,3 @@ class Slope:
 #     s.plot_all_planes()
 #     print('takes this long to plot:')
 #     print(time.time()-start)
-
