@@ -245,7 +245,7 @@ class Slope:
         MIN_EXT_H = self._MIN_EXT_H
         MIN_EXT_L = self._MIN_EXT_L
 
-        tot_h = max(4 * height, MIN_EXT_H, 5 * length / 2)
+        tot_h = max(3 * height, MIN_EXT_H, 5 * length / 2)
         tot_l = max(5 * length, MIN_EXT_L, 4 * height)
 
         # determine coordinates for edges of slope
@@ -1675,7 +1675,7 @@ class Slope:
                 mode="lines+text",
                 text=[f"{FOS:.3f}"],
                 textposition="top right",
-                textfont=dict(family="sans serif", size=30, color=color),
+                textfont=dict(family="sans serif", size=20, color=color),
                 name='',
             )
         )
@@ -1901,10 +1901,10 @@ class Slope:
     def _plot_material_table(self, fig):
         """Plot table of material properties"""
 
-        header_h = 0.05
-        row_h = 0.035
+        header_h = 0.07
+        row_h = 0.05
 
-        table_width = 0.3
+        table_width = 0.45
         table_height = header_h + row_h * len(self._materials)
 
         x0,y0 = 0.1,0.1
@@ -1935,7 +1935,7 @@ class Slope:
 
 
         # add columns
-        column_relative_width = [20,13,10,10,10]
+        column_relative_width = [20,16,10,10,10]
         table_header = ['MATERIAL','COLOR','γ', "c", "ϕ"]
         table_header = ['<b>'+a+'<b>' for a in table_header]
 
@@ -1963,12 +1963,12 @@ class Slope:
             fig.add_annotation(
                 xref="x domain", yref="y domain",
                 x=x,
-                y=y1-header_h,
+                y=y1-header_h-0.02,
                 text=table_header[i],
                 showarrow=False,
                 yshift=15,
                 xshift=15,
-                font_size=20,
+                font_size=13,
                 font_color="black",
             )
             x = x0+c*(table_width)
@@ -2004,12 +2004,12 @@ class Slope:
                     fig.add_annotation(
                         xref="x domain", yref="y domain",
                         x=x,
-                        y=y,
+                        y=y-0.015,
                         text=data[i],
                         showarrow=False,
                         yshift=10,
-                        xshift=15,
-                        font_size=20,
+                        xshift=20,
+                        font_size=12,
                         font_color="black",
                     )
                 x = x0+c*(table_width)
@@ -2063,8 +2063,8 @@ class Slope:
                     text=f"{k}",
                     showarrow=False,
                     yshift=0,
-                    xshift=50,
-                    font_size=20,
+                    xshift=37,
+                    font_size=16,
                     font_color="black",
                 )
 
@@ -2076,9 +2076,9 @@ class Slope:
             text=f"<b>Legend</b>",
             align='center',
             showarrow=False,
-            yshift=50,
+            yshift=33,
             xshift=60,
-            font_size=30,
+            font_size=20,
             font_color="black",
         )
 

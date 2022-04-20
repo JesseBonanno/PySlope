@@ -6,32 +6,59 @@ document.addEventListener("DOMContentLoaded", () => {
     const COLOUR_FOS_DICT = JSON.parse(document.getElementById('COLOUR_FOS_DICT').textContent)
     let max_display_fos = document.getElementById('id_options-max_display_FOS').value
 
+    //initialising things 
+    plot_all = document.getElementById('plotly_js')
+    search_length = search.length
+
+    // for mobile displays hide the annotations and shapes from the plotly chart and create html info
+    if (window.screen.width < 1000) {
+        document.getElementById("mobile_screen_menus").style.display = "block"
+        plot.layout.annotations = []
+        plot.layout.shapes = []
+
+        soils = document.getElementsByClassName('formset-row-Materials')
+        soils_count = soils.length
+        for (var i = 0; i < soils_count; i += 1) {
+            // creating the table of soil properties
+            weight = document.getElementById('id_material-'+i+'-unit_weight').value
+            friction = document.getElementById('id_material-'+i+'-friction_angle').value
+            cohesion = document.getElementById('id_material-'+i+'-cohesion').value
+            soil_name = document.getElementById('id_material-'+i+'-name').value
+            colour = plot.data[i+1].fillcolor
+            var objTo = document.getElementById('mobile_soil_table');
+            var tr = document.createElement("tr");
+            tr.innerHTML = '<td>'+soil_name+'</td><td style="background-color:'+colour+';"></td><td>'+weight+'</td><td>'+cohesion+'</td><td>'+friction+'</td>';
+            objTo.appendChild(tr)
+        }
+
+        //creating the html FOS scale
+        var objTo = document.getElementById('FOS_legend');
+        for (fos_colour in COLOUR_FOS_DICT) {
+            var td = document.createElement("td");
+            td.style.backgroundColor = COLOUR_FOS_DICT[fos_colour];
+            td.style.height = '15px';
+            objTo.appendChild(td)
+        }
+            Plotly.newPlot('plotly_js', plot.data, plot.layout)
+    }
+    else{
+        //if not a mobile screen hide the extra html elements
+        Plotly.newPlot('plotly_js', plot.data, plot.layout)
+        document.getElementById("mobile_screen_menus").style.display = "none"
+    }
+
     // some values for styling
-    var config = {responsive: true}
     var w = document.getElementById('plotly_js').getBoundingClientRect().width
     var h = document.getElementById('plotly_js').getBoundingClientRect().height
-    plot.layout.width = w
-    plot.layout.height = w
+    plot.layout.width = w*0.98
+    plot.layout.height = w*0.6
     plot.layout.margin= {
         'l':10,
         'r':10,
         'b':10,
         't':10,
         'pad':0
-    },
-
-    // create plotly chart for critical FOS
-    Plotly.react('plotly_js', plot.data, plot.layout, config);
-
-
-    // check if first load or not and generate the failure surface if not. I used a step of 10 as there were a lot of traces which need to be loaded and it was taking a while
-    // maybe it would be better to load the first chart and then do this one afterwards, like 'lazy loading' or use a range slider to move through the results and load them one by one? 
-    search_length = search.length
-
-    document.getElementById('plotly_js_all').style.display = 'block'
-    Plotly.newPlot('plotly_js_all', plot.data, plot.layout, config)
-    plot_data = []
-    plot_all = document.getElementById('plotly_js_all')
+    }
 
     // define traces at higher level so can use outside for loop scope
     let traces = [];
@@ -63,8 +90,12 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
         else {
-            Plotly.addTraces(plot_all, traces);
             break
         }
     };
+    
+    //reversed the order of the traces so that the most critical FOS are drawn on the top
+    Plotly.addTraces(plot_all, traces.reverse());
+
+
 });
