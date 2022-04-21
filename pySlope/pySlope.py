@@ -783,8 +783,10 @@ class Slope:
                 if utilities.dist_points(l_c, r_c) > min_dist:
                     search += self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
 
+        search.sort(key= lambda x:x['FOS'])
         self._search = search
-        self._min_FOS_dict = min(search, key = lambda x : x['FOS'])
+
+        self._min_FOS_dict = search[0]
 
     def run_analysis_for_circles(
         self, l_c: tuple, r_c: tuple, NUMBER_CIRCLES: float = 5
@@ -1633,7 +1635,8 @@ class Slope:
                 )
 
        
-
+        traces.reverse()
+        
         temp = fig.to_dict()
         temp['data'] = tuple(list(temp['data']) + traces)
        
