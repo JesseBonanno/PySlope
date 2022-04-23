@@ -4,6 +4,8 @@ from .models import (
     MaterialModel,
     UdlModel,
     PointLoadModel,
+    WaterTableModel,
+    LimitsModel,
 )
 
 class SlopeForm(forms.ModelForm):
@@ -76,11 +78,10 @@ class PointLoadForm(forms.ModelForm):
 
 
 class AnalysisOptionsForm(forms.Form):
-    plot_choices = [('plot_critical','Plot Critical Failure'),('plot_all_planes','Plot All Failure Planes')]
+
     analysis_choices = [('normal','Normal Bishop Analysis'),('dynamic', 'Dynamic Bishop Analysis')]
     slope_choices = [('length','Length'),('angle', 'Angle')]
 
-    plot_choice = forms.ChoiceField(choices=plot_choices, label='Plotting Choices', initial=plot_choices[0])
     analysis_choice = forms.ChoiceField(choices=analysis_choices, label='Analysis Choices', initial=analysis_choices[0])
     slope_choice = forms.ChoiceField(choices=slope_choices, label='Define Slope By:', initial=analysis_choices[0])
 
@@ -88,3 +89,37 @@ class AnalysisOptionsForm(forms.Form):
     max_display_FOS = forms.FloatField(min_value=0,max_value = 5, required=True, label = 'Max display FOS', initial = 3)
 
     prefix = 'options'
+
+class WaterTableForm(forms.ModelForm):
+    class Meta:
+        model = WaterTableModel
+        fields = (
+            'consider_water',
+            'water_depth',
+        )   
+
+        labels = {
+            'consider_water' : 'Consider Water Table?',
+            'water_depth' : 'Water Depth from Crest (m)',
+        }
+
+class LimitsForm(forms.ModelForm):
+    class Meta:
+        model = LimitsModel
+        fields = (
+            'consider_limits',
+            'left_x',
+            'right_x',
+            'consider_internal_limits',
+            'left_x_right',
+            'right_x_left',
+        )
+
+        labels = {
+            'consider_limits' : "Consider Limits?",
+            'left_x' : "left x coordinate (m)",
+            'right_x': "right x coordinate (m)",
+            'consider_internal_limits' : "Consider Internal Limits?",
+            'left_x_right' : "left internal x coordinate (m)",
+            'right_x_left' : "right internal x coordinate (m)",
+        }

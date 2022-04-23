@@ -1426,7 +1426,7 @@ class Slope:
         else:
             return None
 
-    def plot_boundary(self):
+    def plot_boundary(self, material_table=True, legend=False):
         """Plot external boundary, materials, limits, loading and water for model.
 
         Returns
@@ -1450,8 +1450,6 @@ class Slope:
         # dont show legend
         fig.update_layout(
             showlegend=False,
-            # width=1920,
-            # height=1080
         )
 
         # if there are no materials just return an empty shell
@@ -1517,7 +1515,11 @@ class Slope:
             bot.sort()
             top = bot
 
-        fig = self._plot_material_table(fig)
+        if material_table:
+            fig = self._plot_material_table(fig)
+        
+        if legend:
+            fig = self._plot_FOS_legend(fig)
 
         for udl in self._udls:
             fig = self._plot_udl(fig, udl)
@@ -1533,14 +1535,14 @@ class Slope:
 
         return fig
 
-    def plot_critical(self):
+    def plot_critical(self, material_table=True, legend=False):
         """Plot critical slope (i.e. slope with lowest FOS)
 
         Returns
         -------
         Plotly figure
         """
-        fig = self.plot_boundary()
+        fig = self.plot_boundary(material_table=material_table,legend=legend)
 
         FOS = self._min_FOS_dict['FOS']
         c_x = self._min_FOS_dict['c_x']
@@ -1555,7 +1557,7 @@ class Slope:
         fig = self._plot_annotate_FOS(fig, c_x, c_y, FOS)
         return fig
 
-    def plot_all_planes(self, max_fos: float = 10):
+    def plot_all_planes(self, max_fos: float = 10, material_table=True, legend=True):
         """plot multiple failure planes in the same plot
 
         Parameters
@@ -1570,11 +1572,9 @@ class Slope:
 
         """
 
-        fig = self.plot_boundary()
+        fig = self.plot_boundary(material_table=material_table,legend=legend)
 
         data_validation.assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
-
-        fig = self._plot_FOS_legend(fig)
 
         # JB 20.04.22 - 'hacked' into how plotly works to make faster
         # ultimately not very readible approach compared to the old approach
@@ -1717,8 +1717,8 @@ class Slope:
             y=y,
             text="▼",
             showarrow=False,
-            yshift=15,
-            font_size=35,
+            yshift=10,
+            font_size=25,
             font_color="blue",
         )
 
@@ -1727,8 +1727,8 @@ class Slope:
             y=y,
             text="_",
             showarrow=False,
-            yshift=10,
-            font_size=40,
+            yshift=2,
+            font_size=25,
             font_color="blue",
         )
 
@@ -1760,8 +1760,8 @@ class Slope:
                 text="▶",
                 showarrow=False,
                 yshift=15,
-                xshift=-13,
-                font_size=35,
+                xshift=-10,
+                font_size=25,
                 font_color="black",
             )
 
@@ -1772,8 +1772,8 @@ class Slope:
                 text="◀",
                 showarrow=False,
                 yshift=15,
-                xshift=13,
-                font_size=35,
+                xshift=10,
+                font_size=25,
                 font_color="black",
             )
 
@@ -1785,7 +1785,7 @@ class Slope:
                 showarrow=False,
                 yshift=15,
                 xshift=0,
-                font_size=35,
+                font_size=25,
                 font_color="black",
             )
 

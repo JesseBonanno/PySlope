@@ -4,12 +4,13 @@
 {% block head %}
   <title>pySlope</title>
   <link rel='stylesheet' href="{% static 'slope/styles.css' %}">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.8.0/plotly.min.js"></script>
+  <script src="{% static 'slope/charting.js' %}"></script>
   <script src="{% static 'slope/analysis_loading.js' %}"></script>
   <script src="{% static 'slope/add_rows.js' %}"></script>
-  <script src="{% static 'slope/slope_angle_length.js' %}"></script>
+  <script src="{% static 'slope/hide_form.js' %}"></script>
   <script src="{% static 'slope/focus_form.js' %}"></script>
-  <script src="{% static 'slope/charting.js' %}"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.8.0/plotly.min.js"></script>
+
 
   {{ search|json_script:"search" }}
   {{ plot_json|json_script:"plot_json" }}

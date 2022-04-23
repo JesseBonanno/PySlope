@@ -1,4 +1,5 @@
 // based on https://engineertodeveloper.com/dynamic-formsets-with-django/
+// javascript script to ad rows to formsets
 document.addEventListener("DOMContentLoaded", () => {
 
 

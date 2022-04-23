@@ -1,3 +1,5 @@
+// script to update plot to show failure planes
+
 // function to update plot
 function updatePlot(max_display_fos) {
 

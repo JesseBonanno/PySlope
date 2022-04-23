@@ -1,3 +1,5 @@
+// script to lock analysis button after pressing and 
+// changing visualisation to show loading
 document.addEventListener("DOMContentLoaded", () => {
 
     let button = document.getElementById('analysis_button');

@@ -22,6 +22,8 @@ from .models import (
     MaterialModel,
     UdlModel,
     PointLoadModel,
+    WaterTableModel,
+    LimitsModel,
 )
 
 from .forms import (
@@ -30,6 +32,8 @@ from .forms import (
     UdlForm,
     PointLoadForm,
     AnalysisOptionsForm,
+    WaterTableForm,
+    LimitsForm,
 )
 
 def index(request):
@@ -41,11 +45,14 @@ def index(request):
 
     if request.method == 'GET':
         slope_form = SlopeForm(prefix='slope')
-        options_form = AnalysisOptionsForm(prefix='options')
 
         material_formset = MaterialFormSet(queryset=MaterialModel.objects.none(), prefix='material')
         udl_formset = UdlFormSet(queryset=UdlModel.objects.none(), prefix='udl')
         point_load_formset = PointLoadFormSet(queryset=PointLoadModel.objects.none(), prefix='pointload')
+
+        water_table_form = WaterTableForm(prefix='watertable')
+        limits_form = LimitsForm(prefix="limits")
+        options_form = AnalysisOptionsForm(prefix='options')
 
         slope = Slope()
         slope.set_materials(Material())
@@ -58,13 +65,17 @@ def index(request):
                 'material_formset' : material_formset,
                 'udl_formset' : udl_formset,
                 'point_load_formset' : point_load_formset,
+                'water_table_form' : water_table_form,
+                'limits_form' : limits_form,
                 'options_form' : options_form,
                 'forms' : [
                     ('Slope', slope_form, 'form'),
                     ('Materials', material_formset, 'formset'),
                     ('Udls', udl_formset, 'formset'),
                     ('PointLoads', point_load_formset, 'formset'),
-                    ('OptionsForm', options_form, 'form'),
+                    ('WaterTable', water_table_form, 'form'),
+                    ('Limits', limits_form, 'form'),
+                    ('Options', options_form, 'form'),
                 ],
                 'search' : "[]",
                 'COLOUR_FOS_DICT' : COLOUR_FOS_DICT,
@@ -79,6 +90,8 @@ def index(request):
         udl_formset = UdlFormSet(request.POST, prefix='udl')
         point_load_formset = PointLoadFormSet(request.POST, prefix='pointload')
         
+        water_table_form = WaterTableForm(request.POST, prefix='watertable')
+        limits_form = LimitsForm(request.POST, prefix='limits')
         options_form = AnalysisOptionsForm(request.POST, prefix='options')
 
         form_list = [
@@ -86,6 +99,8 @@ def index(request):
             material_formset,
             udl_formset,
             point_load_formset,
+            water_table_form,
+            limits_form,
             options_form,
         ]
 
@@ -97,11 +112,9 @@ def index(request):
         # if form is valid
         if valid:
 
-
             slope = create_slope(*form_list)
 
             #return color_dictionary
-            start = time.time()
             # add coordinates of failure planes to information that gets passed back.
             for s in slope._search:
                 p = Point(s['c_x'],s['c_y'])
@@ -127,18 +140,7 @@ def index(request):
                 s['x'] = [s['r_c'][0]] + x_ + [s['l_c'][0]]
                 s['y'] = [s['r_c'][1]] + y_ + [s['l_c'][1]]
 
-            print(start-time.time())
-
-            if options_form.cleaned_data['plot_choice'] == 'plot_critical':
-                plot = slope.plot_critical()
-                print("plot critical")
-            else:
-                plot = slope.plot_all_planes(
-                    max_fos = options_form.cleaned_data['max_display_FOS']
-                )
-                print("plot all")
-
-
+            plot = slope.plot_critical(material_table=False,legend=True)
             plot_json = plot.update_layout(width=2000, height = 1200).to_json()
 
             search = slope._search[::]
@@ -150,29 +152,35 @@ def index(request):
                     'material_formset' : material_formset,
                     'udl_formset' : udl_formset,
                     'point_load_formset' : point_load_formset,
+                    'water_table_form' : water_table_form,
+                    'limits_form' : limits_form,
                     'options_form' : options_form,
                     'forms' : [
                         ('Slope', slope_form, 'form'),
                         ('Materials', material_formset, 'formset'),
                         ('Udls', udl_formset, 'formset'),
                         ('PointLoads', point_load_formset, 'formset'),
-                        ('OptionsForm', options_form, 'form'),
+                        ('WaterTable', water_table_form, 'form'),
+                        ('Limits', limits_form, 'form'),
+                        ('Options', options_form, 'form'),
                     ],
                     'search' : search,
                     'COLOUR_FOS_DICT' : COLOUR_FOS_DICT,
                 })
     
-    return HttpResponse('erroer')
+    return HttpResponse('error')
 
 def create_slope(
     slope_form,
     material_formset,
     udl_formset,
     point_load_formset,
+    water_table_form,
+    limits_form,
     options_form,
     ):
 
-    # create beam object
+    # create slope object
     if options_form.cleaned_data['slope_choice'] == 'length':
         slope = Slope(
             height = slope_form.cleaned_data['height'],
@@ -257,11 +265,36 @@ def create_slope(
             )
         )
 
+    # add water table to slope
+    if water_table_form.cleaned_data['consider_water']:
+        slope.set_water_table(water_table_form.cleaned_data['water_depth'])
+
+    # limits form
+    limits = limits_form.cleaned_data
+    if limits['consider_limits']:
+        if limits['consider_internal_limits']:
+            slope.set_analysis_limits(
+                left_x= limits['left_x'],
+                right_x = limits['right_x'],
+                left_x_right = limits['left_x_right'],
+                right_x_left = limits['right_x_left'],
+            )
+        else:
+            slope.set_analysis_limits(
+                left_x= limits['left_x'],
+                right_x = limits['right_x'],
+            )
+
     if options_form.cleaned_data['analysis_choice'] == 'normal':
         slope.analyse_slope()
     else:
-        slope.analyse_dynamic(
-            critical_fos=options_form.cleaned_data['critical_FOS']
-        )
+        
+        # might fail if no dynamic loads set up
+        try:
+            slope.analyse_dynamic(
+                critical_fos=options_form.cleaned_data['critical_FOS']
+            )
+        except:
+            slope.analyse_slope()
     
     return slope
