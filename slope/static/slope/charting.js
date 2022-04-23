@@ -1,15 +1,15 @@
-document.addEventListener("DOMContentLoaded", () => {
+// function to update plot
+function updatePlot(max_display_fos) {
 
     // grabbing the JSON data
     const plot = JSON.parse(JSON.parse(document.getElementById('plot_json').textContent))
     const search = JSON.parse(document.getElementById('search').textContent)
     const COLOUR_FOS_DICT = JSON.parse(document.getElementById('COLOUR_FOS_DICT').textContent)
-    let max_display_fos = document.getElementById('id_options-max_display_FOS').value
-
+    
     //initialising things 
-    plot_all = document.getElementById('plotly_js')
-    search_length = search.length
-
+    const plot_all = document.getElementById('plotly_js')
+    const search_length = search.length
+    
     // for mobile displays hide the annotations and shapes from the plotly chart and create html info
     if (window.screen.width < 1000) {
         document.getElementById("mobile_screen_menus").style.display = "block"
@@ -39,13 +39,14 @@ document.addEventListener("DOMContentLoaded", () => {
             td.style.height = '15px';
             objTo.appendChild(td)
         }
-            Plotly.newPlot('plotly_js', plot.data, plot.layout)
     }
     else{
         //if not a mobile screen hide the extra html elements
-        Plotly.newPlot('plotly_js', plot.data, plot.layout)
         document.getElementById("mobile_screen_menus").style.display = "none"
     }
+
+    // create a new plot
+    Plotly.newPlot('plotly_js', plot.data, plot.layout)
 
     // some values for styling
     var w = document.getElementById('plotly_js').getBoundingClientRect().width
@@ -63,32 +64,38 @@ document.addEventListener("DOMContentLoaded", () => {
     // define traces at higher level so can use outside for loop scope
     let traces = [];
 
+    // loop through all results
     for (var i = 0; i < search_length; i += 1) {
         let color;
         let fos;
+
+        // if less than FOS than plot
         if (search[i].FOS < max_display_fos) {
 
-            fos = Math.min(Math.round(search[i].FOS*10)/10,3.0).toString()
+            // get the FOS and round to 1 decimal places for coloring purposes
+            // if greater than 3 use 3
+            fos = Math.min(Math.round(search[i].FOS*10)/10,3).toString()
+
+            // if string length < 2 than is int (ie 2) which needs to be converted to
+            // have one decimal place (ie add "".0")
             if (fos.length < 2) {
                 fos+=".0";
             }
+            
             color = COLOUR_FOS_DICT[fos];
 
             traces.push({
                 'mode':"lines",
-                // can probably add a name to help with 'removing' (or making invisible if possible)
-                // name proabably related to id in search list.
                 'name':"",
                 'type':"scattergl",
                 x:search[i].x,
                 y:search[i].y,
-                meta:[Math.round(search[i].FOS*10)/10],
-                // hovertemplate not really working at the moment (as only shows for the last
-                // node and not all nodes)
-                hovertemplate:[`%{meta[0]}`],
+                hovertemplate: Math.round(search[i].FOS*1000)/1000,
                 marker : {'color': `${color}`},
             });
         }
+        // if not less than FOS stop (since results are sorted all subsequent results
+        // will be greater than FOS)
         else {
             break
         }
@@ -98,4 +105,13 @@ document.addEventListener("DOMContentLoaded", () => {
     Plotly.addTraces(plot_all, traces.reverse());
 
 
+
+}
+document.addEventListener("DOMContentLoaded", () => {
+    let max_display_fos = document.getElementById('id_options-max_display_FOS');
+    updatePlot(max_display_fos.value)
+
+    max_display_fos.addEventListener("change", (e) => {
+            updatePlot(e.currentTarget.value);
+    })   
 });
