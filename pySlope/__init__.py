@@ -1,3 +1,6 @@
-from . import data_validation
-from . import utilities
-from . import pySlope
+from pySlope.pySlope import (
+    Material,
+    Udl,
+    PointLoad,
+    Slope,
+)
