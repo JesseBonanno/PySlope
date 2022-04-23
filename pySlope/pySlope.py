@@ -80,7 +80,7 @@ class Material:
 
 
     def __repr__(self):
-        return f"Material:{self.name}(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom}"
+        return f"Material:{self.name}(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom})"
 
 @dataclass
 class Udl:
@@ -182,6 +182,9 @@ class Slope:
         length : float, optional
             length of slope in metres, by default None
     """
+
+    def __repr__(self):
+        return f"Slope: {round(self._height,3)}V : {round(self._length,3)}H"
 
     def __init__(self, height: float = 1, angle: int = 30, length: float = None):
 
