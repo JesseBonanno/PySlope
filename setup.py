@@ -5,7 +5,7 @@ _here = os.path.abspath(os.path.dirname(__file__))
 
 # Read the verison number
 version = {}
-with open(os.path.join(_here, 'version.py')) as f:
+with open(os.path.join(_here, 'pyslope', 'version.py')) as f:
     exec(f.read(), version)
 
 # Store the README.md file
