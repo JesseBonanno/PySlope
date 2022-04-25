@@ -37,13 +37,23 @@
                 <form action="{% url 'index' %}" method = 'post' id='mainform'>
                 <div style="overflow-x: auto; max-width: 100%;">
                 {% csrf_token %}
-                  <button class="btn btn-primary" type="submit" value="Analyse" id="analysis_button">
-                    <div id="loading_text">
-                      <span class="spinner-border spinner-border-sm loader" role="status" aria-hidden="true"></span>
-                      <span class="loader">Loading...</span>
-                    </div>
+                <!-- button for analysing -->
+                <div id="button-row">
+                  <button class="btn btn-primary" type="submit" value="Analyse" name="Analyse" id="analysis_button">
                     <span id="analyse_text">Analyse</span>
                   </button>
+
+                  <!-- Button for analysing and download a pdf report -->
+                  <button class="btn btn-primary" type="submit" value="pdf" name="pdf" id="pdf_button">
+                    <span id="pdf_text">PDF</span>
+                  </button>
+
+                  <!-- button to reset slope -->
+                  <a class="btn btn-primary" href='{% url "reset" %}' id="reset_button">Clear Slope</a>
+                
+                  <!-- Spinner -->
+                  <span class="spinner-border spinner-border-sm loader" role="status" aria-hidden="true" id="loading-spinner"></span>
+                </div>
                 <!--Main app navigation tab-->
                 <div class="border mt-2" style="display: flex; overflow-x: auto; max-width: 100%;">
                 <ul class="nav nav-tabs flex-nowrap py-2" id="myTab" role="tablist">

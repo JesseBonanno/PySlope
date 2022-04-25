@@ -1,9 +1,14 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.forms import modelformset_factory
 from django.http import Http404, HttpResponse
 from shapely.geometry import Point
 import time
 import json
+
+import base64
+from plotly.io import to_json, from_json
+
+from .utils import render_to_pdf
 
 # import backend section of code
 import os, sys
@@ -36,6 +41,15 @@ from .forms import (
     LimitsForm,
 )
 
+def reset(request):
+    # remove all saved information to allow the form to reset to default parameters
+    request.session['forms']=[]
+    request.session['plot_json']=[]
+    request.session['search']=[]
+    # get request the main page, however now session information is set to none meaning
+    # that the default values are returned to the user.
+    return redirect('index')
+
 def index(request):
 
     #create formsets
@@ -44,20 +58,45 @@ def index(request):
     PointLoadFormSet = modelformset_factory(PointLoadModel, PointLoadForm, extra=1)
 
     if request.method == 'GET':
-        slope_form = SlopeForm(prefix='slope')
+        # if forms have been saved initialise with previous data, otherwise reset.
+        # if clear form button has been called then also dont use previous and use default.
+        if request.session.get('forms') and request.session.get('search'):
+            previous_forms = request.session.get('forms')
+            search = request.session.get('search')
+            # try load up the previous form information
+            # if there is an error it is probably due to a version change.
+            # clearing the beam will help rectify the issue.
+            try:
+                slope_form = SlopeForm(previous_forms, prefix='slope')
 
-        material_formset = MaterialFormSet(queryset=MaterialModel.objects.none(), prefix='material')
-        udl_formset = UdlFormSet(queryset=UdlModel.objects.none(), prefix='udl')
-        point_load_formset = PointLoadFormSet(queryset=PointLoadModel.objects.none(), prefix='pointload')
+                material_formset = MaterialFormSet(previous_forms, prefix='material')
+                udl_formset = UdlFormSet(previous_forms, prefix='udl')
+                point_load_formset = PointLoadFormSet(previous_forms, prefix='pointload')
 
-        water_table_form = WaterTableForm(prefix='watertable')
-        limits_form = LimitsForm(prefix="limits")
-        options_form = AnalysisOptionsForm(prefix='options')
+                water_table_form = WaterTableForm(previous_forms,prefix='watertable')
+                limits_form = LimitsForm(previous_forms, prefix="limits")
+                options_form = AnalysisOptionsForm(previous_forms, prefix='options')
+
+            except:
+                return redirect('reset')
+
+
+        else:
+            slope_form = SlopeForm(prefix='slope')
+
+            material_formset = MaterialFormSet(queryset=MaterialModel.objects.none(), prefix='material')
+            udl_formset = UdlFormSet(queryset=UdlModel.objects.none(), prefix='udl')
+            point_load_formset = PointLoadFormSet(queryset=PointLoadModel.objects.none(), prefix='pointload')
+
+            water_table_form = WaterTableForm(prefix='watertable')
+            limits_form = LimitsForm(prefix="limits")
+            options_form = AnalysisOptionsForm(prefix='options')
+
+            search = "[]"
 
         slope = Slope()
         slope.set_materials(Material())
         plot_json = slope.plot_boundary().update_layout(height=1200,width=2000).to_json()
-        plot = slope.plot_boundary().update_layout(height=1200,width=2000).to_html()
 
         return render(request, 'slope/index.html', {
                 "plot_json": plot_json,
@@ -77,7 +116,7 @@ def index(request):
                     ('Limits', limits_form, 'form'),
                     ('Options', options_form, 'form'),
                 ],
-                'search' : "[]",
+                'search' : search,
                 'COLOUR_FOS_DICT' : COLOUR_FOS_DICT,
             })
     
@@ -140,11 +179,37 @@ def index(request):
                 s['x'] = [s['r_c'][0]] + x_ + [s['l_c'][0]]
                 s['y'] = [s['r_c'][1]] + y_ + [s['l_c'][1]]
 
-            plot = slope.plot_critical(material_table=False,legend=True)
+            plot = slope.plot_critical(material_table=True,legend=True)
             plot_json = plot.update_layout(width=2000, height = 1200).to_json()
 
             search = slope._search[::]
             search.sort(key=lambda x : x['FOS'])
+
+            request.session['search'] = search
+            request.session['plot_json'] = plot_json
+            request.session['forms'] = request.POST
+
+            if request.POST.get('pdf'):
+                try:
+                    max_fos = int(options_form.cleaned_data['max_display_FOS'])
+                except:
+                    max_fos = 0
+
+                plot = slope.plot_all_planes(material_table=True,legend=True, max_fos=max_fos)
+                
+                plot_image = plot.to_image(format='png')
+
+                pdf = render_to_pdf('slope/report.html', context_dict={
+                    'plot': str(base64.b64encode(plot_image)),
+                })
+
+                response = HttpResponse(pdf, content_type='application/pdf')
+
+                filename = 'report.pdf'
+                content = f"attachment; filename={filename}"
+                response['Content-Disposition'] = content
+
+                return response
 
             return render(request, 'slope/index.html', {
                     'plot_json':plot_json,

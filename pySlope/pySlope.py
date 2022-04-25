@@ -1572,7 +1572,7 @@ class Slope:
 
         """
 
-        fig = self.plot_boundary(material_table=material_table,legend=legend)
+        fig = self.plot_critical(material_table=material_table, legend=legend)
 
         data_validation.assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
 
