@@ -182,13 +182,13 @@ def index(request):
             plot = slope.plot_critical(material_table=True,legend=True)
             plot_json = plot.update_layout(width=2000, height = 1200).to_json()
 
-            search = slope._search[::]
-            search.sort(key=lambda x : x['FOS'])
+            search = slope._search
 
             request.session['search'] = search
             request.session['plot_json'] = plot_json
             request.session['forms'] = request.POST
 
+            # return pdf if required
             if request.POST.get('pdf'):
                 try:
                     max_fos = int(options_form.cleaned_data['max_display_FOS'])
@@ -197,14 +197,9 @@ def index(request):
 
                 plot = slope.plot_all_planes(material_table=True,legend=True, max_fos=max_fos)
                 
-                plot_image = plot.to_image(format='png')
-
-                pdf = render_to_pdf('slope/report.html', context_dict={
-                    'plot': str(base64.b64encode(plot_image)),
-                })
-
+                pdf = plot.to_image(format='pdf', width =1600, height = 900)
+                
                 response = HttpResponse(pdf, content_type='application/pdf')
-
                 filename = 'report.pdf'
                 content = f"attachment; filename={filename}"
                 response['Content-Disposition'] = content
