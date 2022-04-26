@@ -8,8 +8,6 @@ import json
 import base64
 from plotly.io import to_json, from_json
 
-from .utils import render_to_pdf
-
 # import backend section of code
 import os, sys
 sys.path.insert(0, os.path.abspath('../../'))
