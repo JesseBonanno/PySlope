@@ -178,7 +178,7 @@ def index(request):
                 s['y'] = [s['r_c'][1]] + y_ + [s['l_c'][1]]
 
             plot = slope.plot_critical(material_table=True,legend=True)
-            plot_json = plot.update_layout(width=2000, height = 1200).to_json()
+            plot_json = plot.update_layout(autosize=True).to_json()
 
             search = slope._search
 
