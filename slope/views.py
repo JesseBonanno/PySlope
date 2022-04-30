@@ -58,9 +58,10 @@ def index(request):
     if request.method == 'GET':
         # if forms have been saved initialise with previous data, otherwise reset.
         # if clear form button has been called then also dont use previous and use default.
-        if request.session.get('forms') and request.session.get('search'):
+        if request.session.get('forms') and request.session.get('search') and request.session.get('plot_json'):
             previous_forms = request.session.get('forms')
             search = request.session.get('search')
+            plot_json = request.session.get('plot_json')
             # try load up the previous form information
             # if there is an error it is probably due to a version change.
             # clearing the beam will help rectify the issue.
@@ -92,9 +93,9 @@ def index(request):
 
             search = "[]"
 
-        slope = Slope()
-        slope.set_materials(Material())
-        plot_json = slope.plot_boundary().update_layout(height=1200,width=2000).to_json()
+            slope = Slope(angle=45)
+            slope.set_materials(Material())
+            plot_json = slope.plot_boundary().update_layout(height=1200,width=2000).to_json()
 
         return render(request, 'slope/index.html', {
                 "plot_json": plot_json,

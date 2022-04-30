@@ -11,15 +11,31 @@ function updatePlot(max_display_fos) {
     //initialising things 
     const plot_all = document.getElementById('plotly_js')
     const search_length = search.length
+
+    
+    // some values for styling
+    const w = window.innerWidth;
+
+    plot.layout.width = w*0.98
+    plot.layout.height = w*0.6
+    plot.layout.margin= {
+        'l':10,
+        'r':10,
+        'b':10,
+        't':10,
+        'pad':0
+    }
     
     // for mobile displays hide the annotations and shapes from the plotly chart and create html info
-    if (window.innerWidth < 900) {
-        document.getElementById("mobile_screen_menus").style.display = "inline-block"
-        if (document.getElementById('mobile_soil_table').childElementCount == 0){
-            document.getElementById("mobile_screen_menus").style.display = "block"
-            plot.layout.annotations = []
-            plot.layout.shapes = []
+    if (w < 900) {
+        
+        // remove legend and material table
+        plot.layout.annotations = []
+        plot.layout.shapes = []
+        document.getElementById("mobile_screen_menus").style.display = "block"
 
+        if (document.getElementById('mobile_soil_table').childElementCount == 0){
+        
             soils = document.getElementsByClassName('formset-row-Materials')
             soils_count = soils.length
 
@@ -45,27 +61,17 @@ function updatePlot(max_display_fos) {
                 objTo.appendChild(td)
             }
         }
+        Plotly.update('plotly_js', plot.data, plot.layout)
     }
     else{
         //if not a mobile screen hide the extra html elements
         document.getElementById("mobile_screen_menus").style.display = "none"
+        // create a new plot
+        Plotly.newPlot('plotly_js', plot.data, plot.layout)
     }
 
-        // some values for styling
-    var w = window.innerWidth;
 
-    plot.layout.width = w*0.98
-    plot.layout.height = w*0.6
-    plot.layout.margin= {
-        'l':10,
-        'r':10,
-        'b':10,
-        't':10,
-        'pad':0
-    }
-
-    // create a new plot
-    Plotly.newPlot('plotly_js', plot.data, plot.layout)
+    
 
     // define traces at higher level so can use outside for loop scope
     let traces = [];

@@ -70,7 +70,7 @@ class PointLoadForm(forms.ModelForm):
         )   
 
         labels = {
-            'magnitude' : 'magnitude (kPa)',
+            'magnitude' : 'magnitude (kN)',
             'offset' : 'offset from crest (m)',
             'color' : 'color (optional)',
             'dynamic_offset': 'dynamic load',
