@@ -6,3 +6,4 @@ gunicorn
 django
 whitenoise
 dj-database-url
+psycopg2==2.4.4
