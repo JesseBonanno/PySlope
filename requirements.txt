@@ -7,3 +7,4 @@ django
 whitenoise
 dj-database-url
 psycopg2-binary
+kaleido
