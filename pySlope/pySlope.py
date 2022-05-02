@@ -2,7 +2,6 @@
 from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
-from functools import wraps
 
 # third party imports
 import plotly.graph_objects as go
@@ -1903,25 +1902,23 @@ class Slope:
     def _plot_material_table(self, fig):
         """Plot table of material properties"""
 
-        header_h = 0.07
+
         row_h = 0.05
+        table_width = 0.4
+        table_height = row_h * (len(self._materials)+1)
 
-        table_width = 0.45
-        table_height = header_h + row_h * len(self._materials)
+        # points at the bottom left
+        x0, y0 = 0.1,0.1
 
-        x0,y0 = 0.1,0.1
+        # points at the top right
+        x1 = x0 + table_width
+        y1 = y0 + table_height
 
-        x1 = x0+table_width
-        y1 = y0+table_height
-
-                # add header
-
-
-
+        # add header background
         fig.add_shape(
             type="rect",
             xref="x domain", yref="y domain",
-            x0=x0, x1=x1, y0=y1-header_h, y1=y1,
+            x0=x0, x1=x1, y0=y1-row_h, y1=y1,
             fillcolor='lightgrey',
         )
 
@@ -1929,28 +1926,33 @@ class Slope:
         fig.add_shape(
             type="rect",
             xref="x domain", yref="y domain",
-            x0=x0, x1=x1, y0=y0, y1=y1-header_h,
+            x0=x0, x1=x1, y0=y0, y1=y1-row_h,
             fillcolor='white'
         )
 
-                # add rows
+        # add columns in
+        column_unit_positions = [20,15,10,10,10]
+        column_rel_positions = []
+
+        total_width = sum(column_unit_positions)
+
+        column_text_unit_xshift = [1,1,4,4,4]
+        assumed_graph_width = 1000
+        column_rel_xshift = [a/total_width * assumed_graph_width * table_width for a in column_text_unit_xshift]
 
 
-        # add columns
-        column_relative_width = [20,16,10,10,10]
-        table_header = ['MATERIAL','COLOR','γ', "c", "ϕ"]
-        table_header = ['<b>'+a+'<b>' for a in table_header]
+        
 
-        t = sum(column_relative_width)
-        column_unit_pos = []
+        cum_width = 0
+        for col_width in column_unit_positions:
+            # get unit position (ie position as percentage of total width)
+            column_rel_position = (cum_width + col_width) / total_width
+            column_rel_positions.append(column_rel_position)
 
-        prev = 0
-        for a in column_relative_width:
-            column_unit_pos.append((prev+a)/t)
-            prev += a
+            cum_width += col_width
 
-        for c in column_unit_pos:
-            x = x0+c*(table_width)
+            # add in column based on unit position
+            x = x0 + column_rel_position *(table_width)
 
             fig.add_shape(
                 type="rect",
@@ -1960,16 +1962,19 @@ class Slope:
 
 
         # add in header text
+        table_header = ['MATERIAL','COLOR','γ', "c", "ϕ"]
+        table_header = ['<b>'+a+'</b>' for a in table_header]
+
         x = x0
-        for i, c in enumerate(column_unit_pos):
+        for i, c in enumerate(column_rel_positions):
             fig.add_annotation(
                 xref="x domain", yref="y domain",
                 x=x,
-                y=y1-header_h-0.02,
+                y=y1-row_h/2,
                 text=table_header[i],
                 showarrow=False,
-                yshift=15,
-                xshift=15,
+                yshift=-13,
+                xshift=column_rel_xshift[i],
                 font_size=13,
                 font_color="black",
             )
@@ -1977,7 +1982,7 @@ class Slope:
 
         # add rows
         for r in range(len(self._materials)):
-            y = y1 - header_h - r * row_h
+            y = y1 - row_h - r * row_h
 
             fig.add_shape(
                 type="rect",
@@ -1987,31 +1992,32 @@ class Slope:
 
         # add material info
 
-        y = y1-header_h
+        y = y1-row_h/2
+        
         for p, m in enumerate(self._materials):
             x = x0
             y -= row_h
             data = [m.name, 'red', m.unit_weight, m.cohesion, m.friction_angle]
 
-            for i, c in enumerate(column_unit_pos):
+            for i, c in enumerate(column_rel_positions):
                 if i==1:
                     fig.add_shape(
                         type="rect",
                         xref="paper", yref="paper",
-                        x0=x, x1=x0+column_unit_pos[1]*(table_width),
-                        y0=y+row_h, y1=y,
+                        x0=x, x1=x0+column_rel_positions[1]*(table_width),
+                        y0=y-row_h/2, y1=y+row_h/2,
                         fillcolor= m.color,
                     )
                 else:
                     fig.add_annotation(
                         xref="x domain", yref="y domain",
                         x=x,
-                        y=y-0.015,
+                        y=y,
                         text=data[i],
                         showarrow=False,
-                        yshift=10,
-                        xshift=20,
-                        font_size=12,
+                        yshift=-13,
+                        xshift=column_rel_xshift[i],
+                        font_size=13,
                         font_color="black",
                     )
                 x = x0+c*(table_width)
