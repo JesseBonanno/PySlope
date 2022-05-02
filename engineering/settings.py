@@ -26,12 +26,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 'django-insecure-&l$*1es-#hg(__vjkanhg(3k2k%b5%6abtvs@m0^kobejk_9so'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-if DEBUG:
-    ALLOWED_HOSTS = []
-else:
-    ALLOWED_HOSTS = ['https://pyslope.herokuapp.com/','.pyslope.com','pyslope.herokuapp.com']
+# if DEBUG:
+#     ALLOWED_HOSTS = []
+# else:
+ALLOWED_HOSTS = ['https://pyslope.herokuapp.com/','.pyslope.com','pyslope.herokuapp.com']
 
 
 # Application definition
