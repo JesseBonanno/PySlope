@@ -79,7 +79,7 @@ class Material:
 
 
     def __repr__(self):
-        return f"Material:{self.name}(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom}"
+        return f"Material:{self.name}(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom})"
 
 @dataclass
 class Udl:
@@ -181,6 +181,9 @@ class Slope:
         length : float, optional
             length of slope in metres, by default None
     """
+
+    def __repr__(self):
+        return f"Slope: {round(self._height,3)}V : {round(self._length,3)}H"
 
     def __init__(self, height: float = 1, angle: int = 30, length: float = None):
 
@@ -775,9 +778,10 @@ class Slope:
                 if utilities.dist_points(l_c, r_c) > min_dist:
                     search += self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
 
-        search.sort(key=lambda x: x['FOS'])
+        search.sort(key = lambda x : x['FOS'])
         self._search = search
-        self._min_FOS_dict = min(search, key = lambda x : x['FOS'])
+
+        self._min_FOS_dict = search[0]
 
     def run_analysis_for_circles(
         self, l_c: tuple, r_c: tuple, NUMBER_CIRCLES: float = 5
@@ -1572,6 +1576,9 @@ class Slope:
 
         data_validation.assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
 
+
+        fig = self._plot_FOS_legend(fig)
+
         # JB 20.04.22 - 'hacked' into how plotly works to make faster
         # ultimately not very readible approach compared to the old approach
         # however old approach was too slow
@@ -2213,17 +2220,3 @@ if __name__ == "__main__":
     print(time.time()-start)
     start = time.time()
     
-    
-    start = time.time()
-    s.analyse_slope()
-    print('takes this long to analyse:')
-    print(time.time()-start)
-
-    print('fos', s.get_min_FOS())
-    print('search:', len(s._search))
-
-    start = time.time()
-    s.plot_all_planes()
-    print('takes this long to plot:')
-    print(time.time()-start)
-
