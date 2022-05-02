@@ -1,0 +1,35 @@
+<html>
+<head>
+<style>
+    @page page1 {
+        size: a4 landscape;
+        @frame header_frame {           /* Static Frame */
+            -pdf-frame-content: header_content;
+            left: 50pt; width: 540pt; top: 50pt; height: 40pt;
+        }
+        @frame content_frame {          /* Content Frame */
+            left: 50pt; width: 540pt; top: 90pt; height: 5000pt;
+        }
+        @frame footer_frame {           /* Another static Frame */
+            -pdf-frame-content: footer_content;
+            left: 50pt; width: 540pt; top: 5000pt; height: 20pt;
+        }
+    }
+
+</style>
+</head>
+ 
+<body>
+    <!-- Content for Static Frame 'header_frame' -->
+    <div id="header_content"><p style="font-size: 24px;">Example plotly report</p></div>
+ 
+    <!-- Content for Static Frame 'footer_frame' -->
+    <div id="footer_content">Page <pdf:pagenumber>
+        of <pdf:pagecount> 
+    </div>
+ 
+    <!-- HTML Content -->
+    <img src="data:image/png;base64,{{ plot }}"><br>
+
+</body>
+</html>

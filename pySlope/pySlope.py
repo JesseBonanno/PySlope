@@ -2,7 +2,6 @@
 from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
-from functools import wraps
 
 # third party imports
 import plotly.graph_objects as go
@@ -248,7 +247,7 @@ class Slope:
         MIN_EXT_H = self._MIN_EXT_H
         MIN_EXT_L = self._MIN_EXT_L
 
-        tot_h = max(4 * height, MIN_EXT_H, 5 * length / 2)
+        tot_h = max(3 * height, MIN_EXT_H, 5 * length / 2)
         tot_l = max(5 * length, MIN_EXT_L, 4 * height)
 
         # determine coordinates for edges of slope
@@ -721,7 +720,10 @@ class Slope:
         point_combinations = ITERATIONS / NUMBER_CIRCLES
 
         NUMBER_POINTS = self._calculate_number_points_slope(point_combinations, NUMBER_POINTS_SLOPE)
-
+        
+        # get limits on bounds of slope
+        # not some limits might still stretch off slope
+        # but <= check later considers this.
         x1, x2, x3, x4 = (
             min(self._top_coord[0], self._limits[0][0]),
             min(self._top_coord[0], self._limits[0][1]),
@@ -751,16 +753,6 @@ class Slope:
             left_coords = left_coords[:-1]
 
 
-        # get limits on bounds of slope
-        # not some limits might still stretch off slope
-        # but <= check later considers this.
-        x1, x2, x3, x4 = (
-            max(self._top_coord[0], self._limits[0][0]),
-            min(self._bot_coord[0], self._limits[0][1]),
-            max(self._top_coord[0], self._limits[1][0]),
-            min(self._bot_coord[0], self._limits[1][1]),
-        )
-
         # only want lines from mid to right for a not very steep gradient
         # if x2 ! > x1 then limit off of slope
         # NOTE: we dont want the end points since we already grabbed those in left and right coords.
@@ -786,7 +778,7 @@ class Slope:
                 if utilities.dist_points(l_c, r_c) > min_dist:
                     search += self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
 
-        search.sort(key= lambda x:x['FOS'])
+        search.sort(key = lambda x : x['FOS'])
         self._search = search
 
         self._min_FOS_dict = search[0]
@@ -860,6 +852,9 @@ class Slope:
             result = self.analyse_circular_failure(c_x, c_y, radius, l_c, r_c)
             if result:
                 FOS, i_l, i_r = result
+                if ((self._limits[0][1] < i_l[0] < self._limits[1][0]) or 
+                   (self._limits[0][1] < i_r[0] < self._limits[1][0])):
+                    break
                 search += [{
                     'FOS': FOS,
                     'l_c': i_l,
@@ -1431,7 +1426,7 @@ class Slope:
         else:
             return None
 
-    def plot_boundary(self):
+    def plot_boundary(self, material_table=True, legend=False):
         """Plot external boundary, materials, limits, loading and water for model.
 
         Returns
@@ -1455,8 +1450,6 @@ class Slope:
         # dont show legend
         fig.update_layout(
             showlegend=False,
-            # width=1920,
-            # height=1080
         )
 
         # if there are no materials just return an empty shell
@@ -1522,7 +1515,11 @@ class Slope:
             bot.sort()
             top = bot
 
-        fig = self._plot_material_table(fig)
+        if material_table:
+            fig = self._plot_material_table(fig)
+        
+        if legend:
+            fig = self._plot_FOS_legend(fig)
 
         for udl in self._udls:
             fig = self._plot_udl(fig, udl)
@@ -1538,14 +1535,14 @@ class Slope:
 
         return fig
 
-    def plot_critical(self):
+    def plot_critical(self, material_table=True, legend=False):
         """Plot critical slope (i.e. slope with lowest FOS)
 
         Returns
         -------
         Plotly figure
         """
-        fig = self.plot_boundary()
+        fig = self.plot_boundary(material_table=material_table,legend=legend)
 
         FOS = self._min_FOS_dict['FOS']
         c_x = self._min_FOS_dict['c_x']
@@ -1560,7 +1557,7 @@ class Slope:
         fig = self._plot_annotate_FOS(fig, c_x, c_y, FOS)
         return fig
 
-    def plot_all_planes(self, max_fos: float = 10):
+    def plot_all_planes(self, max_fos: float = 10, material_table=True, legend=True):
         """plot multiple failure planes in the same plot
 
         Parameters
@@ -1575,9 +1572,10 @@ class Slope:
 
         """
 
-        fig = self.plot_boundary()
+        fig = self.plot_critical(material_table=material_table, legend=legend)
 
         data_validation.assert_strictly_positive_number(max_fos, "max factor of safety (max_fos)")
+
 
         fig = self._plot_FOS_legend(fig)
 
@@ -1681,7 +1679,7 @@ class Slope:
                 mode="lines+text",
                 text=[f"{FOS:.3f}"],
                 textposition="top right",
-                textfont=dict(family="sans serif", size=30, color=color),
+                textfont=dict(family="sans serif", size=20, color=color),
                 name='',
             )
         )
@@ -1723,8 +1721,8 @@ class Slope:
             y=y,
             text="▼",
             showarrow=False,
-            yshift=15,
-            font_size=35,
+            yshift=10,
+            font_size=25,
             font_color="blue",
         )
 
@@ -1733,8 +1731,8 @@ class Slope:
             y=y,
             text="_",
             showarrow=False,
-            yshift=10,
-            font_size=40,
+            yshift=2,
+            font_size=25,
             font_color="blue",
         )
 
@@ -1766,8 +1764,8 @@ class Slope:
                 text="▶",
                 showarrow=False,
                 yshift=15,
-                xshift=-13,
-                font_size=35,
+                xshift=-10,
+                font_size=25,
                 font_color="black",
             )
 
@@ -1778,8 +1776,8 @@ class Slope:
                 text="◀",
                 showarrow=False,
                 yshift=15,
-                xshift=13,
-                font_size=35,
+                xshift=10,
+                font_size=25,
                 font_color="black",
             )
 
@@ -1791,7 +1789,7 @@ class Slope:
                 showarrow=False,
                 yshift=15,
                 xshift=0,
-                font_size=35,
+                font_size=25,
                 font_color="black",
             )
 
@@ -1907,25 +1905,23 @@ class Slope:
     def _plot_material_table(self, fig):
         """Plot table of material properties"""
 
-        header_h = 0.05
-        row_h = 0.035
 
-        table_width = 0.3
-        table_height = header_h + row_h * len(self._materials)
+        row_h = 0.05
+        table_width = 0.4
+        table_height = row_h * (len(self._materials)+1)
 
-        x0,y0 = 0.1,0.1
+        # points at the bottom left
+        x0, y0 = 0.1,0.1
 
-        x1 = x0+table_width
-        y1 = y0+table_height
+        # points at the top right
+        x1 = x0 + table_width
+        y1 = y0 + table_height
 
-                # add header
-
-
-
+        # add header background
         fig.add_shape(
             type="rect",
             xref="x domain", yref="y domain",
-            x0=x0, x1=x1, y0=y1-header_h, y1=y1,
+            x0=x0, x1=x1, y0=y1-row_h, y1=y1,
             fillcolor='lightgrey',
         )
 
@@ -1933,28 +1929,33 @@ class Slope:
         fig.add_shape(
             type="rect",
             xref="x domain", yref="y domain",
-            x0=x0, x1=x1, y0=y0, y1=y1-header_h,
+            x0=x0, x1=x1, y0=y0, y1=y1-row_h,
             fillcolor='white'
         )
 
-                # add rows
+        # add columns in
+        column_unit_positions = [20,15,10,10,10]
+        column_rel_positions = []
+
+        total_width = sum(column_unit_positions)
+
+        column_text_unit_xshift = [1,1,4,4,4]
+        assumed_graph_width = 1000
+        column_rel_xshift = [a/total_width * assumed_graph_width * table_width for a in column_text_unit_xshift]
 
 
-        # add columns
-        column_relative_width = [20,13,10,10,10]
-        table_header = ['MATERIAL','COLOR','γ', "c", "ϕ"]
-        table_header = ['<b>'+a+'<b>' for a in table_header]
+        
 
-        t = sum(column_relative_width)
-        column_unit_pos = []
+        cum_width = 0
+        for col_width in column_unit_positions:
+            # get unit position (ie position as percentage of total width)
+            column_rel_position = (cum_width + col_width) / total_width
+            column_rel_positions.append(column_rel_position)
 
-        prev = 0
-        for a in column_relative_width:
-            column_unit_pos.append((prev+a)/t)
-            prev += a
+            cum_width += col_width
 
-        for c in column_unit_pos:
-            x = x0+c*(table_width)
+            # add in column based on unit position
+            x = x0 + column_rel_position *(table_width)
 
             fig.add_shape(
                 type="rect",
@@ -1964,24 +1965,27 @@ class Slope:
 
 
         # add in header text
+        table_header = ['MATERIAL','COLOR','γ', "c", "ϕ"]
+        table_header = ['<b>'+a+'</b>' for a in table_header]
+
         x = x0
-        for i, c in enumerate(column_unit_pos):
+        for i, c in enumerate(column_rel_positions):
             fig.add_annotation(
                 xref="x domain", yref="y domain",
                 x=x,
-                y=y1-header_h,
+                y=y1-row_h/2,
                 text=table_header[i],
                 showarrow=False,
-                yshift=15,
-                xshift=15,
-                font_size=20,
+                yshift=-13,
+                xshift=column_rel_xshift[i],
+                font_size=13,
                 font_color="black",
             )
             x = x0+c*(table_width)
 
         # add rows
         for r in range(len(self._materials)):
-            y = y1 - header_h - r * row_h
+            y = y1 - row_h - r * row_h
 
             fig.add_shape(
                 type="rect",
@@ -1991,19 +1995,20 @@ class Slope:
 
         # add material info
 
-        y = y1-header_h
+        y = y1-row_h/2
+        
         for p, m in enumerate(self._materials):
             x = x0
             y -= row_h
             data = [m.name, 'red', m.unit_weight, m.cohesion, m.friction_angle]
 
-            for i, c in enumerate(column_unit_pos):
+            for i, c in enumerate(column_rel_positions):
                 if i==1:
                     fig.add_shape(
                         type="rect",
                         xref="paper", yref="paper",
-                        x0=x, x1=x0+column_unit_pos[1]*(table_width),
-                        y0=y+row_h, y1=y,
+                        x0=x, x1=x0+column_rel_positions[1]*(table_width),
+                        y0=y-row_h/2, y1=y+row_h/2,
                         fillcolor= m.color,
                     )
                 else:
@@ -2013,9 +2018,9 @@ class Slope:
                         y=y,
                         text=data[i],
                         showarrow=False,
-                        yshift=10,
-                        xshift=15,
-                        font_size=20,
+                        yshift=-13,
+                        xshift=column_rel_xshift[i],
+                        font_size=13,
                         font_color="black",
                     )
                 x = x0+c*(table_width)
@@ -2069,8 +2074,8 @@ class Slope:
                     text=f"{k}",
                     showarrow=False,
                     yshift=0,
-                    xshift=50,
-                    font_size=20,
+                    xshift=37,
+                    font_size=16,
                     font_color="black",
                 )
 
@@ -2082,9 +2087,9 @@ class Slope:
             text=f"<b>Legend</b>",
             align='center',
             showarrow=False,
-            yshift=50,
+            yshift=33,
             xshift=60,
-            font_size=30,
+            font_size=20,
             font_color="black",
         )
 
@@ -2185,46 +2190,33 @@ class Slope:
         return fig
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
 
-#     start = time.time()
+    start = time.time()
 
-#     s = Slope(height=3, angle=30, length=None)
+    s = Slope(height=3, angle=30, length=None)
 
-#     m1 = Material(unit_weight=20,friction_angle=45,cohesion=2,depth_to_bottom=2, name='Fill', color='blue')
-#     m2 = Material(20,30,2,5, name = 'sand', color='orange')
+    m1 = Material(unit_weight=20,friction_angle=45,cohesion=2,depth_to_bottom=2, name='Fill', color='blue')
+    m2 = Material(20,30,2,5, name = 'sand', color='orange')
 
-#     u1 = Udl(magnitude = 100, offset=2, length=1, dynamic_offset=True, color='red')
-#     u2 = Udl(magnitude = 20, color='green')
+    u1 = Udl(magnitude = 100, offset=2, length=1, dynamic_offset=True, color='red')
+    u2 = Udl(magnitude = 20, color='green')
 
-#     p1 = PointLoad(10,3, 'purple')
+    p1 = PointLoad(10,3, 'purple')
 
-#     s.set_udls(u1, u2)
-#     s.set_pls(p1)
+    s.set_udls(u1, u2)
+    s.set_pls(p1)
 
-#     s.set_materials(m1,m2)
+    s.set_materials(m1,m2)
 
-#     s.set_water_table(4)
+    s.set_water_table(4)
 
-#     s.update_water_analysis_options(auto=True)
+    s.update_water_analysis_options(auto=True)
 
-#     s.update_analysis_options(slices=50, iterations=10000)    
+    s.update_analysis_options(slices=50, iterations=10000)    
 
-#     print('takes this long to initialise:')
-#     print(time.time()-start)
-#     start = time.time()
+    print('takes this long to initialise:')
+    print(time.time()-start)
+    start = time.time()
     
-    
-#     start = time.time()
-#     s.analyse_slope()
-#     print('takes this long to analyse:')
-#     print(time.time()-start)
-
-#     print('fos', s.get_min_FOS())
-#     print('search:', len(s._search))
-
-#     start = time.time()
-#     s.plot_all_planes()
-#     print('takes this long to plot:')
-#     print(time.time()-start)

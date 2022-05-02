@@ -27,3 +27,17 @@ class SlopeModel(models.Model):
     height = models.FloatField(default=1)
     angle = models.FloatField(default=45)
     length = models.FloatField(default=1)
+
+class WaterTableModel(models.Model):
+    consider_water = models.BooleanField(default=False)
+    water_depth = models.FloatField(default = 1)
+
+class LimitsModel(models.Model):
+    consider_limits = models.BooleanField(default=False)
+    left_x = models.FloatField(default = 0)
+    right_x = models.FloatField(default = 8)
+
+    consider_internal_limits = models.BooleanField(default=False)
+    left_x_right = models.FloatField(default=4)
+    right_x_left = models.FloatField(default=6)
+
