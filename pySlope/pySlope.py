@@ -717,7 +717,10 @@ class Slope:
         point_combinations = ITERATIONS / NUMBER_CIRCLES
 
         NUMBER_POINTS = self._calculate_number_points_slope(point_combinations, NUMBER_POINTS_SLOPE)
-
+        
+        # get limits on bounds of slope
+        # not some limits might still stretch off slope
+        # but <= check later considers this.
         x1, x2, x3, x4 = (
             min(self._top_coord[0], self._limits[0][0]),
             min(self._top_coord[0], self._limits[0][1]),
@@ -746,16 +749,6 @@ class Slope:
         if self._gradient > self._gradient_tolerance:
             left_coords = left_coords[:-1]
 
-
-        # get limits on bounds of slope
-        # not some limits might still stretch off slope
-        # but <= check later considers this.
-        x1, x2, x3, x4 = (
-            max(self._top_coord[0], self._limits[0][0]),
-            min(self._bot_coord[0], self._limits[0][1]),
-            max(self._top_coord[0], self._limits[1][0]),
-            min(self._bot_coord[0], self._limits[1][1]),
-        )
 
         # only want lines from mid to right for a not very steep gradient
         # if x2 ! > x1 then limit off of slope
@@ -855,6 +848,9 @@ class Slope:
             result = self.analyse_circular_failure(c_x, c_y, radius, l_c, r_c)
             if result:
                 FOS, i_l, i_r = result
+                if ((self._limits[0][1] < i_l[0] < self._limits[1][0]) or 
+                   (self._limits[0][1] < i_r[0] < self._limits[1][0])):
+                    break
                 search += [{
                     'FOS': FOS,
                     'l_c': i_l,
