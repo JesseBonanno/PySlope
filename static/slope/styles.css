@@ -1,0 +1,67 @@
+h1 {
+    text-align: center;
+    color: rgb(25, 25, 112);
+    padding: 40px 0px 0px;
+}
+
+#outer-flex-container {
+    display: flex;
+    flex-direction: column; 	
+}
+
+#inner-flex-container {
+    display: flex;
+	flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+#mainpanel {
+    margin-bottom: 40px;
+    margin-right: 40px;
+    align-items: center;
+    width: 2000px;
+}
+
+#aside {
+    width: 2000px;
+    align-items: center;
+}
+.tab-content {
+    padding: 20px;
+}
+
+@media screen and ( max-width: 1500px) {
+    #inner-flex-container  { 
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+     }
+    #mainpanel { height: 100vh; }
+    #mainpanel { height: auto;  }
+    #aside { height: auto;  }
+}
+
+.formset-row input {
+    height:30px;
+    width: 150px;
+}
+
+.formset-row select {
+    height:30px;
+    width: 150px;
+}
+
+label {
+    font-weight: bold;
+}
+
+th {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+td {
+    padding-left: 15px;
+    padding-right: 15px;
+}
