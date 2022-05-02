@@ -5,3 +5,4 @@ tqdm
 gunicorn
 django
 whitenoise
+dj-database-url
