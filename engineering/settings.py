@@ -30,10 +30,10 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-if DEBUG:
-    ALLOWED_HOSTS = []
-else:
-    ALLOWED_HOSTS = ['https://pyslope.herokuapp.com/','.pyslope.com','pyslope.herokuapp.com']
+# if DEBUG:
+#     ALLOWED_HOSTS = []
+# else:
+ALLOWED_HOSTS = ['https://pyslope.herokuapp.com/','.pyslope.com','pyslope.herokuapp.com']
 
 
 # Application definition
