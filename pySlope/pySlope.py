@@ -277,7 +277,7 @@ class Slope:
         # udl coordinates can be effected by external boundary modification
         # need to update coordinates.
         self._update_udl_coordinates()
-        self._update_pl_coordinates()
+        self._update_ll_coordinates()
 
     @utilities.reset_results
     def set_water_table(self, depth: float):
@@ -373,22 +373,22 @@ class Slope:
             
         """
 
-        for pl in lls:
-            if isinstance(pl, LineLoad):
-                if pl.magnitude > 0:
-                    self._lls.append(pl)
+        for ll in lls:
+            if isinstance(ll, LineLoad):
+                if ll.magnitude > 0:
+                    self._lls.append(ll)
 
-        self._update_pl_coordinates()
+        self._update_ll_coordinates()
 
     # dont need to reset results since this only should be called
     # as a part of resetting
-    def _update_pl_coordinates(self):
+    def _update_ll_coordinates(self):
         "Update coordinates for point load based on external boundary and LineLoad object"
 
-        for pl in self._lls:
-            coord = max(0,self._top_coord[0]-pl.offset)
+        for ll in self._lls:
+            coord = max(0,self._top_coord[0]-ll.offset)
 
-            pl.coord = coord
+            ll.coord = coord
 
     @utilities.reset_results
     def remove_lls(self, *lls, remove_all = False):
@@ -403,13 +403,13 @@ class Slope:
         """
 
         # can probably write this as O(n) rather than O(n^2)
-        for pl in lls:
-            for check_pl in self._lls:
+        for ll in lls:
+            for check_ll in self._lls:
                 if (
-                    check_pl.offset == pl.offset and
-                    check_pl.magnitude == pl.magnitude
+                    check_ll.offset == ll.offset and
+                    check_ll.magnitude == ll.magnitude
                 ):
-                    self._lls.remove(check_pl)
+                    self._lls.remove(check_ll)
 
         if remove_all:
             self._lls = []
@@ -956,8 +956,8 @@ class Slope:
                 W += self._calculate_strip_udl_force(b, s_x, udl)
 
             # if there is a point load on the strip apply it.
-            for pl in self._lls:
-                W += self._calculate_strip_pl(b, s_x, pl)
+            for ll in self._lls:
+                W += self._calculate_strip_ll(b, s_x, ll)
 
             # consideration for water
             if self._water_RL:
@@ -1075,10 +1075,10 @@ class Slope:
                 udl.offset = offset
             self.set_udls(udl)
 
-        for pl in lls:
-            if pl.dynamic_offset:
-                pl.offset = offset
-            self.set_lls(pl)
+        for ll in lls:
+            if ll.dynamic_offset:
+                ll.offset = offset
+            self.set_lls(ll)
 
     def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float, l_c = None, r_c = None):
         """Get intersection points of a circle with external boundary
@@ -1272,8 +1272,8 @@ class Slope:
 
         return W
 
-    def _calculate_strip_pl(self, b, s_x, pl):
-        """Calculates the pl force over strip.
+    def _calculate_strip_ll(self, b, s_x, ll):
+        """Calculates the ll force over strip.
 
         Parameters
         ----------
@@ -1281,7 +1281,7 @@ class Slope:
             strip width in m
         s_x : float,
             strip x coordinate (for center of strip)
-        pl : LineLoad object,
+        ll : LineLoad object,
             LineLoad object
 
         Returns
@@ -1296,8 +1296,8 @@ class Slope:
         # Need just one comparison to be equal to or greater than so that
         # in the case the point load is excatly at the boundary
         # two adjcent strips wont double up or ignore completely.
-        if strip_xl <= pl.coord < strip_xr:
-            return pl.magnitude
+        if strip_xl <= ll.coord < strip_xr:
+            return ll.magnitude
         else:
             return 0
 
@@ -1523,8 +1523,8 @@ class Slope:
         for udl in self._udls:
             fig = self._plot_udl(fig, udl)
 
-        for pl in self._lls:
-            fig = self._plot_pl(fig, pl)
+        for ll in self._lls:
+            fig = self._plot_ll(fig, ll)
 
         if self._water_RL:
             fig = self._plot_water(fig)
@@ -1794,20 +1794,20 @@ class Slope:
 
         return fig
 
-    def _plot_pl(self, fig, pl):
+    def _plot_ll(self, fig, ll):
         """Add pointload to plot"""
 
 
         fig = utilities.draw_arrow(
             fig,
             angle = -90,
-            force = pl.magnitude,
-            x_sup = pl.coord,
+            force = ll.magnitude,
+            x_sup = ll.coord,
             y_sup = self._top_coord[1],
             color = 'black',
             arrowlength= 150,
             show_values = True,
-            precision= pl.precision,
+            precision= ll.precision,
             units='kN/m',
             arrowhead=10,
         )
@@ -1815,10 +1815,10 @@ class Slope:
         fig = utilities.draw_arrow(
             fig,
             angle = -90,
-            force = pl.magnitude,
-            x_sup = pl.coord,
+            force = ll.magnitude,
+            x_sup = ll.coord,
             y_sup = self._top_coord[1],
-            color = pl.color,
+            color = ll.color,
             arrowlength= 150,
             show_values = False,
             units='kN/m',
