@@ -31,7 +31,7 @@ A typical use case of the `pySlope` package involves the following steps:
 
 1. Create a `Slope` object
 2. Create `Material` objects and assign to `Slope`
-3. Create `Udl` or `PointLoad` objects and assign to `Slope`
+3. Create `Udl` or `LineLoad` objects and assign to `Slope`
 4. Set water table
 5. Set analysis limits
 6. Analyse slope for critical factor of safety
@@ -97,14 +97,14 @@ s.set_udls(u1, u2)
 
 ### Defining Line Loads
 
-The creation of a `PointLoad` object involves the input of:
+The creation of a `LineLoad` object involves the input of:
    - magnitude of load (kN / m)
    - offset of load from crest of slope (m) (default 0 m)
 
 ```python
 
 # define line load, similiar to Udl except there is no length parameter and magnitude is in units (kN/m)
-p1 = PointLoad(magnitude = 10, offset = 3)
+p1 = LineLoad(magnitude = 10, offset = 3)
 
 # assign line loads to slope
 s.set_lls(p1)
