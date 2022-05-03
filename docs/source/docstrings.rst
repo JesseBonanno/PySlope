@@ -13,7 +13,7 @@ Uniform Distributed Load (Udl)
 
 Line Load
 ------------
-.. autoclass:: pySlope.PointLoad
+.. autoclass:: pySlope.LineLoad
 
 Slope
 -------
@@ -23,8 +23,8 @@ Slope
 .. autofunction:: pySlope.Slope.remove_water_table
 .. autofunction:: pySlope.Slope.set_udls
 .. autofunction:: pySlope.Slope.remove_udls
-.. autofunction:: pySlope.Slope.set_pls
-.. autofunction:: pySlope.Slope.remove_pls
+.. autofunction:: pySlope.Slope.set_lls
+.. autofunction:: pySlope.Slope.remove_lls
 .. autofunction:: pySlope.Slope.set_materials
 .. autofunction:: pySlope.Slope.remove_material
 .. autofunction:: pySlope.Slope.update_water_analysis_options

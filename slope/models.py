@@ -17,7 +17,7 @@ class UdlModel(models.Model):
     color = models.CharField(default ='red', max_length = 20, blank=True, null=True)
     dynamic_offset = models.BooleanField(default=False)
 
-class PointLoadModel(models.Model):
+class LineLoadModel(models.Model):
     magnitude = models.FloatField(default = 0)
     offset = models.FloatField(default = 0)
     color = models.CharField(default ='blue', max_length = 20, blank=True, null=True)

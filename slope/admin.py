@@ -5,10 +5,10 @@ from .models import (
     SlopeModel,
     MaterialModel,
     UdlModel,
-    PointLoadModel,
+    LineLoadModel,
 )
 
 admin.site.register(SlopeModel)
 admin.site.register(MaterialModel)
-admin.site.register(PointLoadModel)
+admin.site.register(LineLoadModel)
 admin.site.register(UdlModel)

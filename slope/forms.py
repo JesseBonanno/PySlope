@@ -3,7 +3,7 @@ from .models import (
     SlopeModel,
     MaterialModel,
     UdlModel,
-    PointLoadModel,
+    LineLoadModel,
     WaterTableModel,
     LimitsModel,
 )
@@ -59,9 +59,9 @@ class UdlForm(forms.ModelForm):
             'dynamic_offset': 'dynamic load',
         }
 
-class PointLoadForm(forms.ModelForm):
+class LineLoadForm(forms.ModelForm):
     class Meta:
-        model = PointLoadModel
+        model = LineLoadModel
         fields = (
             'magnitude',
             'offset',

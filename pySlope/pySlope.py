@@ -5,9 +5,8 @@ from dataclasses import dataclass
 
 # third party imports
 import plotly.graph_objects as go
-from shapely.geometry import Polygon, LineString, Point, LinearRing, MultiPoint
+from shapely.geometry import Point, LinearRing
 from tqdm import tqdm
-from colour import Color
 
 # have to do this to allow for relative imports
 # have to allow for relative imports so also works with django
@@ -130,7 +129,7 @@ class Udl:
         return f"UDL: {self.magnitude} kPa, offset = {self.offset} m, load length = {self.length} m"
 
 @dataclass
-class PointLoad:
+class LineLoad:
     """Class representing line load in kN/m
     
         Parameters
@@ -167,7 +166,7 @@ class PointLoad:
             self.color ='blue'
 
     def __repr__(self):
-        return f"Point: {self.magnitude} kN/m, offset = {self.offset} m"
+        return f"Line: {self.magnitude} kN/m, offset = {self.offset} m"
 
 class Slope:
     """Slope object.
@@ -191,7 +190,7 @@ class Slope:
         self._materials = []
         self._water_RL = None
         self._udls = []
-        self._pls = []
+        self._lls = []
 
         self._external_boundary = None
 
@@ -366,54 +365,54 @@ class Slope:
             self._udl_max = 0
    
     @utilities.reset_results
-    def set_pls(self, *pls):
+    def set_lls(self, *lls):
         """set a surface surcharge on top of the slope
         
-        *pls : PointLoad objects
-            PointLoad object to be assigned to the slope object.
+        *lls : LineLoad objects
+            LineLoad object to be assigned to the slope object.
             
         """
 
-        for pl in pls:
-            if isinstance(pl, PointLoad):
+        for pl in lls:
+            if isinstance(pl, LineLoad):
                 if pl.magnitude > 0:
-                    self._pls.append(pl)
+                    self._lls.append(pl)
 
         self._update_pl_coordinates()
 
     # dont need to reset results since this only should be called
     # as a part of resetting
     def _update_pl_coordinates(self):
-        "Update coordinates for point load based on external boundary and PointLoad object"
+        "Update coordinates for point load based on external boundary and LineLoad object"
 
-        for pl in self._pls:
+        for pl in self._lls:
             coord = max(0,self._top_coord[0]-pl.offset)
 
             pl.coord = coord
 
     @utilities.reset_results
-    def remove_pls(self, *pls, remove_all = False):
+    def remove_lls(self, *lls, remove_all = False):
         """Remove udl from model if associated with model.
 
         Parameters
         ----------
-        *pls : PointLoad objects
-            PointLoad object to be removed from the slope object.
+        *lls : LineLoad objects
+            LineLoad object to be removed from the slope object.
         remove_all : bool, optional
-            if true remove all pls, by default False
+            if true remove all lls, by default False
         """
 
         # can probably write this as O(n) rather than O(n^2)
-        for pl in pls:
-            for check_pl in self._pls:
+        for pl in lls:
+            for check_pl in self._lls:
                 if (
                     check_pl.offset == pl.offset and
                     check_pl.magnitude == pl.magnitude
                 ):
-                    self._pls.remove(check_pl)
+                    self._lls.remove(check_pl)
 
         if remove_all:
-            self._pls = []
+            self._lls = []
 
     @utilities.reset_results
     def set_materials(self, *materials):
@@ -957,7 +956,7 @@ class Slope:
                 W += self._calculate_strip_udl_force(b, s_x, udl)
 
             # if there is a point load on the strip apply it.
-            for pl in self._pls:
+            for pl in self._lls:
                 W += self._calculate_strip_pl(b, s_x, pl)
 
             # consideration for water
@@ -1064,11 +1063,11 @@ class Slope:
     def _set_dynamic_offset(self, offset):
         # remember default values?
         udls = self._udls
-        pls = self._pls
+        lls = self._lls
 
         # remove loads
         self.remove_udls(remove_all=True)
-        self.remove_pls(remove_all=True)
+        self.remove_lls(remove_all=True)
 
         # update loads
         for udl in udls:
@@ -1076,10 +1075,10 @@ class Slope:
                 udl.offset = offset
             self.set_udls(udl)
 
-        for pl in pls:
+        for pl in lls:
             if pl.dynamic_offset:
                 pl.offset = offset
-            self.set_pls(pl)
+            self.set_lls(pl)
 
     def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float, l_c = None, r_c = None):
         """Get intersection points of a circle with external boundary
@@ -1282,8 +1281,8 @@ class Slope:
             strip width in m
         s_x : float,
             strip x coordinate (for center of strip)
-        pl : PointLoad object,
-            PointLoad object
+        pl : LineLoad object,
+            LineLoad object
 
         Returns
         -------
@@ -1524,7 +1523,7 @@ class Slope:
         for udl in self._udls:
             fig = self._plot_udl(fig, udl)
 
-        for pl in self._pls:
+        for pl in self._lls:
             fig = self._plot_pl(fig, pl)
 
         if self._water_RL:
@@ -2203,10 +2202,10 @@ if __name__ == "__main__":
     u1 = Udl(magnitude = 100, offset=2, length=1, dynamic_offset=True, color='red')
     u2 = Udl(magnitude = 20, color='green')
 
-    p1 = PointLoad(10,3, 'purple')
+    p1 = LineLoad(10,3, 'purple')
 
     s.set_udls(u1, u2)
-    s.set_pls(p1)
+    s.set_lls(p1)
 
     s.set_materials(m1,m2)
 

@@ -106,8 +106,8 @@ The creation of a `PointLoad` object involves the input of:
 # define line load, similiar to Udl except there is no length parameter and magnitude is in units (kN/m)
 p1 = PointLoad(magnitude = 10, offset = 3)
 
-# assign point loads to slope
-s.set_pls(p1)
+# assign line loads to slope
+s.set_lls(p1)
 ```
 
 ### Defining Water Table

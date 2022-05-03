@@ -6,24 +6,24 @@ document.addEventListener("DOMContentLoaded", () => {
     // support rows
     const addMaterialFormBtn = document.querySelector('#add-Materials-form');
     const addUdlFormBtn = document.querySelector('#add-Udls-form');
-    const addPointLoadFormBtn = document.querySelector('#add-PointLoads-form');
+    const addLineLoadFormBtn = document.querySelector('#add-LineLoads-form');
 
     const materialForm = document.getElementsByClassName("formset-row-Materials");
     const udlForm = document.getElementsByClassName("formset-row-Udls");
-    const pointLoadForm = document.getElementsByClassName("formset-row-PointLoads");
+    const lineLoadForm = document.getElementsByClassName("formset-row-LineLoads");
 
     const mainMaterialForm = document.querySelector("#formset-Materials");
     const mainUdlForm = document.querySelector("#formset-Udls");
-    const mainPointLoadForm = document.querySelector("#formset-PointLoads");
+    const mainLineLoadForm = document.querySelector("#formset-LineLoads");
 
     const totalMaterialForms = document.querySelector('#id_material-TOTAL_FORMS');
-    const totalPointLoadForms = document.querySelector('#id_pointload-TOTAL_FORMS');
+    const totalLineLoadForms = document.querySelector('#id_lineload-TOTAL_FORMS');
     const totalUdlForms = document.querySelector("#id_udl-TOTAL_FORMS");
 
 
     let materialFormCount = materialForm.length - 1;
     let udlFormCount = udlForm.length - 1;
-    let pointLoadFormCount = pointLoadForm.length - 1;
+    let lineLoadFormCount = lineLoadForm.length - 1;
 
     addMaterialFormBtn.addEventListener('click', function(event) {
         event.preventDefault();
@@ -47,23 +47,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     });
 
-    addPointLoadFormBtn.addEventListener('click', function(event) {
+    addLineLoadFormBtn.addEventListener('click', function(event) {
         event.preventDefault();
         
         // clone a New Form
-        const newPointLoadForm = pointLoadForm[0].cloneNode(true);
+        const newLineLoadForm = lineLoadForm[0].cloneNode(true);
 
         //get end position
-        const pointLoadEnd = document.querySelector('#end-row-PointLoads');
+        const lineLoadEnd = document.querySelector('#end-row-LineLoads');
 
-        pointLoadFormCount++;
-        const pointLoadFormRegex = RegExp(`pointload-(\\d){1}-`, 'g');
+        lineLoadFormCount++;
+        const lineLoadFormRegex = RegExp(`lineload-(\\d){1}-`, 'g');
 
-        newPointLoadForm.innerHTML = newPointLoadForm.innerHTML.replace(pointLoadFormRegex, `pointload-${pointLoadFormCount}-`)
+        newLineLoadForm.innerHTML = newLineLoadForm.innerHTML.replace(lineLoadFormRegex, `lineload-${lineLoadFormCount}-`)
 
         // Insert before something lol
-        mainPointLoadForm.insertBefore(newPointLoadForm, pointLoadEnd);
-        totalPointLoadForms.setAttribute('value', `${pointLoadFormCount+1}`);
+        mainLineLoadForm.insertBefore(newLineLoadForm, lineLoadEnd);
+        totalLineLoadForms.setAttribute('value', `${lineLoadFormCount+1}`);
 
     });
 
@@ -103,14 +103,14 @@ document.addEventListener("DOMContentLoaded", () => {
             count++;
         }
         
-        //point loads
+        //line loads
         count = 0;
-        const pointLoadFormRegex = RegExp(`pointload-(\\d){1}-`, 'g');
-        for (let form of pointLoadForm) {
+        const lineLoadFormRegex = RegExp(`lineload-(\\d){1}-`, 'g');
+        for (let form of lineLoadForm) {
             for (let cell of form.children) {
                 for (let input of cell.children){
-                    input.name = input.name.replace(pointLoadFormRegex, `pointload-${count}-`);
-                    input.id = input.id.replace(pointLoadFormRegex, `pointload-${count}-`);
+                    input.name = input.name.replace(lineLoadFormRegex, `lineload-${count}-`);
+                    input.id = input.id.replace(lineLoadFormRegex, `lineload-${count}-`);
                 }
             }
             count++;
@@ -142,13 +142,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     })
 
-    mainPointLoadForm.addEventListener("click", function(event) {
-        if (event.target.classList.contains("delete-PointLoads-form")) {
+    mainLineLoadForm.addEventListener("click", function(event) {
+        if (event.target.classList.contains("delete-LineLoads-form")) {
             event.preventDefault();
-            if (pointLoadFormCount > 0) {
+            if (lineLoadFormCount > 0) {
                 event.target.parentElement.parentElement.remove();
-                pointLoadFormCount--;
-                totalPointLoadForms.setAttribute('value', `${pointLoadFormCount+1}`);
+                lineLoadFormCount--;
+                totalLineLoadForms.setAttribute('value', `${lineLoadFormCount+1}`);
             }
             updateForms(event);
         }

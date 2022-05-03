@@ -16,7 +16,7 @@ from pySlope.pySlope import (
     Slope,
     Material,
     Udl,
-    PointLoad,
+    LineLoad,
     COLOUR_FOS_DICT,
 )
 
@@ -24,7 +24,7 @@ from .models import (
     SlopeModel,
     MaterialModel,
     UdlModel,
-    PointLoadModel,
+    LineLoadModel,
     WaterTableModel,
     LimitsModel,
 )
@@ -33,7 +33,7 @@ from .forms import (
     SlopeForm,
     MaterialForm,
     UdlForm,
-    PointLoadForm,
+    LineLoadForm,
     AnalysisOptionsForm,
     WaterTableForm,
     LimitsForm,
@@ -53,7 +53,7 @@ def index(request):
     #create formsets
     MaterialFormSet = modelformset_factory(MaterialModel, MaterialForm, extra=1)
     UdlFormSet = modelformset_factory(UdlModel, UdlForm, extra = 1)
-    PointLoadFormSet = modelformset_factory(PointLoadModel, PointLoadForm, extra=1)
+    LineLoadFormSet = modelformset_factory(LineLoadModel, LineLoadForm, extra=1)
 
     if request.method == 'GET':
         # if forms have been saved initialise with previous data, otherwise reset.
@@ -70,7 +70,7 @@ def index(request):
 
                 material_formset = MaterialFormSet(previous_forms, prefix='material')
                 udl_formset = UdlFormSet(previous_forms, prefix='udl')
-                point_load_formset = PointLoadFormSet(previous_forms, prefix='pointload')
+                Line_load_formset = LineLoadFormSet(previous_forms, prefix='lineload')
 
                 water_table_form = WaterTableForm(previous_forms,prefix='watertable')
                 limits_form = LimitsForm(previous_forms, prefix="limits")
@@ -85,7 +85,7 @@ def index(request):
 
             material_formset = MaterialFormSet(queryset=MaterialModel.objects.none(), prefix='material')
             udl_formset = UdlFormSet(queryset=UdlModel.objects.none(), prefix='udl')
-            point_load_formset = PointLoadFormSet(queryset=PointLoadModel.objects.none(), prefix='pointload')
+            line_load_formset = LineLoadFormSet(queryset=LineLoadModel.objects.none(), prefix='lineload')
 
             water_table_form = WaterTableForm(prefix='watertable')
             limits_form = LimitsForm(prefix="limits")
@@ -102,7 +102,7 @@ def index(request):
                 'slope_form' : slope_form,
                 'material_formset' : material_formset,
                 'udl_formset' : udl_formset,
-                'point_load_formset' : point_load_formset,
+                'line_load_formset' : line_load_formset,
                 'water_table_form' : water_table_form,
                 'limits_form' : limits_form,
                 'options_form' : options_form,
@@ -110,7 +110,7 @@ def index(request):
                     ('Slope', slope_form, 'form'),
                     ('Materials', material_formset, 'formset'),
                     ('Udls', udl_formset, 'formset'),
-                    ('PointLoads', point_load_formset, 'formset'),
+                    ('LineLoads', line_load_formset, 'formset'),
                     ('WaterTable', water_table_form, 'form'),
                     ('Limits', limits_form, 'form'),
                     ('Options', options_form, 'form'),
@@ -126,7 +126,7 @@ def index(request):
 
         material_formset = MaterialFormSet(request.POST, prefix='material')
         udl_formset = UdlFormSet(request.POST, prefix='udl')
-        point_load_formset = PointLoadFormSet(request.POST, prefix='pointload')
+        line_load_formset = LineLoadFormSet(request.POST, prefix='lineload')
         
         water_table_form = WaterTableForm(request.POST, prefix='watertable')
         limits_form = LimitsForm(request.POST, prefix='limits')
@@ -136,7 +136,7 @@ def index(request):
             slope_form,
             material_formset,
             udl_formset,
-            point_load_formset,
+            line_load_formset,
             water_table_form,
             limits_form,
             options_form,
@@ -210,7 +210,7 @@ def index(request):
                     'slope_form' : slope_form,
                     'material_formset' : material_formset,
                     'udl_formset' : udl_formset,
-                    'point_load_formset' : point_load_formset,
+                    'line_load_formset' : line_load_formset,
                     'water_table_form' : water_table_form,
                     'limits_form' : limits_form,
                     'options_form' : options_form,
@@ -218,7 +218,7 @@ def index(request):
                         ('Slope', slope_form, 'form'),
                         ('Materials', material_formset, 'formset'),
                         ('Udls', udl_formset, 'formset'),
-                        ('PointLoads', point_load_formset, 'formset'),
+                        ('LineLoads', line_load_formset, 'formset'),
                         ('WaterTable', water_table_form, 'form'),
                         ('Limits', limits_form, 'form'),
                         ('Options', options_form, 'form'),
@@ -233,7 +233,7 @@ def create_slope(
     slope_form,
     material_formset,
     udl_formset,
-    point_load_formset,
+    line_load_formset,
     water_table_form,
     limits_form,
     options_form,
@@ -277,24 +277,24 @@ def create_slope(
                 )
             )
 
-    # add point loads to slope
-    for point_load_form in point_load_formset.cleaned_data:
-        if point_load_form:
-            slope.set_pls(
-                PointLoad(
-                    magnitude = point_load_form['magnitude'],
-                    offset= point_load_form['offset'],
-                    color = point_load_form['color'],
-                    dynamic_offset = point_load_form['dynamic_offset'],
+    # add line loads to slope
+    for line_load_form in line_load_formset.cleaned_data:
+        if line_load_form:
+            slope.set_lls(
+                LineLoad(
+                    magnitude = line_load_form['magnitude'],
+                    offset= line_load_form['offset'],
+                    color = line_load_form['color'],
+                    dynamic_offset = line_load_form['dynamic_offset'],
                 )
             )
         else:
-            slope.set_pls(
-                PointLoad(
-                    magnitude = PointLoadModel._meta.get_field('magnitude').get_default(),
-                    offset= PointLoadModel._meta.get_field('offset').get_default(),
-                    color = PointLoadModel._meta.get_field('color').get_default(),
-                    dynamic_offset = PointLoadModel._meta.get_field('dynamic_offset').get_default(),
+            slope.set_lls(
+                LineLoad(
+                    magnitude = LineLoadModel._meta.get_field('magnitude').get_default(),
+                    offset= LineLoadModel._meta.get_field('offset').get_default(),
+                    color = LineLoadModel._meta.get_field('color').get_default(),
+                    dynamic_offset = LineLoadModel._meta.get_field('dynamic_offset').get_default(),
                 )
             )
 
