@@ -24,8 +24,8 @@ setup(
   long_description_content_type="text/markdown",
   author = 'Jesse Bonanno',                   # Type in your name
   author_email = 'jessebonanno@gmail.com',      # Type in your E-Mail
-  url = 'https://github.com/JesseBonanno/pySlope',   # Provide either the link to your github or to your website
-  download_url = 'https://github.com/JesseBonanno/pySlope/archive/'+version['__version__']+'.tar.gz',   
+  url = 'https://github.com/JesseBonanno/pyslope',   # Provide either the link to your github or to your website
+  download_url = 'https://github.com/JesseBonanno/pyslope/archive/'+version['__version__']+'.tar.gz',   
   keywords = ['geotechnical', 'slope', 'stability', 'civil','engineering', 'bishops'],   # Keywords that define your package best
   install_requires=[            
           'colour>=0.1.5',

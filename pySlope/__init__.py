@@ -1,4 +1,4 @@
-from pyslope.pySlope import (
+from pyslope.pyslope import (
     Material,
     Udl,
     LineLoad,

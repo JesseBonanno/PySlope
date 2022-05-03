@@ -12,7 +12,7 @@ from tqdm import tqdm
 # have to allow for relative imports so also works with django
 
 # if using this file or sphinx, cant be relative
-if __name__ == "__main__" or __name__ == "pySlope":
+if __name__ == "__main__" or __name__ == "pyslope":
     import data_validation
     import utilities
 # if running from django need to use relative

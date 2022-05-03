@@ -1,9 +1,9 @@
-# PySlope
+# pySlope
 
-[![License](https://img.shields.io/badge/license-MIT-lightgreen.svg)](https://github.com/JesseBonanno/pySlope/blob/main/LICENSE.txt)
+[![License](https://img.shields.io/badge/license-MIT-lightgreen.svg)](https://github.com/JesseBonanno/pyslope/blob/main/LICENSE.txt)
 [![CodeFactor](https://www.codefactor.io/repository/github/jessebonanno/pyslope/badge?s=43db3d31fb1ca55747ede7e5205c7d9e0cf37ced)](https://www.codefactor.io/repository/github/jessebonanno/pyslope)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JesseBonanno/pySlope/main?filepath=pySlope%2Fexamples%2Freadme_example.ipynb)
-[![Documentation Status](https://readthedocs.org/projects/pySlope/badge/?version=main)](https://pyslope.readthedocs.io/en/latest)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JesseBonanno/pyslope/main?filepath=pyslope%2Fexamples%2Freadme_example.ipynb)
+[![Documentation Status](https://readthedocs.org/projects/pyslope/badge/?version=main)](https://pyslope.readthedocs.io/en/latest)
 
 pySlope is a 2D slope stability module based on bishops method of slices. This module allows for the following parameters:
    - unlimited horizontal geological units
@@ -37,7 +37,7 @@ A typical use case of the `pySlope` package involves the following steps:
 6. Analyse slope for critical factor of safety
 7. Create plots
 
-You can follow along with this example below in this web-based binder jupyter notebook. [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JesseBonanno/pySlope/main?filepath=pySlope%2Fexamples%2Freadme_example.ipynb)
+You can follow along with this example below in this web-based binder jupyter notebook. [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JesseBonanno/pyslope/main?filepath=pyslope%2Fexamples%2Freadme_example.ipynb)
 
 ### Creating a Slope
 
@@ -160,8 +160,8 @@ s.plot_all_planes(max_fos=i) # plots boundary with all slope failures below fos 
 
 Examples of the plots are shown below. 
 
-![example_1 plot critical](https://github.com/JesseBonanno/pySlope/blob/main/pySlope/examples/readme_example_plot_critical.png)
-![example_1 plot all slopes fos less than 2](https://github.com/JesseBonanno/pySlope/blob/main/pySlope/examples/readme_example_plot_all_maxfos2.png)
+![example_1 plot critical](https://github.com/JesseBonanno/pyslope/blob/main/pyslope/examples/readme_example_plot_critical.png)
+![example_1 plot all slopes fos less than 2](https://github.com/JesseBonanno/pyslope/blob/main/pyslope/examples/readme_example_plot_all_maxfos2.png)
 
 ### Dynamic Analysis
 
@@ -203,7 +203,7 @@ From this we get the following output results:
 
 We can also get a plot as after running dynamic analysis all plots are based on the final iteration of the dynamic analysis.
 
-![example_1 plot all slopes fos less than 2](https://github.com/JesseBonanno/pySlope/blob/main/pySlope/examples/readme_example_plot_dynamic.png)
+![example_1 plot all slopes fos less than 2](https://github.com/JesseBonanno/pyslope/blob/main/pyslope/examples/readme_example_plot_dynamic.png)
 
 
 ## Installing the package
@@ -223,13 +223,13 @@ There is a lot of room for expansion of the project, and the direction of the pr
 
 ## Contributing
 
-The guidelines for contributing are specified [here](https://github.com/JesseBonanno/pySlope/blob/main/CONTRIBUTING.md).
+The guidelines for contributing are specified [here](https://github.com/JesseBonanno/pyslope/blob/main/CONTRIBUTING.md).
 
 ## Support
 
-The guidelines for support are specified [here](https://github.com/JesseBonanno/pySlope/blob/main/SUPPORT.md).
+The guidelines for support are specified [here](https://github.com/JesseBonanno/pyslope/blob/main/SUPPORT.md).
 
 
 ## License
 
-[![License](https://img.shields.io/badge/license-MIT-lightgreen.svg)](https://github.com/JesseBonanno/pySlope/blob/main/LICENSE.txt)
+[![License](https://img.shields.io/badge/license-MIT-lightgreen.svg)](https://github.com/JesseBonanno/pyslope/blob/main/LICENSE.txt)

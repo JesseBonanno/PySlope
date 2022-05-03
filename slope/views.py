@@ -12,7 +12,7 @@ from plotly.io import to_json, from_json
 import os, sys
 sys.path.insert(0, os.path.abspath('../../'))
 
-from pySlope.pySlope import (
+from pyslope.pyslope import (
     Slope,
     Material,
     Udl,
