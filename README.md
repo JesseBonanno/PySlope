@@ -1,9 +1,13 @@
 # pySlope
 
+
+[![PyPi](https://img.shields.io/pypi/v/pyslope.svg)](https://pypi.org/project/pyslope/)
 [![License](https://img.shields.io/badge/license-MIT-lightgreen.svg)](https://github.com/JesseBonanno/pyslope/blob/main/LICENSE.txt)
 [![CodeFactor](https://www.codefactor.io/repository/github/jessebonanno/pyslope/badge?s=43db3d31fb1ca55747ede7e5205c7d9e0cf37ced)](https://www.codefactor.io/repository/github/jessebonanno/pyslope)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JesseBonanno/pyslope/main?filepath=pyslope%2Fexamples%2Freadme_example.ipynb)
 [![Documentation Status](https://readthedocs.org/projects/pyslope/badge/?version=main)](https://pyslope.readthedocs.io/en/latest)
+[![Code Style](https://img.shields.io/badge/code%20style-black-black)](https://github.com/psf/black)
+[![Downloads](https://pepy.tech/badge/pyslope)](https://pepy.tech/project/pyslope)
 
 pySlope is a 2D slope stability module based on bishops method of slices. This module allows for the following parameters:
    - unlimited horizontal geological units
