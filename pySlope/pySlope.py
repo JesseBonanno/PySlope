@@ -64,7 +64,7 @@ class Material:
         if self.name is None:
             self.name = ''
         if self.color is None:
-            self.color =''
+            self.color = ''
         
         assert(isinstance(self.name, str))
         assert(isinstance(self.color, str))
@@ -156,7 +156,7 @@ class LineLoad:
     color: str = 'blue'
     dynamic_offset : bool = False
 
-    def __post_init__(self):
+    def __post_init__(self          ):
         data_validation.assert_positive_number(self.magnitude, 'load magnitude')
         data_validation.assert_positive_number(self.offset, 'load offset')
 

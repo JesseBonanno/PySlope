@@ -1,12 +1,8 @@
 from setuptools import setup
 import os
+import versioneer
 
 _here = os.path.abspath(os.path.dirname(__file__))
-
-# Read the verison number
-version = {}
-with open(os.path.join(_here, 'pyslope', 'version.py')) as f:
-    exec(f.read(), version)
 
 # Store the README.md file
 with open(os.path.join(_here, "README.md"), encoding="utf-8") as f:
@@ -16,7 +12,8 @@ with open(os.path.join(_here, "README.md"), encoding="utf-8") as f:
 setup(
   name = 'pyslope',         # How you named your package folder (MyLib)
   packages = ['pyslope'],   # Chose the same as "name"
-  version = version['__version__'],      # Start with a small number and increase it with every change you make
+  version = versioneer.get_version(),      # Start with a small number and increase it with every change you make
+  cmdclass=versioneer.get_cmdclass(),
   license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
   description = 'A 2D Slope Stability Software using bishops method',   # Give a short description about your library
   # Long description from README.md
