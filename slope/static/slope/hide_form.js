@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const angle_row = slope_form[1];
         const length_row = slope_form[2];
 
-        if (define_slope_by_dropdown.value === "length"){
+        if (define_slope_by_dropdown.value === "length") {
             angle_row.style = "display:none";
             length_row.style = "display:block";
         } else {
@@ -44,34 +44,30 @@ document.addEventListener("DOMContentLoaded", () => {
         const consider_limits = document.getElementById('id_limits-consider_limits');
         const consider_internal_limits = document.getElementById('id_limits-consider_internal_limits');
         const limits_form = document.querySelectorAll(".Limits-div");
-        
+
         // define to help with scope issues
         let internal_display;
         let limits_display;
 
-        // run through internal limits options first
-        // so can be overwritten by general limits options
-        // in later code if required
-        if (consider_internal_limits.checked) {
-            internal_display = "block"
+        if (consider_limits.checked && consider_internal_limits.checked) {
+            // loop through items below checkbox and either show or hide
+            for (let i = 1; i < 6; i++) {
+                limits_form[i].style = `display:inline`
+            }
         }
-        else {
-            internal_display = "none"
-        }
-        // loop through items below checkbox and either show or hide
-        for (let i = 4; i < 6; i++) {
-            limits_form[i].style=`display:${internal_display}`
-        }
+        else if (consider_limits.checked) {
+            for (let i = 1; i < 4; i++) {
+                limits_form[i].style = `display:inline`
+            }
+            for (let i = 4; i < 6; i++) {
+                limits_form[i].style = `display:none`
+            }
 
-        if (consider_limits.checked) {
-            limits_display = "block"
         }
-        else {
-            limits_display = "none"
-        }
-        // loop through items below checkbox and either show or hide
-        for (let i = 1; i < 4; i++) {
-            limits_form[i].style=`display:${limits_display}`
+        else if (!consider_limits.checked) {
+            for (let i = 1; i < 6; i++) {
+                limits_form[i].style = `display:none`
+            }
         }
     }
 

@@ -27,7 +27,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+# If have environment variable 'DJANGO_DEBUG' set as 'TRUE' (Note string),
+# then will set debug to true, otherwise false. If no env var than false.
+DEBUG = os.environ.get("DJANGO_DEBUG") == "TRUE"
 
 if DEBUG:
     ALLOWED_HOSTS = []
