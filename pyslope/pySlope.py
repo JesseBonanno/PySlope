@@ -251,6 +251,9 @@ class Slope:
                 )
             length = height / tan(radians(angle))
 
+        # help with division by zero errors
+        length = max(length, 0.001)
+
         MIN_EXT_H = self._MIN_EXT_H
         MIN_EXT_L = self._MIN_EXT_L
 
@@ -270,11 +273,7 @@ class Slope:
         # set relevant variables to self
         self._length = length
         self._height = height
-
-        if angle == 90 or length == 0:
-            self._gradient = 10000000
-        else:
-            self._gradient = height / length
+        self._gradient = height / length
 
         self._top_coord = top
         self._bot_coord = bot
@@ -1482,9 +1481,9 @@ class Slope:
         if y < self._bot_coord[1]:
             return self._external_length
 
-        # y is above the bottom of the slope
-        elif y < self._external_height:
-            return self._top_coord[0] + (self._top_coord[1] - y) / self._gradient
+        # if y is above height return none
+        elif y > self._top_coord[1]:
+            return None
 
         elif y == self._bot_coord[1]:
             return self._bot_coord[0]
@@ -1492,8 +1491,9 @@ class Slope:
         elif y == self._top_coord[1]:
             return self._top_coord[0]
 
+            # y is above the bottom of the slope
         else:
-            return None
+            return self._top_coord[0] + (self._top_coord[1] - y) / self._gradient
 
     def plot_boundary(self, material_table=True, legend=False):
         """Plot external boundary, materials, limits, loading and water for model.
@@ -2305,7 +2305,7 @@ if __name__ == "__main__":
 
     start = time.time()
 
-    s = Slope(height=3, angle=30, length=None)
+    s = Slope(height=1.3, angle=89.9, length=None)
 
     m1 = Material(
         unit_weight=20,
@@ -2315,17 +2315,12 @@ if __name__ == "__main__":
         name="Fill",
         color="blue",
     )
-    m2 = Material(20, 30, 2, 5, name="sand", color="orange")
 
-    u1 = Udl(magnitude=100, offset=2, length=1, dynamic_offset=True, color="red")
     u2 = Udl(magnitude=20, color="green")
 
-    p1 = LineLoad(10, 3, "purple")
+    s.set_udls(u2)
 
-    s.set_udls(u1, u2)
-    s.set_lls(p1)
-
-    s.set_materials(m1, m2)
+    s.set_materials(m1)
 
     s.set_water_table(4)
 
@@ -2333,6 +2328,7 @@ if __name__ == "__main__":
 
     s.update_analysis_options(slices=50, iterations=10000)
 
-    print("takes this long to initialise:")
-    print(time.time() - start)
-    start = time.time()
+    s.analyse_slope()
+    fig = s.plot_all_planes()
+
+    fig.write_html("hi.html")
