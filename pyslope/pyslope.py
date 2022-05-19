@@ -731,8 +731,10 @@ class Slope:
         else:
             self._number_limits = 4
 
-    def analyse_slope(self):
-        """Analyse many possible failure planes for a slope."""
+    def _set_entry_exit_planes(self):
+        """Function to generate search planes based on a method
+        of predetermining where the failure plane will enter and
+        exit the model."""
 
         # Approximate number of runs and distribution of searches
         ITERATIONS = self._iterations
@@ -807,113 +809,96 @@ class Slope:
 
         search = []
 
-        min_dist = self._min_failure_distance
-
-        # loop through left and right coordinates and generate a circular slope
-        # that passes through these points
-        # Not sure if multiprocessing can help, always made it slightly slower for all my tests
-
         for l_c in tqdm(left_coords):
             for r_c in right_coords:
-                if utilities.dist_points(l_c, r_c) > min_dist:
-                    search += self.run_analysis_for_circles(l_c, r_c, NUMBER_CIRCLES)
+                if utilities.dist_points(l_c, r_c) > self._min_failure_distance:
 
-        search.sort(key=lambda x: x["FOS"])
+                    # assume a starting circle that has a straight vertical slope down at the top of the slope
+                    # this means the centre of the circle is in line with the top of the slope
+                    # since the tangent of the circle is perpendicular to the centre
+
+                    # angle of slope of choord (For circular slope)
+                    beta = atan((l_c[1] - r_c[1]) / (r_c[0] - l_c[0]))
+
+                    # half of the circle coord that passess from top of point to bottom of point
+                    half_coord_distance = (
+                        sqrt((l_c[1] - r_c[1]) ** 2 + (r_c[0] - l_c[0]) ** 2) / 2
+                    )
+
+                    # starting circle details
+                    start_radius = half_coord_distance / cos(beta) * 1.1
+                    # start_centre = (l_c[0] + start_radius, l_c[1])
+                    start_chord_to_centre = sqrt(
+                        start_radius**2 - half_coord_distance**2
+                    )
+                    start_chord_to_edge = start_radius - start_chord_to_centre
+
+                    # two intersecting chords through circle have segments of chords related
+                    # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
+                    # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
+                    C = half_coord_distance**2
+
+                    for i in range(0, NUMBER_CIRCLES):
+
+                        # doesnt include going all the way in which we dont want to do anyways
+                        chord_to_edge = (
+                            start_chord_to_edge * (NUMBER_CIRCLES - i) / NUMBER_CIRCLES
+                        )
+                        radius = utilities.circle_radius_from_abcd(chord_to_edge, C)
+                        centre = utilities.circle_centre(
+                            beta=beta,
+                            chord_intersection=utilities.mid_coord(l_c, r_c),
+                            chord_to_centre=radius - chord_to_edge,
+                        )
+                        c_x, c_y = centre
+
+                        i_list = self._get_circle_external_intersection(
+                            c_x, c_y, radius, l_c, r_c
+                        )
+
+                        if len(set(i_list)) != 2:
+                            continue
+                        else:
+                            l_c = i_list[0]
+                            r_c = i_list[1]
+
+                        search += [
+                            {
+                                "l_c": l_c,
+                                "r_c": r_c,
+                                "c_x": c_x,
+                                "c_y": c_y,
+                                "radius": radius,
+                            }
+                        ]
+
         self._search = search
 
-        self._min_FOS_dict = search[0]
+    def analyse_slope(self):
+        """Analyse many possible failure planes for a slope."""
 
-    def run_analysis_for_circles(
-        self, l_c: tuple, r_c: tuple, NUMBER_CIRCLES: float = 5
-    ) -> list:
-        """Runs slope analyse for fixed left and right points for
-        a number of possible circular failures.
+        # get failure planes
+        self._set_entry_exit_planes()
 
-        Parameters
-        ----------
-        l_c : tuple,
-            left coordinate written in the form (x,y)
-        r_c : tuple
-            right coordinate written in the form (x,y)
-        NUMBER_CIRCLES : int, optional
-            Number of circular slopes to break the area into
-            (although some potential slopes might not be generated),
-            by default 5
-
-        Returns
-        -------
-        list
-            list of dictionaries of searched results
-        """
-
-        # data validation
-        data_validation.assert_strictly_positive_number(
-            NUMBER_CIRCLES, "NUMBER_CIRCLES"
-        )
-        NUMBER_CIRCLES = int(NUMBER_CIRCLES)
-
-        data_validation.assert_length(l_c, 2, "l_c")
-        data_validation.assert_length(r_c, 2, "r_c")
-
-        # assume a starting circle that has a straight vertical slope down at the top of the slope
-        # this means the centre of the circle is in line with the top of the slope
-        # since the tangent of the circle is perpendicular to the centre
-
-        # angle of slope of choord (For circular slope)
-        beta = atan((l_c[1] - r_c[1]) / (r_c[0] - l_c[0]))
-
-        # half of the circle coord that passess from top of point to bottom of point
-        half_coord_distance = sqrt((l_c[1] - r_c[1]) ** 2 + (r_c[0] - l_c[0]) ** 2) / 2
-
-        # starting circle details
-        start_radius = half_coord_distance / cos(beta)
-        # start_centre = (l_c[0] + start_radius, l_c[1])
-        start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
-        start_chord_to_edge = start_radius - start_chord_to_centre
-
-        # two intersecting chords through circle have segments of chords related
-        # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
-        # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-        C = half_coord_distance**2
-
-        # loop through circles
-        search = []
-
-        for i in range(0, NUMBER_CIRCLES):
-
-            # doesnt include going all the way in which we dont want to do anyways
-            chord_to_edge = start_chord_to_edge * (NUMBER_CIRCLES - i) / NUMBER_CIRCLES
-            radius = utilities.circle_radius_from_abcd(chord_to_edge, C)
-            centre = utilities.circle_centre(
-                beta=beta,
-                chord_intersection=utilities.mid_coord(l_c, r_c),
-                chord_to_centre=radius - chord_to_edge,
+        # go through each assumed plane and calculate the FOS
+        for i, search in enumerate(tqdm(self._search)):
+            self._search[i]["FOS"] = self.analyse_circular_failure(
+                c_x=search["c_x"],
+                c_y=search["c_y"],
+                radius=search["radius"],
+                l_c=search["l_c"],
+                r_c=search["r_c"],
             )
-            c_x, c_y = centre
 
-            result = self.analyse_circular_failure(c_x, c_y, radius, l_c, r_c)
-            if result:
-                FOS, i_l, i_r = result
-                if (self._limits[0][1] < i_l[0] < self._limits[1][0]) or (
-                    self._limits[0][1] < i_r[0] < self._limits[1][0]
-                ):
-                    break
-                search += [
-                    {
-                        "FOS": FOS,
-                        "l_c": i_l,
-                        "r_c": i_r,
-                        "c_x": c_x,
-                        "c_y": c_y,
-                        "radius": radius,
-                    }
-                ]
-            else:
-                continue
+        # tidy the information to remove anything that didnt run and
+        # to be sorted from lowest FOS to highest FOS
+        search = list(filter((lambda x: x["FOS"] is not None), self._search))
+        self._search = search
+        self._search.sort(key=lambda x: x["FOS"])
 
-        return search
+        print(f"length of search is {len(self._search)}")
 
-    def analyse_circular_failure(
+    def analyse_circular_failure_ordinary(
         self, c_x: float, c_y: float, radius: float, l_c=None, r_c=None
     ):
         """Calculate factor of safety for a circular failure plane through the slope.
@@ -951,9 +936,14 @@ class Slope:
         )
         data_validation.assert_strictly_positive_number(radius, "radius")
 
-        i_list = self._get_circle_external_intersection(c_x, c_y, radius, l_c, r_c)
-        if len(i_list) < 2:
-            return None
+        # if l_c and r_c not set then user is probably checking an individual circular plane
+        # can get the right and left coordinate intersection with the model for this case.
+        if l_c is None or r_c is None:
+            i_list = self._get_circle_external_intersection(c_x, c_y, radius, l_c, r_c)
+            if len(set(i_list)) != 2:
+                return None
+
+        i_list = [l_c, r_c]
         # total number of slices
         SLICES = self._slices
 
@@ -976,7 +966,10 @@ class Slope:
         # loop through slices
         for _ in range(0, SLICES):
             # define y coordinates for slice bottom
-            s_yb = c_y - sqrt(radius**2 - (s_x - c_x) ** 2)
+            # HAS ERROR
+            # (cy - s_yb) ** 2 + abs(s_x-c_x)**2 = R ** 2
+            # sqrt(R**2 - abs(s_x-c_x)**2) = c_y - s_yb
+            s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
 
             # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
@@ -984,6 +977,9 @@ class Slope:
             # out of bounds
             if s_yt is None:
                 return None
+
+            if s_yt < s_yb:
+                s_yt = s_yb
 
             # get alpha, dy always positive, dx negative to right (uphill), dx positive to left
             # note alpha in radians by default
@@ -1043,7 +1039,175 @@ class Slope:
         if pushing <= 0:
             return None
 
-        return (resisting / pushing, i_list[0], i_list[1])
+        FOS = resisting / pushing
+
+        return FOS
+
+    # bishop
+
+    def analyse_circular_failure(
+        self, c_x: float, c_y: float, radius: float, l_c=None, r_c=None
+    ):
+        """Calculate factor of safety for a circular failure plane through the slope.
+
+        Parameters
+        ----------
+        c_x : float
+            circle center x coordinate
+        c_y : float
+            circle center y coordinate
+        radius : float
+            circle radius
+        l_c : tuple, optional
+            coordinates of left intersection between boundary and
+            failure plane if already known, by default None.
+        r_c : tuple, optional
+            coordinates of left intersection between boundary and
+            failure plane if already known, by default None.
+
+
+        Returns
+        -------
+        float
+            factor of safety
+        None
+            if cant calculate returns None
+
+        """
+
+        # if l_c and r_c not set then user is probably checking an individual circular plane
+        # can get the right and left coordinate intersection with the model for this case.
+        if l_c is None or r_c is None:
+            i_list = self._get_circle_external_intersection(c_x, c_y, radius, l_c, r_c)
+            if len(set(i_list)) != 2:
+                return None
+
+        FS = self.analyse_circular_failure_ordinary(c_x, c_y, radius, l_c, r_c)
+
+        if FS is None:
+            return None
+
+        i_list = [l_c, r_c]
+        prev_FS = FS
+
+        # total number of slices
+        SLICES = self._slices
+
+        # horizontal distance between left and right slice
+        dist = i_list[1][0] - i_list[0][0]
+
+        # width of a slice
+        b = dist / SLICES
+
+        for _ in range(10):
+            # initialise centre point of first slice
+            s_x = i_list[0][0] + b / 2
+
+            if prev_FS is None:
+                return None
+
+            # intialise the push and resistance components for FOS before looping
+            pushing = 0.0
+            resisting = 0.0
+
+            # loop through slices
+            for _ in range(0, SLICES):
+                # define y coordinates for slice bottom
+
+                # if radius < abs(s_x - c_x):
+                #     return None
+
+                s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
+
+                # get y coordinate at slice top
+                s_yt = self.get_external_y_intersection(s_x)
+
+                # out of bounds
+                if s_yt is None:
+                    return None
+
+                # get alpha, dy always positive, dx negative to right (uphill), dx positive to left
+                # note alpha in radians by default
+                dy = c_y - s_yb
+                dx = c_x - s_x
+                alpha = atan(dx / dy)
+
+                # get length
+                l = b / cos(alpha)
+
+                # calculate strip weight
+                W = self._calculate_strip_weight(b, s_yt, s_yb)
+
+                # get material properties at the bottom of the slice
+                bottom_material = self._get_material_at_depth(s_yb)
+
+                cohesion = bottom_material.cohesion
+                friction_angle = bottom_material.friction_angle
+
+                # ACCORDING TO GEOSLOPE SHOULD DO THE CHECK BELOW.
+                # THIS HOWEVER ELIMINATES ALMOST ALL OF THE PROPOSED SLOPES
+                # SLIDE DOESNT CONSIDER THIS.
+
+                # if _ == 0:
+                #     if alpha * 180 / 3.14 > 45 + friction_angle / 2:
+                #         return None
+
+                # if _ == SLICES - 1:
+                #     if alpha * 180 / 3.14 < 45 - friction_angle/2:
+                #         return None
+
+                # if there is a udl load on the strip apply it.
+                for udl in self._udls:
+                    W += self._calculate_strip_udl_force(b, s_x, udl)
+
+                # if there is a point load on the strip apply it.
+                for ll in self._lls:
+                    W += self._calculate_strip_ll(b, s_x, ll)
+
+                # consideration for water
+                if self._water_RL:
+                    # determine H factor based on setting
+                    # https://www.rocscience.com/help/slide2/documentation/slide-model/material-properties/define-material-properties/water-parameters
+
+                    # only use H factor if on the slope, otherwise use 1
+                    if self._top_coord[0] < s_x < self._bot_coord[0]:
+                        U = (
+                            max(min(self._water_RL, s_yt) - s_yb, 0)
+                            * 9.81
+                            * b
+                            * self._water_analysis_H
+                        )
+                    else:
+                        U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * b * 1
+                else:
+                    U = 0
+
+                # calculate ma
+                ma = cos(alpha) + sin(alpha) * tan(radians(friction_angle)) / prev_FS
+
+                # calculate resisting
+                resisting += (
+                    cohesion * b + (W - U) * tan(radians(friction_angle))
+                ) / ma
+
+                # calculate pushing
+                pushing += W * sin(alpha)
+
+                # initialise slice x coordinate for next loop
+                s_x = s_x + b
+
+            if pushing <= 0:
+                return None
+            if resisting < 0 or pushing < 0:
+                return None
+
+            FS = resisting / pushing
+            if abs(prev_FS - FS) < 0.01:
+                return FS
+            else:
+                prev_FS = FS
+
+        return prev_FS
 
     def analyse_dynamic(self, critical_fos=1.3):
         """Analyse slope and offset dynamic loads until critical FOS is achieved
@@ -1435,7 +1599,7 @@ class Slope:
         float
             critical factor of safety
         """
-        return self._min_FOS_dict["FOS"]
+        return self._search[0]["FOS"]
 
     def get_min_FOS_circle(self):
         """Get the properties of the circle that gave the critical factor of safety.
@@ -1445,9 +1609,9 @@ class Slope:
         tuple
             tuple containing (circle x coordinate, circle y coordinate, circle radius)
         """
-        c_x = self._min_FOS_dict["c_x"]
-        c_y = self._min_FOS_dict["c_y"]
-        radius = self._min_FOS_dict["radius"]
+        c_x = self._search[0]["c_x"]
+        c_y = self._search[0]["c_y"]
+        radius = self._search[0]["radius"]
         return (c_x, c_y, radius)
 
     def get_min_FOS_end_points(self):
@@ -1458,8 +1622,8 @@ class Slope:
         tuple
             tuple containing (left coordinate, right coordinate)
         """
-        l_c = self._min_FOS_dict["l_c"]
-        r_c = self._min_FOS_dict["r_c"]
+        l_c = self._search[0]["l_c"]
+        r_c = self._search[0]["r_c"]
         return (l_c, r_c)
 
     def get_external_y_intersection(self, x):
@@ -1481,9 +1645,9 @@ class Slope:
         if y < self._bot_coord[1]:
             return self._external_length
 
-        # if y is above height return none
-        elif y > self._top_coord[1]:
-            return None
+        # y is above the bottom of the slope
+        elif y < self._external_height:
+            return self._top_coord[0] + (self._top_coord[1] - y) / self._gradient
 
         elif y == self._bot_coord[1]:
             return self._bot_coord[0]
@@ -1491,9 +1655,8 @@ class Slope:
         elif y == self._top_coord[1]:
             return self._top_coord[0]
 
-            # y is above the bottom of the slope
         else:
-            return self._top_coord[0] + (self._top_coord[1] - y) / self._gradient
+            return None
 
     def plot_boundary(self, material_table=True, legend=False):
         """Plot external boundary, materials, limits, loading and water for model.
@@ -1613,12 +1776,12 @@ class Slope:
         """
         fig = self.plot_boundary(material_table=material_table, legend=legend)
 
-        FOS = self._min_FOS_dict["FOS"]
-        c_x = self._min_FOS_dict["c_x"]
-        c_y = self._min_FOS_dict["c_y"]
-        radius = self._min_FOS_dict["radius"]
-        l_c = self._min_FOS_dict["l_c"]
-        r_c = self._min_FOS_dict["r_c"]
+        FOS = self._search[0]["FOS"]
+        c_x = self._search[0]["c_x"]
+        c_y = self._search[0]["c_y"]
+        radius = self._search[0]["radius"]
+        l_c = self._search[0]["l_c"]
+        r_c = self._search[0]["r_c"]
 
         fig = self._plot_failure_plane(
             fig, c_x, c_y, radius, l_c, r_c, FOS=FOS, show_center=True
@@ -2303,32 +2466,27 @@ class Slope:
 
 if __name__ == "__main__":
 
-    start = time.time()
-
-    s = Slope(height=1.3, angle=89.9, length=None)
+    s = Slope(height=1, angle=None, length=1)
 
     m1 = Material(
         unit_weight=20,
-        friction_angle=45,
-        cohesion=2,
+        friction_angle=35,
+        cohesion=1,
         depth_to_bottom=2,
         name="Fill",
-        color="blue",
+        color="cream",
     )
-
-    u2 = Udl(magnitude=20, color="green")
-
-    s.set_udls(u2)
 
     s.set_materials(m1)
 
-    s.set_water_table(4)
-
-    s.update_water_analysis_options(auto=True)
-
     s.update_analysis_options(slices=50, iterations=10000)
 
-    s.analyse_slope()
-    fig = s.plot_all_planes()
-
-    fig.write_html("hi.html")
+    print(
+        s.analyse_circular_failure(
+            c_x=s._top_coord[0],
+            c_y=s._top_coord[1],
+            radius=1.414,
+            l_c=[s._top_coord[0] - 1, s._top_coord[1]],
+            r_c=s._bot_coord,
+        )
+    )

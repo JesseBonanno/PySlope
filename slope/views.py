@@ -195,8 +195,13 @@ def index(request):
                         y_.append(y[i])
 
                 # need to add left and right points to capture the ends in the slope (JB 19/04/22)
-                s["x"] = [s["r_c"][0]] + x_ + [s["l_c"][0]]
-                s["y"] = [s["r_c"][1]] + y_ + [s["l_c"][1]]
+                # if not many data points don't bother showing
+                if len(x_) > 2:
+                    s["x"] = [s["r_c"][0]] + x_ + [s["l_c"][0]]
+                    s["y"] = [s["r_c"][1]] + y_ + [s["l_c"][1]]
+                else:
+                    s["x"] = []
+                    s["y"] = []
 
             plot = slope.plot_critical(material_table=True, legend=True)
             plot_json = plot.update_layout(autosize=True).to_json()
