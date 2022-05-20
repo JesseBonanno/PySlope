@@ -258,7 +258,7 @@ def index(request):
                 },
             )
 
-    return HttpResponse("error")
+    return redirect("reset")
 
 
 def create_slope(
