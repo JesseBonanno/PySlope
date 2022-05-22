@@ -18,8 +18,6 @@ pySlope is a 2D slope stability module based on bishops method of slices. This m
  
 This module can return plots for the critical failure slope or plots for all failure slopes below a certain factor of safety.
 
-The module can perform 2500 iterations with 50 slices in approximately 3 seconds.
-
 ## Project Purpose
 
 The purpose of this project is two fold:
@@ -128,15 +126,15 @@ Analysis limits can be specified as a general left and right limit, OR as a set 
 
 Currently the model coordinates are dynamic in that the overall model dimensions are based on the size of the slope.
 
-A simple workaround method is to use the following values `s._top_slope[0]` which represents the x coordinate of the crest of the slope, and `s._bot_slope[0]` which represents the x coordinate of the toe of the slope.
+The `get_top_coordinates` and `get_bottom_coordinates` methods can be useful to help define limits in reference to the top and bottom of the slope. 
 
 ```python
-s.set_analysis_limits(s._top_coord[0]-5,s._bot_coord[0]+5)
+s.set_analysis_limits(s.get_top_coordinates()[0] - 5, s.get_bottom_coordinates()[0] + 5)
 ```
 
 ### Analysing Slope
 
-To analyse the `Slope` the analyse_slope() method is called. By default 2500 iterations are run with 50 slices per failure plane.
+To analyse the `Slope` the analyse_slope() method is called. By default 2000 iterations are run with 50 slices per failure plane.
 
 ```python
 # The user can change the number of slices and iterations with the method below.
@@ -184,26 +182,22 @@ s.set_udls(
     Udl(magnitude=100, length=1, offset=2, dynamic_offset=True, color='purple')
 )
 
-# run dynamic analysis aiming for a FOS of 1.2
-s.analyse_dynamic(critical_fos=1.2)
+# run dynamic analysis aiming for a FOS of 1.4
+s.analyse_dynamic(critical_fos=1.4)
 
 # get dictionary of all determined minimum FOS with key value pairing of offset : value
-print(s.get_dynamic_results())
+s.get_dynamic_results()
 
-# can be better printed out as
-for k,v in s.get_dynamic_results().items():
-    print('Offset:', round(k,3), ' m, FOS:', round(v,3))
+# or can print the values out
+s.print_dynamic_results()
 ```
 
 From this we get the following output results:
 
-- Offset: 0  m, FOS: 1.016
-- Offset: 5.186  m, FOS: 1.471
-- Offset: 2.098  m, FOS: 1.26
-- Offset: 1.584  m, FOS: 1.232
-- Offset: 1.352  m, FOS: 1.204
-- Offset: 1.324  m, FOS: 1.198
-- Offset: 1.332  m, FOS: 1.2
+- Offset: 0.000 m, FOS: 1.288
+- Offset: 0.735 m, FOS: 1.402
+- Offset: 1.463 m, FOS: 1.510
+- Offset: 5.186 m, FOS: 1.684
 
 We can also get a plot as after running dynamic analysis all plots are based on the final iteration of the dynamic analysis.
 
@@ -212,7 +206,16 @@ We can also get a plot as after running dynamic analysis all plots are based on 
 
 ## Installing the package
 
-Currently this repository is not being distributed as a python package. To use, feel free to fork the code.
+If you want to install the `pyslope` package, you run this one-liner:
+
+```shell
+pip install pyslope
+```
+
+> **NOTE**: You need Python 3 to install this package (you may need to write `pip3` instead of `pip`).
+
+The library dependencies are listed in the file `requirements.txt`, but you only need to look at them if you clone the repository.
+If you install the package via `pip`, the listed dependencies should be installed automatically.
 
 ## Future Work
 

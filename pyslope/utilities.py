@@ -22,6 +22,7 @@ def reset_results(method):
                     'c_y': 0,
                     'radius': 0,
                     }
+
         return method_output
     return _impl
 

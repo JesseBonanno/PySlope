@@ -2,6 +2,7 @@
 from math import radians, tan, sqrt, atan, cos, sin
 import time
 from dataclasses import dataclass
+import os
 
 # third party imports
 import plotly.graph_objects as go
@@ -198,13 +199,17 @@ class Slope:
         self._udls = []
         self._lls = []
 
+        # NOTE: dont want to reset with changes to the model, just need to initialise here
+        self._dynamic_results = {}
+        self._individual_planes = []
+
         self._external_boundary = None
 
         # intialise options
         self.update_boundary_options(MIN_EXT_H=6, MIN_EXT_L=10)
         self.set_external_boundary(height=height, angle=angle, length=length)
         self.update_analysis_options(
-            slices=50, iterations=2500, min_failure_dist=0, gradient_tolerance=8
+            slices=50, iterations=2000, min_failure_dist=0, gradient_tolerance=8
         )
 
         self.update_water_analysis_options(auto=True)
@@ -234,7 +239,6 @@ class Slope:
         ValueError
             If input not in required range or of required type
         """
-
         # validate inputs
         data_validation.assert_strictly_positive_number(height, "height")
         if angle is not None:
@@ -285,6 +289,9 @@ class Slope:
         # need to update coordinates.
         self._update_udl_coordinates()
         self._update_ll_coordinates()
+
+        # reset limits
+        self.remove_analysis_limits()
 
     @utilities.reset_results
     def set_water_table(self, depth: float):
@@ -637,9 +644,9 @@ class Slope:
         """Reset analysis limits to default (no limits)."""
         self.set_analysis_limits(
             left_x=0,
-            right_x_left=0,
+            right_x_left=self._top_coord[0],
+            left_x_right=self._top_coord[0],
             right_x=self._external_length,
-            left_x_right=self._external_length,
         )
 
     @utilities.reset_results
@@ -667,69 +674,51 @@ class Slope:
             right x coordinate left hand limit of search, defines
             inner edge of bottom of search. If none ignored, by default None
         """
-        # if only one of the double paremets is defined
+        # set to current model values if not set, else check input is valid
+        if left_x is None:
+            left_x = self._limits[0]
+        else:
+            data_validation.assert_positive_number(left_x, "left_x limit") 
+
+        if left_x_right is None:
+            left_x_right = self._limits[1]
+        else:
+            data_validation.assert_strictly_positive_number(
+                left_x_right, "left_x right coordinate"
+            )
+
+        if right_x_left is None:
+            right_x_left = self._limits[2]
+        else:
+            data_validation.assert_strictly_positive_number(right_x, "right_x_limit")
+
+        if right_x is None:
+            right_x = self._limits[3]
+        else:
+            data_validation.assert_strictly_positive_number(
+                right_x_left, "right_x left coordinate"
+            )
+
+        # if only one of the double parameters is defined
         # the other should be set up to equal it
         # or the diagram is confusing
         if left_x_right is not None and right_x_left is None:
-            right_x_left = max(self._limits[1][0], left_x_right)
+            right_x_left = left_x_right
 
         if right_x_left is not None and left_x_right is None:
-            left_x_right = min(self._limits[0][1], right_x_left)
+            left_x_right = right_x_left
 
-        # set to current model values if not set
-        if left_x is None:
-            left_x = self._limits[0][0]
-        if left_x_right is None:
-            left_x_right = self._limits[0][1]
-        if right_x_left is None:
-            right_x_left = self._limits[1][0]
-        if right_x is None:
-            right_x = self._limits[1][1]
+        # enforce hard boundaries for limits
+        left_x = max(left_x, 0)
+        left_x_right = min(left_x_right, self._top_coord[0])
+        right_x = min(right_x, self._external_length)
+        right_x_left = max(right_x_left, self._top_coord[0])
+        
+        # check order is okay
+        if left_x >= left_x_right or right_x_left >= right_x:
+            raise ValueError('limits out of order or conflicting, check input for analysis limits')
 
-        # check correct value entered
-        data_validation.assert_positive_number(left_x, "left_x limit")
-        data_validation.assert_strictly_positive_number(right_x, "right_x_limit")
-        data_validation.assert_strictly_positive_number(
-            right_x_left, "right_x left coordinate"
-        )
-        data_validation.assert_strictly_positive_number(
-            left_x_right, "left_x right coordinate"
-        )
-
-        # check the numbers are in the correct ascending order.
-        # note: it is okay for the inner limits to overlap. They look at seperate things.
-        if left_x > right_x:
-            raise ValueError(
-                f"right_x ({right_x}) should be greater than left_x ({left_x}), i cant assign these limits"
-            )
-
-        if right_x_left > right_x:
-            raise ValueError(
-                f"right_x ({right_x}) should be greater than right_x left ({right_x_left}), i cant assign these limits"
-            )
-
-        if left_x_right < left_x:
-            raise ValueError(
-                f"left_x ({left_x}) should be less than left_x right ({left_x_right}), i cant assign these limits"
-            )
-
-        # check that the left x is on slope
-        if left_x >= self._bot_coord[0]:
-            raise ValueError(
-                f"left_x ({left_x}) should be < bottom of slope coordinate ({self._bot_coord[0]}"
-            )
-        # check that righ x is on bottom slope or slope
-        if right_x <= self._top_coord[0]:
-            raise ValueError(
-                f"right_x ({right_x}) should be > top slope coordinate ({self._top_coord[0]})"
-            )
-
-        self._limits = [(left_x, left_x_right), (right_x_left, right_x)]
-
-        if right_x_left == 0 and left_x_right == self._external_length:
-            self._number_limits = 2
-        else:
-            self._number_limits = 4
+        self._limits = [left_x, left_x_right, right_x_left, right_x]
 
     def _set_entry_exit_planes(self):
         """Function to generate search planes based on a method
@@ -740,139 +729,120 @@ class Slope:
         ITERATIONS = self._iterations
 
         # number of different radii to consider for the same end points
-        NUMBER_CIRCLES = max(5, int(ITERATIONS / 1000))
-
-        # number of different end points to consider
-        NUMBER_POINTS_SLOPE = max(5, int(ITERATIONS / 800))
+        NUMBER_CIRCLES = max(5, int(ITERATIONS / 800))
 
         # generate coordinates for left of slope
         point_combinations = ITERATIONS / NUMBER_CIRCLES
 
-        NUMBER_POINTS = self._calculate_number_points_slope(
-            point_combinations, NUMBER_POINTS_SLOPE
-        )
+        NUMBER_POINTS = int(sqrt(point_combinations))
 
         # get limits on bounds of slope
         # not some limits might still stretch off slope
         # but <= check later considers this.
         x1, x2, x3, x4 = (
-            min(self._top_coord[0], self._limits[0][0]),
-            min(self._top_coord[0], self._limits[0][1]),
-            max(self._bot_coord[0], self._limits[1][0]),
-            max(self._bot_coord[0], self._limits[1][1]),
+            min(self._top_coord[0], self._limits[0]),
+            min(self._top_coord[0], self._limits[1]),
+            max(self._bot_coord[0], self._limits[2]),
+            max(self._bot_coord[0], self._limits[3]),
         )
 
         y2, y3 = self._top_coord[1], self._bot_coord[1]
 
-        # split top and bottom slope up into 10 coordinate points
-        if x2 != x1:
-            left_coords = [
-                (x1 + (n / (NUMBER_POINTS - 1)) * (x2 - x1), y2)
-                for n in range(NUMBER_POINTS)
-            ]
-        else:
-            left_coords = []
+        left_coords = [
+            (x1 + (n / (NUMBER_POINTS - 1)) * (x2 - x1), y2)
+            for n in range(NUMBER_POINTS)
+        ]
 
-        if x3 != x4:
-            right_coords = [
-                (x3 + (n / (NUMBER_POINTS - 1)) * (x4 - x3), y3)
-                for n in range(NUMBER_POINTS)
-            ]
-        else:
-            right_coords = []
-
-        # ignore crest if too steep (gradient tolerance exceeded)
-        if self._gradient > self._gradient_tolerance:
-            left_coords = left_coords[:-1]
-
-        # only want lines from mid to right for a not very steep gradient
-        # if x2 ! > x1 then limit off of slope
-        # NOTE: we dont want the end points since we already grabbed those in left and right coords.
-        if self._gradient < self._gradient_tolerance and x2 >= x1:
-            left_mid_coords = [
-                x1 + (x2 - x1) * (i / (NUMBER_POINTS_SLOPE + 1))
-                for i in range(1, NUMBER_POINTS_SLOPE + 1)
-            ]
-            left_coords += [
-                (x, self.get_external_y_intersection(x)) for x in left_mid_coords
-            ]
-
-        # if x4 ! > x3 then limit off of slope
-        if x4 >= x3:
-            right_mid_coords = [
-                x3 + (x4 - x3) * (i / (NUMBER_POINTS_SLOPE + 1))
-                for i in range(1, NUMBER_POINTS_SLOPE + 1)
-            ]
-            right_coords += [
-                (x, self.get_external_y_intersection(x)) for x in right_mid_coords
-            ]
+        right_coords = [
+            (x3 + (n / (NUMBER_POINTS)) * (x4 - x3), y3)
+            for n in range(1,NUMBER_POINTS+1)
+        ]
 
         search = []
 
         for l_c in tqdm(left_coords):
             for r_c in right_coords:
                 if utilities.dist_points(l_c, r_c) > self._min_failure_distance:
-
-                    # assume a starting circle that has a straight vertical slope down at the top of the slope
-                    # this means the centre of the circle is in line with the top of the slope
-                    # since the tangent of the circle is perpendicular to the centre
-
-                    # angle of slope of choord (For circular slope)
-                    beta = atan((l_c[1] - r_c[1]) / (r_c[0] - l_c[0]))
-
-                    # half of the circle coord that passess from top of point to bottom of point
-                    half_coord_distance = (
-                        sqrt((l_c[1] - r_c[1]) ** 2 + (r_c[0] - l_c[0]) ** 2) / 2
-                    )
-
-                    # starting circle details
-                    start_radius = half_coord_distance / cos(beta) * 1.1
-                    # start_centre = (l_c[0] + start_radius, l_c[1])
-                    start_chord_to_centre = sqrt(
-                        start_radius**2 - half_coord_distance**2
-                    )
-                    start_chord_to_edge = start_radius - start_chord_to_centre
-
-                    # two intersecting chords through circle have segments of chords related
-                    # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
-                    # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-                    C = half_coord_distance**2
-
-                    for i in range(0, NUMBER_CIRCLES):
-
-                        # doesnt include going all the way in which we dont want to do anyways
-                        chord_to_edge = (
-                            start_chord_to_edge * (NUMBER_CIRCLES - i) / NUMBER_CIRCLES
-                        )
-                        radius = utilities.circle_radius_from_abcd(chord_to_edge, C)
-                        centre = utilities.circle_centre(
-                            beta=beta,
-                            chord_intersection=utilities.mid_coord(l_c, r_c),
-                            chord_to_centre=radius - chord_to_edge,
-                        )
-                        c_x, c_y = centre
-
-                        i_list = self._get_circle_external_intersection(
-                            c_x, c_y, radius, l_c, r_c
-                        )
-
-                        if len(set(i_list)) != 2:
-                            continue
-                        else:
-                            l_c = i_list[0]
-                            r_c = i_list[1]
-
-                        search += [
-                            {
-                                "l_c": l_c,
-                                "r_c": r_c,
-                                "c_x": c_x,
-                                "c_y": c_y,
-                                "radius": radius,
-                            }
-                        ]
+                    search += self._generate_planes(l_c, r_c, NUMBER_CIRCLES)
 
         self._search = search
+    
+    def _generate_planes(self, l_c, r_c, NUMBER_CIRCLES):
+        search =[]
+
+        # assume a starting circle that has a straight vertical slope down at the top of the slope
+        # this means the centre of the circle is in line with the top of the slope
+        # since the tangent of the circle is perpendicular to the centre
+
+        # angle of slope of choord (For circular slope)
+        beta = atan((l_c[1] - r_c[1]) / (r_c[0] - l_c[0]))
+
+        # half of the circle coord that passess from top of point to bottom of point
+        half_coord_distance = (
+            sqrt((l_c[1] - r_c[1]) ** 2 + (r_c[0] - l_c[0]) ** 2) / 2
+        )
+
+        # starting circle details
+        start_radius = half_coord_distance / cos(beta) * 1.1
+        # start_centre = (l_c[0] + start_radius, l_c[1])
+        start_chord_to_centre = sqrt(
+            start_radius**2 - half_coord_distance**2
+        )
+        start_chord_to_edge = start_radius - start_chord_to_centre
+
+        # two intersecting chords through circle have segments of chords related
+        # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
+        # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
+        C = half_coord_distance**2
+
+        for i in range(0, NUMBER_CIRCLES):
+
+            # doesnt include going all the way in which we dont want to do anyways
+            chord_to_edge = (
+                start_chord_to_edge * (NUMBER_CIRCLES - i) / NUMBER_CIRCLES
+            )
+            radius = utilities.circle_radius_from_abcd(chord_to_edge, C)
+            centre = utilities.circle_centre(
+                beta=beta,
+                chord_intersection=utilities.mid_coord(l_c, r_c),
+                chord_to_centre=radius - chord_to_edge,
+            )
+            c_x, c_y = centre
+
+            i_list = self._get_circle_external_intersection(
+                c_x, c_y, radius, l_c, r_c
+            )
+
+            if len(set(i_list)) < 2:
+                continue
+
+            l_c = i_list[0]
+            r_c = i_list[1]
+
+            search += [
+                {
+                    "l_c": l_c,
+                    "r_c": r_c,
+                    "c_x": c_x,
+                    "c_y": c_y,
+                    "radius": radius,
+                }
+            ]
+        
+        return search
+
+    def add_single_entry_exit_plane(self, l_c, r_c, number_circles=5):
+        # add by adding in left and right failure coordinate
+        self._individual_planes += self._generate_planes(l_c,r_c,number_circles)
+
+    def add_single_circular_plane(self, c_x, c_y, radius):
+        self._individual_planes += [{
+                    "l_c": None,
+                    "r_c": None,
+                    "c_x": c_x,
+                    "c_y": c_y,
+                    "radius": radius,
+                }]
 
     def analyse_slope(self):
         """Analyse many possible failure planes for a slope."""
@@ -896,7 +866,8 @@ class Slope:
         self._search = search
         self._search.sort(key=lambda x: x["FOS"])
 
-        print(f"length of search is {len(self._search)}")
+        if os.environ.get("DJANGO_DEBUG") == "TRUE":
+            print(f"length of search is {len(self._search)}")
 
     def analyse_circular_failure_ordinary(
         self, c_x: float, c_y: float, radius: float, l_c=None, r_c=None
@@ -1221,7 +1192,7 @@ class Slope:
 
         # check case for load at right and load at left before
         # trying to converge on position
-        right = 0
+        right = 0.0
         left = self._length - 0.01
 
         # check for extreme case with loads at crest (right)
@@ -1271,11 +1242,11 @@ class Slope:
             # then probably not
             if previous_fos != fos:
                 if (
-                    abs(previous_fos - fos) <= 0.01
+                    (abs(previous_fos - fos) <= 0.01
+                    or abs(fos - critical_fos) <= 0.01)
                     and round(fos, 3) >= critical_fos
-                    and abs(fos - critical_fos) <= 0.03
                 ):
-                    return 2
+                    break
 
             # If FOS high then move closer to cliff
             if fos < critical_fos:
@@ -1284,6 +1255,8 @@ class Slope:
                 left = midpoint
 
             previous_fos = fos
+
+        self._dynamic_results = dict(sorted(self._dynamic_results.items(), key=lambda item: item[1]))
 
     def _set_dynamic_offset(self, offset):
         # remember default values?
@@ -1534,62 +1507,18 @@ class Slope:
         else:
             return 0
 
-    def _calculate_number_points_slope(self, point_combinations, NUMBER_POINTS_SLOPE):
-        """_summary_
-
-        Parameters
-        ----------
-        point_combinations : int
-            total number of slope coordinate groups to reach target number
-            of iterations
-        NUMBER_POINTS_SLOPE : int
-            number of points to be added to slope
-
-        Returns
-        -------
-        int
-            number points for top and bottom of slope
-        """
-        # if deep seeded or limits exclude the slope
-        if (
-            self._limits[0][1] < self._top_coord[0]
-            and self._limits[1][0] > self._bot_coord[0]
-        ):
-            NUMBER_POINTS = int(sqrt(point_combinations))
-
-        # if limits exclude slope only in one direction
-        elif (
-            self._limits[0][1] < self._top_coord[0]
-            or self._limits[1][0] > self._bot_coord[0]
-        ):
-            P = point_combinations
-            N = NUMBER_POINTS_SLOPE
-
-            NUMBER_POINTS = int((-N + sqrt(N**2 + 4 * P)) / 2)
-
-        else:
-            if self._gradient > self._gradient_tolerance:
-                NUMBER_POINTS = (
-                    int(
-                        (
-                            NUMBER_POINTS_SLOPE
-                            + sqrt(NUMBER_POINTS_SLOPE**2 + 4 * point_combinations)
-                        )
-                        / 2
-                    )
-                    - NUMBER_POINTS_SLOPE
-                )
-            else:
-                NUMBER_POINTS = int(sqrt(point_combinations)) - NUMBER_POINTS_SLOPE
-
-        return NUMBER_POINTS
-
     def get_dynamic_results(self):
         return self._dynamic_results
 
     def print_dynamic_results(self):
         for k, v in self.get_dynamic_results().items():
-            print("Offset:", round(k, 3), " m, FOS:", round(v, 3))
+            offset = str(round(k,3))
+            offset = offset + '0' * (5-len(offset))
+
+            fos = str(round(v, 3))
+            fos = fos + '0' * (5-len(fos))
+
+            print(f"Offset: {offset} m, FOS: {fos}")
 
     def get_min_FOS(self):
         """Get min factor of safety for slope model.
@@ -1657,6 +1586,12 @@ class Slope:
 
         else:
             return None
+
+    def get_top_coordinates(self):
+        return self._top_coord
+
+    def get_bottom_coordinates(self):
+        return self._bot_coord
 
     def plot_boundary(self, material_table=True, legend=False):
         """Plot external boundary, materials, limits, loading and water for model.
@@ -1975,8 +1910,8 @@ class Slope:
     def _plot_limits(self, fig):
         """Add analysis limits to plot"""
 
-        l1_x, l2_x = self._limits[0]
-        r1_x, r2_x = self._limits[1]
+        l1_x, l2_x = self._limits[0], self._limits[1]
+        r1_x, r2_x = self._limits[2], self._limits[3]
 
         l1_y = self.get_external_y_intersection(l1_x)
         l2_y = self.get_external_y_intersection(l2_x)
@@ -1986,7 +1921,7 @@ class Slope:
         points_right = [(l1_x, l1_y)]
         points_left = [(r2_x, r2_y)]
 
-        if self._number_limits == 4:
+        if self._limits[1] != self._limits[2]:
             points_right += [(r1_x, r1_y)]
             points_left += [(l2_x, l2_y)]
 
@@ -2466,27 +2401,79 @@ class Slope:
 
 if __name__ == "__main__":
 
-    s = Slope(height=1, angle=None, length=1)
+    # Arbritrary example defined in README.md
 
+    # slope defined with height (m) of slope and angle (deg) or length (m) of slope,
+    # depending on which value is set and which is None.
+    s = Slope(height=3, angle=30, length=None)
+
+    # define a material with unit weight, friction angle, cohesion and depth from top
+    # of slope to bottom of layer. The model will automatically order units and if
+    # a material is the lowest it will be extended to the bottom of the model
     m1 = Material(
         unit_weight=20,
-        friction_angle=35,
-        cohesion=1,
-        depth_to_bottom=2,
-        name="Fill",
-        color="cream",
+        friction_angle=45,
+        cohesion=2,
+        depth_to_bottom=2
     )
 
-    s.set_materials(m1)
+    # material can also be defined with positional arguments, if the user can remember
+    # the order of required parameters.
+    m2 = Material(20, 30, 2, 5)
 
-    s.update_analysis_options(slices=50, iterations=10000)
+    # the created material objects can then be assigned to the model.
+    # The same depth to bottom cant be specified for two different materials and an
+    # error will be raised if this happens
+    s.set_materials(m1,m2)
 
-    print(
-        s.analyse_circular_failure(
-            c_x=s._top_coord[0],
-            c_y=s._top_coord[1],
-            radius=1.414,
-            l_c=[s._top_coord[0] - 1, s._top_coord[1]],
-            r_c=s._bot_coord,
-        )
+    # define uniform load objects with magnitude (kPa), offset (m) from the crest of the slope
+    # length of the load (m) (if greater than length slope or None then assumed continuous).
+    u1 = Udl(magnitude = 100, offset = 2, length = 1)
+
+    # by default offset = 0 (m) and length = None.
+    u2 = Udl(magnitude = 20)
+
+    # assign uniform loads to model 
+    s.set_udls(u1, u2)
+
+    # define line load, similiar to Udl except there is no length parameter and magnitude is in units (kN/m)
+    p1 = LineLoad(magnitude = 10, offset = 3)
+
+    # assign line loads to slope
+    s.set_lls(p1)
+
+    # Set water table if required. If None then not considered, by default no water table.
+    s.set_water_table(4)
+
+    # set limits on the slope failure search zone
+    s.set_analysis_limits(s.get_top_coordinates()[0] - 5, s.get_bottom_coordinates()[0] + 5)
+
+
+    # save the results (optional)
+    # Can save figure using ``fig.write_image("./results.pdf")`` (can change extension to be
+    # png, jpg, svg or other formats as reired). Requires pip install -U kaleido
+
+    # fig_1.write_image("./readme_example_plot_critical.png")
+    # fig_2.write_image("./readme_example_plot_all_maxfos2.png")
+
+    # lets say i want to see how close i can move my 100 kPa UDL
+    # while keeping the FOS above 1.4
+
+    # remove udl object load from slope
+    s.remove_udls(u1)
+
+    # if we didnt have the object we could remove all and readd the
+    # other udl object
+    s.remove_udls(remove_all=True)
+    s.set_udls(u2)
+
+    # now lets add the udl again but this time set the load as 'dynamic'
+    # for all loads and materials we also have the option to set the color ourselves
+    # lets try set the color as 'purple'
+    s.set_udls(
+        Udl(magnitude=100, length=1, offset=2, dynamic_offset=True, color='purple')
     )
+
+    # lets run a dynamic analysis to see what the offset would be:
+    s.analyse_dynamic(critical_fos=1.4)
+    s.print_dynamic_results()
