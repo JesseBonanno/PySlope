@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import os
 
 # third party imports
-import plotly.graph_objects as go
+from plotly import graph_objects as go
 from shapely.geometry import Point, LinearRing
 from tqdm import tqdm
 
@@ -208,9 +208,7 @@ class Slope:
         # intialise options
         self.update_boundary_options(MIN_EXT_H=6, MIN_EXT_L=10)
         self.set_external_boundary(height=height, angle=angle, length=length)
-        self.update_analysis_options(
-            slices=50, iterations=2000, min_failure_dist=0, gradient_tolerance=8
-        )
+        self.update_analysis_options(slices=50, iterations=2000, min_failure_dist=0)
 
         self.update_water_analysis_options(auto=True)
 
@@ -563,7 +561,6 @@ class Slope:
         slices: int = None,
         iterations: int = None,
         min_failure_dist: int = None,
-        gradient_tolerance: int = None,
     ):
         """Function to update analysis modelling options.
 
@@ -571,39 +568,24 @@ class Slope:
         ----------
         slices : int, optional
             Slices to take in calculation for each potential
-            circular failureIf None doesnt update the parameter, by default None
+            circular failure (between 10 and 500). If None doesnt update the parameter, by default None.
         iterations : int, optional
-            Approximate number of potential slopes to check.
-            If None doesnt update the parameter, by default None
+            Approximate number of potential slopes to check (between 1000 and 100000).
+            If None doesnt update the parameter, by default None.
         min_failure_distance : int, optional
             If specified only failure slopes with a distance greater than the
             min failure distance will be assessed, by default None.
-        gradient_tolerance : int, none
-            The maximum value of gradient denominator allowed before failure is
-            no longer considered from the top of the slope, by default None.
         """
         if slices:
-            data_validation.assert_range(slices, "slices", 10, 500)
-            self._slices = slices
+            self._slices = max(min(500, slices), 10)
+
         if iterations:
-            data_validation.assert_range(iterations, "iterations", 1000, 100000)
-            self._iterations = iterations
+            self._iterations = max(min(iterations, 100000), 1000)
+
         if min_failure_dist is not None:
-            data_validation.assert_positive_number(
-                min_failure_dist, "min failure distance"
-            )
-            if min_failure_dist > self._external_length:
-                print(
-                    "min failure distance should not be greater than the length of the model. Check Value."
-                )
             self._min_failure_distance = min(
                 min_failure_dist, self._external_length * 0.9
             )
-        if gradient_tolerance and isinstance(gradient_tolerance, int):
-            data_validation.assert_positive_number(
-                gradient_tolerance, "gradient tolerance"
-            )
-            self._gradient_tolerance = gradient_tolerance
 
     @utilities.reset_results
     def update_boundary_options(
@@ -678,7 +660,7 @@ class Slope:
         if left_x is None:
             left_x = self._limits[0]
         else:
-            data_validation.assert_positive_number(left_x, "left_x limit") 
+            data_validation.assert_positive_number(left_x, "left_x limit")
 
         if left_x_right is None:
             left_x_right = self._limits[1]
@@ -713,10 +695,12 @@ class Slope:
         left_x_right = min(left_x_right, self._top_coord[0])
         right_x = min(right_x, self._external_length)
         right_x_left = max(right_x_left, self._top_coord[0])
-        
+
         # check order is okay
         if left_x >= left_x_right or right_x_left >= right_x:
-            raise ValueError('limits out of order or conflicting, check input for analysis limits')
+            raise ValueError(
+                "limits out of order or conflicting, check input for analysis limits"
+            )
 
         self._limits = [left_x, left_x_right, right_x_left, right_x]
 
@@ -725,37 +709,43 @@ class Slope:
         of predetermining where the failure plane will enter and
         exit the model."""
 
-        # Approximate number of runs and distribution of searches
-        ITERATIONS = self._iterations
-
         # number of different radii to consider for the same end points
-        NUMBER_CIRCLES = max(5, int(ITERATIONS / 800))
+        num_circles = max(5, int(self._iterations / 800))
 
         # generate coordinates for left of slope
-        point_combinations = ITERATIONS / NUMBER_CIRCLES
+        point_combinations = self._iterations / num_circles
 
-        NUMBER_POINTS = int(sqrt(point_combinations))
+        # simplification generally will mean slightly less iterations occur.
+        # for the default value of 2000 this will be exact
+        # (5 circles * 20 top * 20 bottom = 2000 exact combinations)
+        num_points_top = int(sqrt(point_combinations))
+        num_points_bot = num_points_top
+
+        while num_points_top * num_points_bot * num_circles < self._iterations:
+            num_points_bot += 1
 
         # get limits on bounds of slope
         # not some limits might still stretch off slope
         # but <= check later considers this.
-        x1, x2, x3, x4 = (
-            min(self._top_coord[0], self._limits[0]),
-            min(self._top_coord[0], self._limits[1]),
-            max(self._bot_coord[0], self._limits[2]),
-            max(self._bot_coord[0], self._limits[3]),
-        )
+        x1, x2, x3, x4 = self._limits
 
-        y2, y3 = self._top_coord[1], self._bot_coord[1]
-
+        # coordinates for failure planes at top of slope
+        # y coordinate is always the coordinate of the top of the slope
         left_coords = [
-            (x1 + (n / (NUMBER_POINTS - 1)) * (x2 - x1), y2)
-            for n in range(NUMBER_POINTS)
+            (x1 + (n / (num_points_top - 1)) * (x2 - x1), self._top_coord[1])
+            for n in range(num_points_top)
+        ]
+
+        # coodinates for the bottom of the failure plane
+        # can be at bottom or on slope, so y is function of x and
+        # needs to be determined for different points
+        right_coords_x = [
+            x3 + (n / (num_points_bot)) * (x4 - x3)
+            for n in range(1, num_points_bot + 1)
         ]
 
         right_coords = [
-            (x3 + (n / (NUMBER_POINTS)) * (x4 - x3), y3)
-            for n in range(1,NUMBER_POINTS+1)
+            (x, self.get_external_y_intersection(x)) for x in right_coords_x
         ]
 
         search = []
@@ -763,12 +753,38 @@ class Slope:
         for l_c in tqdm(left_coords):
             for r_c in right_coords:
                 if utilities.dist_points(l_c, r_c) > self._min_failure_distance:
-                    search += self._generate_planes(l_c, r_c, NUMBER_CIRCLES)
+                    search += self._generate_planes(l_c, r_c, num_circles)
 
         self._search = search
-    
-    def _generate_planes(self, l_c, r_c, NUMBER_CIRCLES):
-        search =[]
+
+    def _generate_planes(self, l_c, r_c, num_circles=5):
+        """Generate failure plane circle coordinates with entry and exit point.
+
+        Parameters
+        ----------
+        l_c : float
+            Left x coordinate which represents the top of the failure
+            plane.
+        r_c : float
+            Right x coordinate which represents the bottom of the failure
+            plane.
+        num_circles : int, optional
+            number of different circle radii to assess passing through
+            the entry and exit points, by default 5
+
+        Returns
+        -------
+        list of dictionaries of the form:
+        {
+            "l_c": l_c,
+            "r_c": r_c,
+            "c_x": c_x,
+            "c_y": c_y,
+            "radius": radius,
+        }
+
+        """
+        search = []
 
         # assume a starting circle that has a straight vertical slope down at the top of the slope
         # this means the centre of the circle is in line with the top of the slope
@@ -778,16 +794,12 @@ class Slope:
         beta = atan((l_c[1] - r_c[1]) / (r_c[0] - l_c[0]))
 
         # half of the circle coord that passess from top of point to bottom of point
-        half_coord_distance = (
-            sqrt((l_c[1] - r_c[1]) ** 2 + (r_c[0] - l_c[0]) ** 2) / 2
-        )
+        half_coord_distance = sqrt((l_c[1] - r_c[1]) ** 2 + (r_c[0] - l_c[0]) ** 2) / 2
 
         # starting circle details
         start_radius = half_coord_distance / cos(beta) * 1.1
         # start_centre = (l_c[0] + start_radius, l_c[1])
-        start_chord_to_centre = sqrt(
-            start_radius**2 - half_coord_distance**2
-        )
+        start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
         start_chord_to_edge = start_radius - start_chord_to_centre
 
         # two intersecting chords through circle have segments of chords related
@@ -795,12 +807,10 @@ class Slope:
         # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
         C = half_coord_distance**2
 
-        for i in range(0, NUMBER_CIRCLES):
+        for i in range(0, num_circles):
 
             # doesnt include going all the way in which we dont want to do anyways
-            chord_to_edge = (
-                start_chord_to_edge * (NUMBER_CIRCLES - i) / NUMBER_CIRCLES
-            )
+            chord_to_edge = start_chord_to_edge * (num_circles - i) / num_circles
             radius = utilities.circle_radius_from_abcd(chord_to_edge, C)
             centre = utilities.circle_centre(
                 beta=beta,
@@ -809,9 +819,7 @@ class Slope:
             )
             c_x, c_y = centre
 
-            i_list = self._get_circle_external_intersection(
-                c_x, c_y, radius, l_c, r_c
-            )
+            i_list = self._get_circle_external_intersection(c_x, c_y, radius, l_c, r_c)
 
             if len(set(i_list)) < 2:
                 continue
@@ -828,31 +836,76 @@ class Slope:
                     "radius": radius,
                 }
             ]
-        
+
         return search
 
-    def add_single_entry_exit_plane(self, l_c, r_c, number_circles=5):
+    def add_single_entry_exit_plane(self, l_cx, r_cx, num_circles=5):
+        """Add failure plane to be analysed be specifying start and exit point.
+
+        Parameters
+        ----------
+        l_c : float
+            Left x coordinate which represents the top of the failure
+            plane.
+        r_c : float
+            Right x coordinate which represents the bottom of the failure
+            plane.
+        num_circles : int, optional
+            number of different circle radii to assess passing through
+            the entry and exit points, by default 5
+        """
         # add by adding in left and right failure coordinate
-        self._individual_planes += self._generate_planes(l_c,r_c,number_circles)
+        self._individual_planes += self._generate_planes(
+            (l_cx, self.get_external_y_intersection(l_cx)),
+            (r_cx, self.get_external_y_intersection(r_cx)),
+            num_circles,
+        )
 
     def add_single_circular_plane(self, c_x, c_y, radius):
-        self._individual_planes += [{
-                    "l_c": None,
-                    "r_c": None,
+        """Add failure plane to be analysed by specifying circle properties.
+
+        Parameters
+        ----------
+        c_x : float,
+            centre of circle x coordinate.
+        c_y : float,
+            centre of circle y coordinate.
+        radius : float
+            radius of circle
+        """
+        i_list = self._get_circle_external_intersection(c_x, c_y, radius)
+        if len(set(i_list)) < 2:
+            return None
+        else:
+            self._individual_planes += [
+                {
+                    "l_c": i_list[0],
+                    "r_c": i_list[1],
                     "c_x": c_x,
                     "c_y": c_y,
                     "radius": radius,
-                }]
+                }
+            ]
+
+    def remove_individual_planes(self):
+        """Remove individually added failure planes."""
+        self._individual_planes = []
 
     def analyse_slope(self):
-        """Analyse many possible failure planes for a slope."""
+        """Analyse many possible failure planes for a slope OR
+        indivually added failure planes if added to slope."""
 
-        # get failure planes
-        self._set_entry_exit_planes()
+        # if individual failure planes set only analyse them
+        if self._individual_planes != []:
+            self._search = self._individual_planes
+
+        # otherwise generate planes across the entire slope
+        else:
+            self._set_entry_exit_planes()
 
         # go through each assumed plane and calculate the FOS
         for i, search in enumerate(tqdm(self._search)):
-            self._search[i]["FOS"] = self.analyse_circular_failure(
+            self._search[i]["FOS"] = self._analyse_circular_failure_bishop(
                 c_x=search["c_x"],
                 c_y=search["c_y"],
                 radius=search["radius"],
@@ -869,10 +922,11 @@ class Slope:
         if os.environ.get("DJANGO_DEBUG") == "TRUE":
             print(f"length of search is {len(self._search)}")
 
-    def analyse_circular_failure_ordinary(
+    def _analyse_circular_failure_ordinary(
         self, c_x: float, c_y: float, radius: float, l_c=None, r_c=None
     ):
-        """Calculate factor of safety for a circular failure plane through the slope.
+        """Calculate factor of safety for a circular failure plane through the slope
+        using the ordinary method (swedish method of slices).
 
         Parameters
         ----------
@@ -913,8 +967,9 @@ class Slope:
             i_list = self._get_circle_external_intersection(c_x, c_y, radius, l_c, r_c)
             if len(set(i_list)) != 2:
                 return None
+        else:
+            i_list = [l_c, r_c]
 
-        i_list = [l_c, r_c]
         # total number of slices
         SLICES = self._slices
 
@@ -1016,10 +1071,11 @@ class Slope:
 
     # bishop
 
-    def analyse_circular_failure(
+    def _analyse_circular_failure_bishop(
         self, c_x: float, c_y: float, radius: float, l_c=None, r_c=None
     ):
-        """Calculate factor of safety for a circular failure plane through the slope.
+        """Calculate factor of safety for a circular failure plane through the slope
+        using bishops method.
 
         Parameters
         ----------
@@ -1049,16 +1105,19 @@ class Slope:
         # if l_c and r_c not set then user is probably checking an individual circular plane
         # can get the right and left coordinate intersection with the model for this case.
         if l_c is None or r_c is None:
-            i_list = self._get_circle_external_intersection(c_x, c_y, radius, l_c, r_c)
-            if len(set(i_list)) != 2:
+            i_list = self._get_circle_external_intersection(c_x, c_y, radius)
+            if len(set(i_list)) < 2:
                 return None
+            else:
+                l_c, r_c = i_list[0], i_list[1]
+        else:
+            i_list = [l_c, r_c]
 
-        FS = self.analyse_circular_failure_ordinary(c_x, c_y, radius, l_c, r_c)
+        FS = self._analyse_circular_failure_ordinary(c_x, c_y, radius, l_c, r_c)
 
         if FS is None:
             return None
 
-        i_list = [l_c, r_c]
         prev_FS = FS
 
         # total number of slices
@@ -1242,10 +1301,8 @@ class Slope:
             # then probably not
             if previous_fos != fos:
                 if (
-                    (abs(previous_fos - fos) <= 0.01
-                    or abs(fos - critical_fos) <= 0.01)
-                    and round(fos, 3) >= critical_fos
-                ):
+                    abs(previous_fos - fos) <= 0.01 or abs(fos - critical_fos) <= 0.01
+                ) and round(fos, 3) >= critical_fos:
                     break
 
             # If FOS high then move closer to cliff
@@ -1256,7 +1313,9 @@ class Slope:
 
             previous_fos = fos
 
-        self._dynamic_results = dict(sorted(self._dynamic_results.items(), key=lambda item: item[1]))
+        self._dynamic_results = dict(
+            sorted(self._dynamic_results.items(), key=lambda item: item[1])
+        )
 
     def _set_dynamic_offset(self, offset):
         # remember default values?
@@ -1512,11 +1571,11 @@ class Slope:
 
     def print_dynamic_results(self):
         for k, v in self.get_dynamic_results().items():
-            offset = str(round(k,3))
-            offset = offset + '0' * (5-len(offset))
+            offset = str(round(k, 3))
+            offset = offset + "0" * (5 - len(offset))
 
             fos = str(round(v, 3))
-            fos = fos + '0' * (5-len(fos))
+            fos = fos + "0" * (5 - len(fos))
 
             print(f"Offset: {offset} m, FOS: {fos}")
 
@@ -1588,9 +1647,23 @@ class Slope:
             return None
 
     def get_top_coordinates(self):
+        """Returns the top coordinate of the slope.
+
+        Returns
+        -------
+        tuple
+            (x,y) coordinate of the top of the slope.
+        """
         return self._top_coord
 
     def get_bottom_coordinates(self):
+        """Returns the bottom coordinate of the slope.
+
+        Returns
+        -------
+        tuple
+            (x,y) coordinate of the bottom of the slope.
+        """
         return self._bot_coord
 
     def plot_boundary(self, material_table=True, legend=False):
@@ -2410,12 +2483,7 @@ if __name__ == "__main__":
     # define a material with unit weight, friction angle, cohesion and depth from top
     # of slope to bottom of layer. The model will automatically order units and if
     # a material is the lowest it will be extended to the bottom of the model
-    m1 = Material(
-        unit_weight=20,
-        friction_angle=45,
-        cohesion=2,
-        depth_to_bottom=2
-    )
+    m1 = Material(unit_weight=20, friction_angle=45, cohesion=2, depth_to_bottom=2)
 
     # material can also be defined with positional arguments, if the user can remember
     # the order of required parameters.
@@ -2424,20 +2492,20 @@ if __name__ == "__main__":
     # the created material objects can then be assigned to the model.
     # The same depth to bottom cant be specified for two different materials and an
     # error will be raised if this happens
-    s.set_materials(m1,m2)
+    s.set_materials(m1, m2)
 
     # define uniform load objects with magnitude (kPa), offset (m) from the crest of the slope
     # length of the load (m) (if greater than length slope or None then assumed continuous).
-    u1 = Udl(magnitude = 100, offset = 2, length = 1)
+    u1 = Udl(magnitude=100, offset=2, length=1)
 
     # by default offset = 0 (m) and length = None.
-    u2 = Udl(magnitude = 20)
+    u2 = Udl(magnitude=20)
 
-    # assign uniform loads to model 
+    # assign uniform loads to model
     s.set_udls(u1, u2)
 
     # define line load, similiar to Udl except there is no length parameter and magnitude is in units (kN/m)
-    p1 = LineLoad(magnitude = 10, offset = 3)
+    p1 = LineLoad(magnitude=10, offset=3)
 
     # assign line loads to slope
     s.set_lls(p1)
@@ -2446,8 +2514,9 @@ if __name__ == "__main__":
     s.set_water_table(4)
 
     # set limits on the slope failure search zone
-    s.set_analysis_limits(s.get_top_coordinates()[0] - 5, s.get_bottom_coordinates()[0] + 5)
-
+    s.set_analysis_limits(
+        s.get_top_coordinates()[0] - 5, s.get_bottom_coordinates()[0] + 5
+    )
 
     # save the results (optional)
     # Can save figure using ``fig.write_image("./results.pdf")`` (can change extension to be
@@ -2471,9 +2540,21 @@ if __name__ == "__main__":
     # for all loads and materials we also have the option to set the color ourselves
     # lets try set the color as 'purple'
     s.set_udls(
-        Udl(magnitude=100, length=1, offset=2, dynamic_offset=True, color='purple')
+        Udl(magnitude=100, length=1, offset=2, dynamic_offset=True, color="purple")
     )
 
-    # lets run a dynamic analysis to see what the offset would be:
-    s.analyse_dynamic(critical_fos=1.4)
-    s.print_dynamic_results()
+    s.remove_individual_planes()
+
+    for r in [9, 10, 11]:
+        s.add_single_circular_plane(
+            c_x=13.7,
+            c_y=17.02,
+            radius=r,
+        )
+
+    s.add_single_entry_exit_plane(10, 15, 5)
+
+    s.analyse_slope()
+
+    fig = s.plot_all_planes()
+    fig.show()

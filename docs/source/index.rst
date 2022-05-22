@@ -13,8 +13,6 @@ Welcome to pySlope's documentation!
  
 This module can return plots for the critical failure slope or plots for all failure slopes below a certain factor of safety.
 
-The module can perform 2500 iterations with 50 slices in approximately 3 seconds.
-
 The ``pySlope`` `package repository <https://github.com/JesseBonanno/pySlope>`_ can be found on Github.
 
 .. toctree::
