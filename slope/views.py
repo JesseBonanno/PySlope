@@ -284,6 +284,13 @@ def create_slope(
             angle=slope_form.cleaned_data["angle"],
         )
 
+    # update iterations and slices to consider
+    slope.update_analysis_options(
+        slices=options_form.cleaned_data['slices'],
+        iterations=options_form.cleaned_data['iterations'],
+    )
+
+
     # add materials to slope
     for material_form in material_formset.cleaned_data:
         if material_form:

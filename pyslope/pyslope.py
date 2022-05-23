@@ -61,8 +61,12 @@ class Material:
     def __post_init__(self):
         data_validation.assert_range(self.unit_weight, "unit weight", 1, 50)
         data_validation.assert_positive_number(self.friction_angle, "friction_angle")
-        data_validation.assert_positive_number(self.cohesion, "cohesion")
-        data_validation.assert_positive_number(self.depth_to_bottom, "depth to bottom")
+        data_validation.assert_number(self.cohesion, "cohesion")
+        data_validation.assert_number(self.depth_to_bottom, "depth to bottom")
+
+        # if user gives a negative value just make it positive instead.
+        self.cohesion = abs(self.cohesion)
+        self.depth_to_bottom = abs(self.depth_to_bottom)
 
         if self.name is None:
             self.name = ""
@@ -116,13 +120,18 @@ class Udl:
     dynamic_offset: bool = False
 
     def __post_init__(self):
-        data_validation.assert_positive_number(self.magnitude, "load magnitude")
-        data_validation.assert_positive_number(self.offset, "load offset")
+        data_validation.assert_number(self.magnitude, "load magnitude")
+        data_validation.assert_number(self.offset, "load offset")
+
         if self.length:
-            data_validation.assert_positive_number(self.length, "load length")
+            data_validation.assert_number(self.length, "load length")
+            self.length = abs(self.length)
         else:
             # make none if length = 0?
             self.length = None
+
+        self.magnitude = abs(self.magnitude)
+        self.offset = abs(self.offset)
 
         self.precision = utilities.get_precision(self.magnitude)
 
@@ -163,10 +172,13 @@ class LineLoad:
     dynamic_offset: bool = False
 
     def __post_init__(self):
-        data_validation.assert_positive_number(self.magnitude, "load magnitude")
-        data_validation.assert_positive_number(self.offset, "load offset")
+        data_validation.assert_number(self.magnitude, "load magnitude")
+        data_validation.assert_number(self.offset, "load offset")
 
         self.precision = utilities.get_precision(self.magnitude)
+
+        self.magnitude = abs(self.magnitude)
+        self.offset = abs(self.offset)
 
         if not utilities.is_color(self.color):
             self.color = "blue"
@@ -208,7 +220,7 @@ class Slope:
         # intialise options
         self.update_boundary_options(MIN_EXT_H=6, MIN_EXT_L=10)
         self.set_external_boundary(height=height, angle=angle, length=length)
-        self.update_analysis_options(slices=50, iterations=2000, min_failure_dist=0)
+        self.update_analysis_options(slices=25, iterations=1000, min_failure_dist=0)
 
         self.update_water_analysis_options(auto=True)
 
@@ -570,7 +582,7 @@ class Slope:
             Slices to take in calculation for each potential
             circular failure (between 10 and 500). If None doesnt update the parameter, by default None.
         iterations : int, optional
-            Approximate number of potential slopes to check (between 1000 and 100000).
+            Approximate number of potential slopes to check (between 500 and 100000).
             If None doesnt update the parameter, by default None.
         min_failure_distance : int, optional
             If specified only failure slopes with a distance greater than the
@@ -580,7 +592,7 @@ class Slope:
             self._slices = max(min(500, slices), 10)
 
         if iterations:
-            self._iterations = max(min(iterations, 100000), 1000)
+            self._iterations = max(min(iterations, 100000), 500)
 
         if min_failure_dist is not None:
             self._min_failure_distance = min(
@@ -796,7 +808,8 @@ class Slope:
         # half of the circle coord that passess from top of point to bottom of point
         half_coord_distance = sqrt((l_c[1] - r_c[1]) ** 2 + (r_c[0] - l_c[0]) ** 2) / 2
 
-        # starting circle details
+        # starting circle details, if radius 1 would be a vertical slope.
+        # increase to 1.1 to prevent ma denominator issues for bishops method.
         start_radius = half_coord_distance / cos(beta) * 1.1
         # start_centre = (l_c[0] + start_radius, l_c[1])
         start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
@@ -1794,7 +1807,6 @@ class Slope:
         fig = self._plot_failure_plane(
             fig, c_x, c_y, radius, l_c, r_c, FOS=FOS, show_center=True
         )
-        fig = self._plot_annotate_FOS(fig, c_x, c_y, FOS)
         return fig
 
     def plot_all_planes(self, max_fos: float = 10, material_table=True, legend=True):
@@ -1882,7 +1894,7 @@ class Slope:
 
         return go.Figure(temp)
 
-    def _plot_annotate_FOS(self, fig, c_x: float, c_y: float, FOS: float):
+    def _plot_annotate_FOS(self, fig, c_x: float, c_y: float, radius : float, FOS: float):
         """Annotate FOS on figure.
 
         Parameters
@@ -1900,15 +1912,6 @@ class Slope:
         Plotly figure.
         """
 
-        # validate inputs
-        data_validation.assert_strictly_positive_number(
-            c_x, "circle center x coordinate"
-        )
-        data_validation.assert_strictly_positive_number(
-            c_y, "circle center y coordinate"
-        )
-        data_validation.assert_strictly_positive_number(FOS, "Factor of safety")
-
         if FOS > 3:
             color = COLOUR_FOS_DICT[3.0]
         else:
@@ -1919,10 +1922,12 @@ class Slope:
                 x=[c_x],
                 y=[c_y],
                 mode="lines+text",
-                text=[f"{FOS:.3f}"],
+                text=[f'{FOS:.3f}'],
                 textposition="top right",
                 textfont=dict(family="sans serif", size=20, color=color),
                 name="",
+                texttemplate="%{text}",
+                hovertemplate=f'Centre: ({c_x:.3f}, {c_y:.3f})<br>Radius: {radius:.3f}<br>FOS: {FOS:.3f}',
             )
         )
 
@@ -2412,17 +2417,10 @@ class Slope:
         plotly figure
         """
 
-        # data validation
-        data_validation.assert_strictly_positive_number(
-            c_x, "circle center x coordinate"
-        )
-        data_validation.assert_strictly_positive_number(
-            c_y, "circle center y coordinate"
-        )
-        data_validation.assert_strictly_positive_number(radius, "radius")
-        data_validation.assert_length(l_c, 2, "l_c")
-        data_validation.assert_length(r_c, 2, "r_c")
-        data_validation.assert_strictly_positive_number(FOS, "Factor of safety")
+        c_x = round(c_x, 3)
+        c_y = round(c_y, 3)
+        radius = round(radius, 3)
+        FOS = round(FOS, 3)
 
         if FOS > 3:
             color = COLOUR_FOS_DICT[3.0]
@@ -2463,11 +2461,15 @@ class Slope:
                 y=y_,
                 mode="lines",
                 line_color=color,
-                meta=[round(FOS, 3)],
-                hovertemplate="%{meta[0]}",
+                hovertemplate="",
+                texttemplate="",
                 name="",
             )
         )
+
+        # if show center add annotation with hoverlabel and text
+        if show_center:
+            fig = self._plot_annotate_FOS(fig, c_x, c_y, radius, FOS)
 
         return fig
 
