@@ -134,7 +134,7 @@ class AnalysisOptionsForm(forms.Form):
 
     iterations = forms.IntegerField(
         min_value=500,
-        max_value=10000,
+        max_value=5000,
         required=True,
         label="Iterations",
         initial=500,
