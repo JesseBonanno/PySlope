@@ -6,7 +6,7 @@
   <link rel='stylesheet' href="{% static 'slope/styles.css' %}">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.8.0/plotly.min.js"></script>
   <script src="{% static 'slope/charting.js' %}"></script>
-  <script src="{% static 'slope/analysis_loading.js' %}"></script>
+  <script src="{% static 'slope/button_control.js' %}"></script>
   <script src="{% static 'slope/add_rows.js' %}"></script>
   <script src="{% static 'slope/hide_form.js' %}"></script>
   <script src="{% static 'slope/focus_form.js' %}"></script>
@@ -40,7 +40,7 @@
                 {% csrf_token %}
                 <!-- button for analysing -->
                 <div id="button-row">
-                  <button class="btn btn-primary" type="submit" value="Analyse" name="Analyse" id="analysis_button">
+                  <button class="btn btn-primary" disabled type="submit" value="Analyse" name="Analyse" id="analysis_button">
                     <span id="analyse_text">Analyse</span>
                   </button>
 
