@@ -22,6 +22,7 @@ else:
     from . import utilities
 
 COLOUR_FOS_DICT, MATERIAL_COLORS = utilities.COLOUR_FOS_DICT, utilities.MATERIAL_COLORS
+MAX_COLOUR_KEY = max(COLOUR_FOS_DICT)
 
 
 @dataclass
@@ -227,7 +228,20 @@ class Slope:
         # sets default analysis limits (ie no limit)
         self.remove_analysis_limits()
 
-    @utilities.reset_results
+    # clears search value, run when model results no longer valid.
+    def _reset_results(self):
+        self._search = []
+        self._min_FOS = 0
+        self._min_FOS_location = []
+        self._min_FOS_dict = {
+            "FOS": 0,
+            "l_c": 0,
+            "r_c": 0,
+            "c_x": 0,
+            "c_y": 0,
+            "radius": 0,
+        }
+
     def set_external_boundary(
         self, height: float = 2, angle: int = 30, length: float = None
     ):
@@ -303,7 +317,9 @@ class Slope:
         # reset limits
         self.remove_analysis_limits()
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def set_water_table(self, depth: float):
         """set water table value.
 
@@ -319,12 +335,16 @@ class Slope:
             data_validation.assert_positive_number(depth, "water depth")
             self._water_RL = max(0, self._top_coord[1] - depth)
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def remove_water_table(self):
         """Remove water table from model"""
         self._water_RL = None
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def set_udls(self, *udls):
         """set a surface surcharge on top of the slope.
 
@@ -349,6 +369,9 @@ class Slope:
         if self._udls:
             self._udl_max = max(udl.magnitude for udl in self._udls)
 
+        # reset results
+        self._reset_results()
+
     # dont need to reset results since this only should be called
     # as a part of resetting
     def _update_udl_coordinates(self):
@@ -365,7 +388,6 @@ class Slope:
             udl.left = left_x
             udl.right = right_x
 
-    @utilities.reset_results
     def remove_udls(self, *udls, remove_all=False):
         """Remove udl from model if associated with model.
 
@@ -392,7 +414,9 @@ class Slope:
             self._udls = []
             self._udl_max = 0
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def set_lls(self, *lls):
         """set a surface surcharge on top of the slope
 
@@ -413,6 +437,9 @@ class Slope:
 
         self._update_ll_coordinates()
 
+        # reset results
+        self._reset_results()
+
     # dont need to reset results since this only should be called
     # as a part of resetting
     def _update_ll_coordinates(self):
@@ -423,7 +450,6 @@ class Slope:
 
             ll.coord = coord
 
-    @utilities.reset_results
     def remove_lls(self, *lls, remove_all=False):
         """Remove udl from model if associated with model.
 
@@ -444,7 +470,9 @@ class Slope:
         if remove_all:
             self._lls = []
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def set_materials(self, *materials):
         """Assign material instances to the slope instance.
 
@@ -502,7 +530,9 @@ class Slope:
 
         self._materials = material_refined
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def remove_material(
         self, material: Material = None, depth: float = None, remove_all=False
     ):
@@ -540,7 +570,9 @@ class Slope:
         if remove_all:
             self._materials = []
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def update_water_analysis_options(self, auto: bool = True, H: int = 1):
         """Update analysis options regarding how water is treated.
 
@@ -567,7 +599,9 @@ class Slope:
 
         self._water_analysis_H = H
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def update_analysis_options(
         self,
         slices: int = None,
@@ -599,7 +633,9 @@ class Slope:
                 min_failure_dist, self._external_length * 0.9
             )
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def update_boundary_options(
         self,
         MIN_EXT_L: float = None,
@@ -633,7 +669,9 @@ class Slope:
         if self._external_boundary is not None:
             self.set_external_boundary(height=self._height, length=self._length)
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def remove_analysis_limits(self):
         """Reset analysis limits to default (no limits)."""
         self.set_analysis_limits(
@@ -643,7 +681,9 @@ class Slope:
             right_x=self._external_length,
         )
 
-    @utilities.reset_results
+        # reset results
+        self._reset_results()
+
     def set_analysis_limits(
         self,
         left_x: float = None,
@@ -715,6 +755,9 @@ class Slope:
             )
 
         self._limits = [left_x, left_x_right, right_x_left, right_x]
+
+        # reset results
+        self._reset_results()
 
     def _set_entry_exit_planes(self):
         """Function to generate search planes based on a method
@@ -874,6 +917,9 @@ class Slope:
             num_circles,
         )
 
+        # reset results
+        self._reset_results()
+
     def add_single_circular_plane(self, c_x, c_y, radius):
         """Add failure plane to be analysed by specifying circle properties.
 
@@ -900,9 +946,15 @@ class Slope:
                 }
             ]
 
+        # reset results
+        self._reset_results()
+
     def remove_individual_planes(self):
         """Remove individually added failure planes."""
         self._individual_planes = []
+
+        # reset results
+        self._reset_results()
 
     def analyse_slope(self):
         """Analyse many possible failure planes for a slope OR
@@ -1829,10 +1881,7 @@ class Slope:
                 l_c = i["l_c"]
                 r_c = i["r_c"]
 
-                if FOS > 3:
-                    color = COLOUR_FOS_DICT[3.0]
-                else:
-                    color = COLOUR_FOS_DICT[round(FOS, 1)]
+                color = COLOUR_FOS_DICT[min(round(FOS, 1), MAX_COLOUR_KEY)]
 
                 # generate points for circle, generates points only along bottom half of circle
                 x, y = utilities.generate_circle_coordinates(c_x, c_y, radius)
@@ -1894,10 +1943,7 @@ class Slope:
         Plotly figure.
         """
 
-        if FOS > 3:
-            color = COLOUR_FOS_DICT[3.0]
-        else:
-            color = COLOUR_FOS_DICT[round(FOS, 1)]
+        color = COLOUR_FOS_DICT[min(round(FOS, 1), MAX_COLOUR_KEY)]
 
         fig.add_trace(
             go.Scatter(
@@ -2295,8 +2341,6 @@ class Slope:
         x0 = 0.9
         x1 = 0.95
 
-        max_fos = max(COLOUR_FOS_DICT)
-
         fig.add_shape(
             type="rect",
             xref="paper",
@@ -2315,8 +2359,8 @@ class Slope:
                 yref="paper",
                 x0=x0,
                 x1=x1,
-                y0=yi + k * (yf - yi) / max_fos,
-                y1=yi + (k + 0.1) * (yf - yi) / max_fos,
+                y0=yi + k * (yf - yi) / MAX_COLOUR_KEY,
+                y1=yi + (k + 0.1) * (yf - yi) / MAX_COLOUR_KEY,
                 fillcolor=v,
                 line=dict(
                     color="black",
@@ -2327,10 +2371,16 @@ class Slope:
             if round(k, 1) % 1 == 0:
 
                 # bandaid fix because i cant figure out why the scale shows wrong
-                if k < 1.5:
-                    y = float(yi) + float(k - 0.05) * float(yf - yi) / float(max_fos)
+                if k < 2.5:
+                    y = float(yi) + float(k - 0.15) * float(yf - yi) / float(
+                        MAX_COLOUR_KEY
+                    )
+                elif k > 4.5:
+                    y = float(yi) + float(k) * float(yf - yi) / float(MAX_COLOUR_KEY)
                 else:
-                    y = float(yi) + float(k + 0.05) * float(yf - yi) / float(max_fos)
+                    y = float(yi) + float(k + 0.1) * float(yf - yi) / float(
+                        MAX_COLOUR_KEY
+                    )
 
                 fig.add_annotation(
                     xref="paper",
@@ -2404,8 +2454,8 @@ class Slope:
         radius = round(radius, 3)
         FOS = round(FOS, 3)
 
-        if FOS > 3:
-            color = COLOUR_FOS_DICT[3.0]
+        if FOS > 5:
+            color = COLOUR_FOS_DICT[5.0]
         else:
             color = COLOUR_FOS_DICT[round(FOS, 1)]
 

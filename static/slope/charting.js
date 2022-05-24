@@ -69,6 +69,7 @@ function createPlot(max_display_fos) {
 }
 function updateFOS(max_display_fos) {
 
+
     // get plot object
     const plot_all = document.getElementById('plotly_js');
 
@@ -78,6 +79,7 @@ function updateFOS(max_display_fos) {
 
     //get colour FOS dictionary
     const COLOUR_FOS_DICT = JSON.parse(document.getElementById('COLOUR_FOS_DICT').textContent);
+    const MAX_COLOUR_FOS = Object.keys(COLOUR_FOS_DICT).pop()
 
     // get the highest FOS shown on the plot (if isNan than set to 0)
     let traces_length = plot_all.data.length;
@@ -118,8 +120,8 @@ function updateFOS(max_display_fos) {
             else if (search[i].FOS < max_display_fos) {
 
                 // get the FOS and round to 1 decimal places for coloring purposes
-                // if greater than 3 use 3
-                fos = Math.min(Math.round(search[i].FOS * 10) / 10, 3).toString()
+                // if greater than 5 use 5
+                fos = Math.min(Math.round(search[i].FOS * 10) / 10, Number(MAX_COLOUR_FOS)).toString()
 
                 // if string length < 2 than is int (ie 2) which needs to be converted to
                 // have one decimal place (ie add "".0")

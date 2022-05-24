@@ -17,27 +17,6 @@ MATERIAL_COLORS = [
     "#a3acf7",
 ]
 
-# wrapper for slope results
-def reset_results(method):
-    @wraps(method)
-    def _impl(self, *method_args, **method_kwargs):
-        method_output = method(self, *method_args, **method_kwargs)
-        self._search = []
-        self._min_FOS = 0
-        self._min_FOS_location = []
-        self._min_FOS_dict = {
-            "FOS": 0,
-            "l_c": 0,
-            "r_c": 0,
-            "c_x": 0,
-            "c_y": 0,
-            "radius": 0,
-        }
-
-        return method_output
-
-    return _impl
-
 
 def is_color(color):
     try:
@@ -138,7 +117,9 @@ def create_fos_color_dictionary():
         (0, "red"),
         (1, "orange"),
         (2, "green"),
-        (3, "blue"),
+        (3, "#0c84a8"),
+        (4, "#0c1ea8"),
+        (5, "purple"),
     ]
 
     colors.sort(key=lambda x: x[0])
