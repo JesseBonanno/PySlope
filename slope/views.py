@@ -8,6 +8,8 @@ import json
 import base64
 from plotly.io import to_json, from_json
 
+from pyslope.pyslope import utilities
+
 # import backend section of code
 import os, sys
 
@@ -171,37 +173,32 @@ def index(request):
             # return color_dictionary
             # add coordinates of failure planes to information that gets passed back.
             for s in slope._search:
-                p = Point(s["c_x"], s["c_y"])
-                x, y = p.buffer(s["radius"]).boundary.coords.xy
+
+                c_x = s["c_x"]
+                c_y = s["c_y"]
+                radius = s["radius"]
+                r_c = s["r_c"]
+                l_c = s["l_c"]
+
+                # generate points for circle, generates points only along bottom half of circle
+                x, y = utilities.generate_circle_coordinates(c_x, c_y, radius)
 
                 # empty vectors for circle points that we will actually include
                 x_ = []
                 y_ = []
 
-                # generate points for circle, will always generate 64 points (65 in list since start and end are same)
-
                 # 65 long list but the last half of points are for the top half of
                 # circle and so will never actually be required.
-                for i in range(34):
+                for i in range(len(x)):
                     # x coordinate should be between left and right
                     # note for y, should be less than left y but can stoop
                     # below right i
-                    if (
-                        x[i] <= s["r_c"][0]
-                        and x[i] >= s["l_c"][0]
-                        and y[i] <= s["l_c"][1]
-                    ):
+                    if x[i] <= r_c[0] and x[i] >= l_c[0]:
                         x_.append(x[i])
                         y_.append(y[i])
 
-                # need to add left and right points to capture the ends in the slope (JB 19/04/22)
-                # if not many data points don't bother showing
-                if len(x_) > 2:
-                    s["x"] = [s["r_c"][0]] + x_ + [s["l_c"][0]]
-                    s["y"] = [s["r_c"][1]] + y_ + [s["l_c"][1]]
-                else:
-                    s["x"] = []
-                    s["y"] = []
+                s["x"] = [l_c[0]] + x_ + [r_c[0]]
+                s["y"] = [l_c[1]] + y_ + [r_c[1]]
 
             plot = slope.plot_critical(material_table=True, legend=True)
             plot_json = plot.update_layout(autosize=True).to_json()
@@ -286,10 +283,9 @@ def create_slope(
 
     # update iterations and slices to consider
     slope.update_analysis_options(
-        slices=options_form.cleaned_data['slices'],
-        iterations=options_form.cleaned_data['iterations'],
+        slices=options_form.cleaned_data["slices"],
+        iterations=options_form.cleaned_data["iterations"],
     )
-
 
     # add materials to slope
     for material_form in material_formset.cleaned_data:

@@ -6,7 +6,7 @@ import os
 
 # third party imports
 from plotly import graph_objects as go
-from shapely.geometry import Point, LinearRing
+from shapely.geometry import LinearRing
 from tqdm import tqdm
 
 # have to do this to allow for relative imports
@@ -812,13 +812,13 @@ class Slope:
         # increase to 1.1 to prevent ma denominator issues for bishops method.
         start_radius = half_coord_distance / cos(beta) * 1.1
         # start_centre = (l_c[0] + start_radius, l_c[1])
-        start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
+        start_chord_to_centre = sqrt(start_radius ** 2 - half_coord_distance ** 2)
         start_chord_to_edge = start_radius - start_chord_to_centre
 
         # two intersecting chords through circle have segments of chords related
         # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
         # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-        C = half_coord_distance**2
+        C = half_coord_distance ** 2
 
         for i in range(0, num_circles):
 
@@ -832,7 +832,7 @@ class Slope:
             )
             c_x, c_y = centre
 
-            i_list = self._get_circle_external_intersection(c_x, c_y, radius, l_c, r_c)
+            i_list = self._get_circle_external_intersection(c_x, c_y, radius)
 
             if len(set(i_list)) < 2:
                 continue
@@ -926,11 +926,14 @@ class Slope:
                 r_c=search["r_c"],
             )
 
+        if os.environ.get("DJANGO_DEBUG") == "TRUE":
+            print(f"length of search is {len(self._search)}")
+
         # tidy the information to remove anything that didnt run and
         # to be sorted from lowest FOS to highest FOS
         search = list(filter((lambda x: x["FOS"] is not None), self._search))
-        self._search = search
-        self._search.sort(key=lambda x: x["FOS"])
+        search.sort(key=lambda x: x["FOS"])
+        self._search = list(filter(lambda x: (x["FOS"] <= 5), search))
 
         if os.environ.get("DJANGO_DEBUG") == "TRUE":
             print(f"length of search is {len(self._search)}")
@@ -977,7 +980,7 @@ class Slope:
         # if l_c and r_c not set then user is probably checking an individual circular plane
         # can get the right and left coordinate intersection with the model for this case.
         if l_c is None or r_c is None:
-            i_list = self._get_circle_external_intersection(c_x, c_y, radius, l_c, r_c)
+            i_list = self._get_circle_external_intersection(c_x, c_y, radius)
             if len(set(i_list)) != 2:
                 return None
         else:
@@ -1008,7 +1011,7 @@ class Slope:
             # HAS ERROR
             # (cy - s_yb) ** 2 + abs(s_x-c_x)**2 = R ** 2
             # sqrt(R**2 - abs(s_x-c_x)**2) = c_y - s_yb
-            s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
+            s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
 
             # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
@@ -1160,7 +1163,7 @@ class Slope:
                 # if radius < abs(s_x - c_x):
                 #     return None
 
-                s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
+                s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
 
                 # get y coordinate at slice top
                 s_yt = self.get_external_y_intersection(s_x)
@@ -1350,9 +1353,7 @@ class Slope:
                 ll.offset = offset
             self.set_lls(ll)
 
-    def _get_circle_external_intersection(
-        self, c_x: float, c_y: float, radius: float, l_c=None, r_c=None
-    ):
+    def _get_circle_external_intersection(self, c_x: float, c_y: float, radius: float):
         """Get intersection points of a circle with external boundary
 
         Parameters
@@ -1363,32 +1364,12 @@ class Slope:
             circle y coordinate
         radius : float
             circle radius
-        l_c : tuple, optional
-            coordinates of left intersection between boundary and
-            failure plane if already known, by default None.
-        r_c : tuple, optional
-            coordinates of left intersection between boundary and
-            failure plane if already known, by default None.
 
         Returns
         -------
         tuple
             tuple of two coordinates (left coordinate, right coordinate)
         """
-        # if left and right intersection provided only need to check if cuts through middle of
-        # the slope.
-        if l_c and r_c:
-            i_list = [l_c, r_c]
-            mid_intersection = utilities.cirle_line_intersection(
-                self._top_coord, self._bot_coord, c_x, c_y, radius
-            )
-            for a in mid_intersection:
-                if a[0] >= self._top_coord[0] and a[0] <= self._bot_coord[0]:
-                    if abs(a[0] - l_c[0]) > 0.1:
-                        i_list.append(a)
-
-            i_list.sort(key=lambda x: x[0])
-            return i_list
 
         i_list = []
 
@@ -1438,7 +1419,7 @@ class Slope:
         unique_list = []
         x = -1
         for i in i_list:
-            if abs(i[0] - x) > 0.1:
+            if abs(i[0] - x) > 0.01:
                 unique_list.append(i)
             x = i[0]
 
@@ -1809,14 +1790,14 @@ class Slope:
         )
         return fig
 
-    def plot_all_planes(self, max_fos: float = 10, material_table=True, legend=True):
+    def plot_all_planes(self, max_fos: float = 5, material_table=True, legend=True):
         """plot multiple failure planes in the same plot
 
         Parameters
         ----------
         max_fos : float, optional
             maximum factor of safety to display for planes,
-            by default 10.
+            by default 5.
 
         Returns
         -------
@@ -1853,9 +1834,8 @@ class Slope:
                 else:
                     color = COLOUR_FOS_DICT[round(FOS, 1)]
 
-                # generate points for circle, will always generate 64 points (65 in list since start and end are same)
-                p = Point(c_x, c_y)
-                x, y = p.buffer(radius).boundary.coords.xy
+                # generate points for circle, generates points only along bottom half of circle
+                x, y = utilities.generate_circle_coordinates(c_x, c_y, radius)
 
                 # empty vectors for circle points that we will actually include
                 x_ = []
@@ -1863,7 +1843,7 @@ class Slope:
 
                 # 65 long list but the last half of points are for the top half of
                 # circle and so will never actually be required.
-                for i in range(34):
+                for i in range(len(x)):
                     # x coordinate should be between left and right
                     # note for y, should be less than left y but can stoop
                     # below right i
@@ -1871,8 +1851,8 @@ class Slope:
                         x_.append(x[i])
                         y_.append(y[i])
 
-                x_ = [r_c[0]] + x_ + [l_c[0]]
-                y_ = [r_c[1]] + y_ + [l_c[1]]
+                x_ = [l_c[0]] + x_ + [r_c[0]]
+                y_ = [l_c[1]] + y_ + [r_c[1]]
 
                 traces.append(
                     {
@@ -1894,7 +1874,9 @@ class Slope:
 
         return go.Figure(temp)
 
-    def _plot_annotate_FOS(self, fig, c_x: float, c_y: float, radius : float, FOS: float):
+    def _plot_annotate_FOS(
+        self, fig, c_x: float, c_y: float, radius: float, FOS: float
+    ):
         """Annotate FOS on figure.
 
         Parameters
@@ -1922,12 +1904,12 @@ class Slope:
                 x=[c_x],
                 y=[c_y],
                 mode="lines+text",
-                text=[f'{FOS:.3f}'],
+                text=[f"{FOS:.3f}"],
                 textposition="top right",
                 textfont=dict(family="sans serif", size=20, color=color),
                 name="",
                 texttemplate="%{text}",
-                hovertemplate=f'Centre: ({c_x:.3f}, {c_y:.3f})<br>Radius: {radius:.3f}<br>FOS: {FOS:.3f}',
+                hovertemplate=f"Centre: ({c_x:.3f}, {c_y:.3f})<br>Radius: {radius:.3f}<br>FOS: {FOS:.3f}",
             )
         )
 
@@ -2427,9 +2409,8 @@ class Slope:
         else:
             color = COLOUR_FOS_DICT[round(FOS, 1)]
 
-        # generate points for circle, will always generate 64 points (65 in list since start and end are same)
-        p = Point(c_x, c_y)
-        x, y = p.buffer(radius).boundary.coords.xy
+        # generate points for circle
+        x, y = utilities.generate_circle_coordinates(c_x, c_y, radius)
 
         # empty vectors for circle points that we will actually include
         x_ = []
@@ -2437,7 +2418,7 @@ class Slope:
 
         # 65 long list but the last half of points are for the top half of
         # circle and so will never actually be required.
-        for i in range(34):
+        for i in range(len(x)):
             # x coordinate should be between left and right
             # note for y, should be less than left y but can stoop
             # below right i
@@ -2446,11 +2427,11 @@ class Slope:
                 y_.append(y[i])
 
         if show_center:
-            x_ += [l_c[0], c_x, r_c[0], x_[0]]
-            y_ += [l_c[1], c_y, r_c[1], y_[0]]
+            x_ += [r_c[0], c_x, l_c[0], x_[0]]
+            y_ += [r_c[1], c_y, l_c[1], y_[0]]
         else:
-            x_ = [r_c[0]] + x_ + [l_c[0]]
-            y_ = [r_c[1]] + y_ + [l_c[1]]
+            x_ = [l_c[0]] + x_ + [r_c[0]]
+            y_ = [l_c[1]] + y_ + [r_c[1]]
 
         # THIS IS TOO SLOW (in experimentation the real
         # problem is with plotly, even with minimal data
@@ -2480,81 +2461,21 @@ if __name__ == "__main__":
 
     # slope defined with height (m) of slope and angle (deg) or length (m) of slope,
     # depending on which value is set and which is None.
-    s = Slope(height=3, angle=30, length=None)
+    s = Slope(height=1, angle=None, length=1)
 
     # define a material with unit weight, friction angle, cohesion and depth from top
     # of slope to bottom of layer. The model will automatically order units and if
     # a material is the lowest it will be extended to the bottom of the model
-    m1 = Material(unit_weight=20, friction_angle=45, cohesion=2, depth_to_bottom=2)
-
-    # material can also be defined with positional arguments, if the user can remember
-    # the order of required parameters.
-    m2 = Material(20, 30, 2, 5)
+    m1 = Material(unit_weight=20, friction_angle=35, cohesion=2, depth_to_bottom=2)
 
     # the created material objects can then be assigned to the model.
     # The same depth to bottom cant be specified for two different materials and an
     # error will be raised if this happens
-    s.set_materials(m1, m2)
+    s.set_materials(m1)
 
-    # define uniform load objects with magnitude (kPa), offset (m) from the crest of the slope
-    # length of the load (m) (if greater than length slope or None then assumed continuous).
-    u1 = Udl(magnitude=100, offset=2, length=1)
-
-    # by default offset = 0 (m) and length = None.
-    u2 = Udl(magnitude=20)
-
-    # assign uniform loads to model
-    s.set_udls(u1, u2)
-
-    # define line load, similiar to Udl except there is no length parameter and magnitude is in units (kN/m)
-    p1 = LineLoad(magnitude=10, offset=3)
-
-    # assign line loads to slope
-    s.set_lls(p1)
-
-    # Set water table if required. If None then not considered, by default no water table.
-    s.set_water_table(4)
-
-    # set limits on the slope failure search zone
-    s.set_analysis_limits(
-        s.get_top_coordinates()[0] - 5, s.get_bottom_coordinates()[0] + 5
-    )
-
-    # save the results (optional)
-    # Can save figure using ``fig.write_image("./results.pdf")`` (can change extension to be
-    # png, jpg, svg or other formats as reired). Requires pip install -U kaleido
-
-    # fig_1.write_image("./readme_example_plot_critical.png")
-    # fig_2.write_image("./readme_example_plot_all_maxfos2.png")
-
-    # lets say i want to see how close i can move my 100 kPa UDL
-    # while keeping the FOS above 1.4
-
-    # remove udl object load from slope
-    s.remove_udls(u1)
-
-    # if we didnt have the object we could remove all and readd the
-    # other udl object
-    s.remove_udls(remove_all=True)
-    s.set_udls(u2)
-
-    # now lets add the udl again but this time set the load as 'dynamic'
-    # for all loads and materials we also have the option to set the color ourselves
-    # lets try set the color as 'purple'
-    s.set_udls(
-        Udl(magnitude=100, length=1, offset=2, dynamic_offset=True, color="purple")
-    )
-
-    s.remove_individual_planes()
-
-    for r in [9, 10, 11]:
-        s.add_single_circular_plane(
-            c_x=13.7,
-            c_y=17.02,
-            radius=r,
-        )
-
-    s.add_single_entry_exit_plane(10, 15, 5)
+    s.add_single_entry_exit_plane(4.45, 5.45, 5)
+    s.add_single_entry_exit_plane(4, 5, 10)
+    s.add_single_entry_exit_plane(3, 5.4, 5)
 
     s.analyse_slope()
 

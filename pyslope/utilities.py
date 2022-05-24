@@ -4,9 +4,20 @@ from shapely.geometry import Point
 from colour import Color
 from functools import wraps
 
-MATERIAL_COLORS = ['#efa59c','#77e1ca', '#cdacfc','#f2c6a7','#7edff4','#f2a8c3','#cde9ba','#f2c1fa','#f1dba3','#a3acf7']
+MATERIAL_COLORS = [
+    "#efa59c",
+    "#77e1ca",
+    "#cdacfc",
+    "#f2c6a7",
+    "#7edff4",
+    "#f2a8c3",
+    "#cde9ba",
+    "#f2c1fa",
+    "#f1dba3",
+    "#a3acf7",
+]
 
-#wrapper for slope results
+# wrapper for slope results
 def reset_results(method):
     @wraps(method)
     def _impl(self, *method_args, **method_kwargs):
@@ -15,16 +26,18 @@ def reset_results(method):
         self._min_FOS = 0
         self._min_FOS_location = []
         self._min_FOS_dict = {
-                    'FOS': 0,
-                    'l_c': 0,
-                    'r_c': 0,
-                    'c_x': 0,
-                    'c_y': 0,
-                    'radius': 0,
-                    }
+            "FOS": 0,
+            "l_c": 0,
+            "r_c": 0,
+            "c_x": 0,
+            "c_y": 0,
+            "radius": 0,
+        }
 
         return method_output
+
     return _impl
+
 
 def is_color(color):
     try:
@@ -35,11 +48,12 @@ def is_color(color):
         return False
 
 
-def mid_coord(p1 : Point, p2 : Point) -> Point:
+def mid_coord(p1: Point, p2: Point) -> Point:
     return [(a + b) / 2 for a, b in zip(p1, p2)]
 
-def dist_points(p1:tuple, p2:tuple) -> float:
-    return sqrt(abs(p1[0]-p2[0])**2 + abs(p1[1]-p2[1]) ** 2 )
+
+def dist_points(p1: tuple, p2: tuple) -> float:
+    return sqrt(abs(p1[0] - p2[0]) ** 2 + abs(p1[1] - p2[1]) ** 2)
 
 
 def circle_radius_from_abcd(c_to_e, C):
@@ -56,21 +70,22 @@ def circle_centre(beta, chord_intersection, chord_to_centre):
 
     return [a + b for a, b in zip(chord_intersection, (dx, dy))]
 
-def cirle_line_intersection(top_coord,bot_coord,cx,cy,r):
+
+def cirle_line_intersection(top_coord, bot_coord, cx, cy, r):
     # Based on https://mathworld.wolfram.com/Circle-LineIntersection.html
     #  shift so 0,0 is datum
-    top_coord = [(top_coord[0]-cx), (top_coord[1]-cy)]
-    bot_coord = [(bot_coord[0]-cx), (bot_coord[1]-cy)]
+    top_coord = [(top_coord[0] - cx), (top_coord[1] - cy)]
+    bot_coord = [(bot_coord[0] - cx), (bot_coord[1] - cy)]
 
     dx = bot_coord[0] - top_coord[0]
     dy = bot_coord[1] - top_coord[1]
-    dr = sqrt(dx**2 + dy**2)
+    dr = sqrt(dx ** 2 + dy ** 2)
 
     D = top_coord[0] * bot_coord[1] - bot_coord[0] * top_coord[1]
 
-    disc = abs(r**2 * dr**2) - abs(D**2)
+    disc = abs(r ** 2 * dr ** 2) - abs(D ** 2)
 
-    if disc < 0 :
+    if disc < 0:
         return []
 
     if dy < 0:
@@ -78,62 +93,103 @@ def cirle_line_intersection(top_coord,bot_coord,cx,cy,r):
     else:
         m = 1
 
-    x1 = (D * dy + m * dx * sqrt(disc)) / dr**2 + cx
-    x2 = (D * dy -  m * dx * sqrt(disc)) / dr**2 + cx
+    x1 = (D * dy + m * dx * sqrt(disc)) / dr ** 2 + cx
+    x2 = (D * dy - m * dx * sqrt(disc)) / dr ** 2 + cx
 
-    y1 = ((- (D * dx)) + abs(dy) * sqrt(disc)) / dr**2 + cy
-    y2 = ((- (D * dx)) - abs(dy) * sqrt(disc)) / dr**2 + cy
+    y1 = ((-(D * dx)) + abs(dy) * sqrt(disc)) / dr ** 2 + cy
+    y2 = ((-(D * dx)) - abs(dy) * sqrt(disc)) / dr ** 2 + cy
 
     if disc == 0:
-        return [(x1,y1)]
+        return [(x1, y1)]
     else:
-        return [(x1,y1), (x2,y2)]
-        
-def create_fos_color_dictionary():
-    colors = [
-        (0,'red'),
-        (1,'orange'),
-        (2,'green'),
-        (3,'blue'),
+        return [(x1, y1), (x2, y2)]
+
+
+def generate_circle_coordinates(c_x, c_y, radius, number_points=90):
+    """Generate coordinates around bottom half of circumference of circle.
+
+    Parameters
+    ----------
+    c_x : float
+        circle centre x coordinate
+    c_y : float
+        circle centre y coordinate
+    radius : float
+        circle radius
+
+    returns
+    list of x coordinates and list of y coordinates.
+    """
+
+    x = [
+        round(c_x - cos(radians(alpha)) * radius, 3)
+        for alpha in range(1, 180, int(180 / number_points))
+    ]
+    y = [
+        round(c_y - sin(radians(alpha)) * radius, 3)
+        for alpha in range(1, 180, int(180 / number_points))
     ]
 
-    colors.sort(key = lambda x : x[0])
+    return (x, y)
+
+
+def create_fos_color_dictionary():
+    colors = [
+        (0, "red"),
+        (1, "orange"),
+        (2, "green"),
+        (3, "blue"),
+    ]
+
+    colors.sort(key=lambda x: x[0])
 
     color_dict = {}
 
-    for i in range(len(colors)-1):
+    for i in range(len(colors) - 1):
         c1 = Color(colors[i][1])
-        c2 = Color(colors[i+1][1])
+        c2 = Color(colors[i + 1][1])
 
         p1 = colors[i][0]
-        p2 = colors[i+1][0]
+        p2 = colors[i + 1][0]
 
-        d = int((p2 - p1)*10)
+        d = int((p2 - p1) * 10)
 
-        color_range = list(c1.range_to(c2,d+1))
+        color_range = list(c1.range_to(c2, d + 1))
 
-        for f in range(d+1):
-            color_dict[round(f/10+p1,1)] = color_range[f].hex
+        for f in range(d + 1):
+            color_dict[round(f / 10 + p1, 1)] = color_range[f].hex
 
     return color_dict
 
+
 COLOUR_FOS_DICT = create_fos_color_dictionary()
 
+
 def get_precision(n):
-# determine the precision of the value entered
+    # determine the precision of the value entered
     mag = str(n)
-    if '.' not in mag:
+    if "." not in mag:
         return 0
     else:
-        decimals = mag.split('.')[1]
-        for i in range(len(decimals)-3):
-            if decimals[i] == decimals[i+1] == decimals [i+2] == '0':
+        decimals = mag.split(".")[1]
+        for i in range(len(decimals) - 3):
+            if decimals[i] == decimals[i + 1] == decimals[i + 2] == "0":
                 return i
-        
+
     return len(decimals)
 
-def draw_line(fig, angle, x_sup, y_sup, length=-20, xoffset=0, yoffset=0,
-              color='red', line_width=2):
+
+def draw_line(
+    fig,
+    angle,
+    x_sup,
+    y_sup,
+    length=-20,
+    xoffset=0,
+    yoffset=0,
+    color="red",
+    line_width=2,
+):
     """Draw an anchored line on a plotly figure.
 
     Parameters
@@ -165,17 +221,25 @@ def draw_line(fig, angle, x_sup, y_sup, length=-20, xoffset=0, yoffset=0,
     # Establish line start and end coordinates.
     x0 = xoffset
     y0 = yoffset
-    x1 = x0 + int(length * cos(radians(angle)) )
-    y1 = y0 + int(length * sin(radians(angle)) )
+    x1 = x0 + int(length * cos(radians(angle)))
+    y1 = y0 + int(length * sin(radians(angle)))
 
     # Create dictionary for shape object representing line.
     shape = dict(
         type="line",
-        xref="x", yref="y",
-        x0=x0, y0=y0, x1=x1, y1=y1,
-        line_color=color, line_width=line_width,
-        xsizemode='pixel', ysizemode='pixel',
-        xanchor=x_sup, yanchor=y_sup)
+        xref="x",
+        yref="y",
+        x0=x0,
+        y0=y0,
+        x1=x1,
+        y1=y1,
+        line_color=color,
+        line_width=line_width,
+        xsizemode="pixel",
+        ysizemode="pixel",
+        xanchor=x_sup,
+        yanchor=y_sup,
+    )
 
     # Append shape to plot or subplot
     fig.add_shape(shape)
@@ -183,8 +247,9 @@ def draw_line(fig, angle, x_sup, y_sup, length=-20, xoffset=0, yoffset=0,
     return fig
 
 
-def draw_arrowhead(fig, angle, x_sup, y_sup, length=5, xoffset=0, yoffset=0,
-                   color='red', line_width=2):
+def draw_arrowhead(
+    fig, angle, x_sup, y_sup, length=5, xoffset=0, yoffset=0, color="red", line_width=2
+):
     """Draw an anchored arrowhead on a plotly figure.
 
     Parameters
@@ -238,8 +303,8 @@ def draw_arrowhead(fig, angle, x_sup, y_sup, length=5, xoffset=0, yoffset=0,
         xoffset=xoffset,
         yoffset=yoffset,
         color=color,
-        line_width=line_width
-        )
+        line_width=line_width,
+    )
 
     # Append line to figure (half of arrowhead)
     fig = draw_line(
@@ -252,14 +317,27 @@ def draw_arrowhead(fig, angle, x_sup, y_sup, length=5, xoffset=0, yoffset=0,
         yoffset=yoffset,
         color=color,
         line_width=line_width,
-        )
+    )
 
     return fig
 
 
-def draw_arrow(fig, angle, force, x_sup, y_sup, xoffset=0, yoffset=0, color='red',
-               line_width=2, arrowhead=5, arrowlength=40, show_values=True,
-               units="N", precision=3):
+def draw_arrow(
+    fig,
+    angle,
+    force,
+    x_sup,
+    y_sup,
+    xoffset=0,
+    yoffset=0,
+    color="red",
+    line_width=2,
+    arrowhead=5,
+    arrowlength=40,
+    show_values=True,
+    units="N",
+    precision=3,
+):
     """Draw an anchored arrow on a plotly figure.
 
     Parameters
@@ -328,7 +406,7 @@ def draw_arrow(fig, angle, force, x_sup, y_sup, xoffset=0, yoffset=0, color='red
         yoffset=yoffset,
         color=color,
         line_width=line_width,
-        )
+    )
 
     # Draw arrowline for force
     fig = draw_line(
@@ -341,18 +419,14 @@ def draw_arrow(fig, angle, force, x_sup, y_sup, xoffset=0, yoffset=0, color='red
         yoffset=yoffset,
         color=color,
         line_width=line_width,
-        )
+    )
 
     if show_values:
         # determine start and end of arrow
         x0 = xoffset + x_sup
         y0 = yoffset + y_sup
-        x1 = (
-            int(-arrowlength * d * cos(radians(angle)))
-            ) * 1.1
-        y1 = (
-            int(-arrowlength * d * sin(radians(angle)))
-            ) * 1.3
+        x1 = (int(-arrowlength * d * cos(radians(angle)))) * 1.1
+        y1 = (int(-arrowlength * d * sin(radians(angle)))) * 1.3
 
         # make so text doesnt intersect x axis
         if abs(y1) < 5:
@@ -362,7 +436,8 @@ def draw_arrow(fig, angle, force, x_sup, y_sup, xoffset=0, yoffset=0, color='red
                 y1 = -10
 
         annotation = dict(
-            xref="x", yref="y",
+            xref="x",
+            yref="y",
             x=x0,
             y=y0,
             xshift=x1,
@@ -376,8 +451,3 @@ def draw_arrow(fig, angle, force, x_sup, y_sup, xoffset=0, yoffset=0, color='red
         fig.add_annotation(annotation)
 
     return fig
-
-
-    
-
-    

@@ -143,10 +143,10 @@ class AnalysisOptionsForm(forms.Form):
 
     slices = forms.IntegerField(
         min_value=10,
-        max_value=100,
+        max_value=50,
         required=True,
         label="Slices",
-        initial=10,
+        initial=25,
         widget=RangeInput(attrs={"step": 5}),
     )
 
