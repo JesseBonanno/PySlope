@@ -103,12 +103,43 @@ def index(request):
             limits_form = LimitsForm(prefix="limits")
             options_form = AnalysisOptionsForm(prefix="options")
 
-            search = "[]"
-
             slope = Slope(angle=45)
             slope.set_materials(Material())
+            slope.update_analysis_options(iterations=500, slices=10)
+            slope.analyse_slope()
+
+            for s in slope._search:
+
+                c_x = s["c_x"]
+                c_y = s["c_y"]
+                radius = s["radius"]
+                r_c = s["r_c"]
+                l_c = s["l_c"]
+
+                # generate points for circle, generates points only along bottom half of circle
+                x, y = utilities.generate_circle_coordinates(c_x, c_y, radius)
+
+                # empty vectors for circle points that we will actually include
+                x_ = []
+                y_ = []
+
+                # 65 long list but the last half of points are for the top half of
+                # circle and so will never actually be required.
+                for i in range(len(x)):
+                    # x coordinate should be between left and right
+                    # note for y, should be less than left y but can stoop
+                    # below right i
+                    if x[i] <= r_c[0] and x[i] >= l_c[0]:
+                        x_.append(x[i])
+                        y_.append(y[i])
+
+                s["x"] = [l_c[0]] + x_ + [r_c[0]]
+                s["y"] = [l_c[1]] + y_ + [r_c[1]]
+
+            search = slope._search
+
             plot_json = (
-                slope.plot_boundary().update_layout(height=1200, width=2000).to_json()
+                slope.plot_critical().update_layout(height=1200, width=2000).to_json()
             )
 
         return render(
