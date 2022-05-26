@@ -2,171 +2,182 @@
 {% load static %}
 
 {% block head %}
-  <title>pySlope</title>
-  <link rel='stylesheet' href="{% static 'slope/styles.css' %}">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.8.0/plotly.min.js"></script>
-  <script src="{% static 'slope/charting.js' %}"></script>
-  <script src="{% static 'slope/button_control.js' %}"></script>
-  <script src="{% static 'slope/add_rows.js' %}"></script>
-  <script src="{% static 'slope/hide_form.js' %}"></script>
-  <script src="{% static 'slope/focus_form.js' %}"></script>
-  <script src="{% static 'slope/slider_values.js' %}"></script>
+<title>pySlope</title>
+<link rel='stylesheet' href="{% static 'slope/styles.css' %}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.8.0/plotly.min.js"></script>
+<script src="{% static 'slope/charting.js' %}"></script>
+<script src="{% static 'slope/button_control.js' %}"></script>
+<script src="{% static 'slope/add_rows.js' %}"></script>
+<script src="{% static 'slope/hide_form.js' %}"></script>
+<script src="{% static 'slope/focus_form.js' %}"></script>
+<script src="{% static 'slope/slider_values.js' %}"></script>
+<script src="{% static 'slope/update_pdf_link.js' %}"></script>
 
 
-  {{ search|json_script:"search" }}
-  {{ plot_json|json_script:"plot_json" }}
-  {{ COLOUR_FOS_DICT|json_script:"COLOUR_FOS_DICT" }}
+{{ search|json_script:"search" }}
+{{ plot_json|json_script:"plot_json" }}
+{{ COLOUR_FOS_DICT|json_script:"COLOUR_FOS_DICT" }}
 
-  <script type="text/javascript"> let myArray = JSON.parse(document.getElementById('search').textContent);</script>
-  
-  
+<script type="text/javascript"> let myArray = JSON.parse(document.getElementById('search').textContent);</script>
+
+
 {% endblock %}
 
 {% block body %}
-  
-  <!-- TO DO: Maybe can reflect on the layout of the existing app-->
-  <!-- Alert is a to do item -->
-  <div> <!--id="outer-flex-container"> primary flex container - Stevan commented this out as I was trying to optimise the chart for smaller screens -->
-    <h1>pySlope</h1>
 
-    <div> <!-- id="inner-flex-container"> flex item #2 - Stevan commented this out as I was trying to optimise the chart for smaller screens -->
+<!-- TO DO: Maybe can reflect on the layout of the existing app-->
+<!-- Alert is a to do item -->
+<div>
+  <!--id="outer-flex-container"> primary flex container - Stevan commented this out as I was trying to optimise the chart for smaller screens -->
+  <h1>pySlope</h1>
 
-      <div id="mainpanel" class="container" style="max-width: 100%;">
+  <div>
+    <!-- id="inner-flex-container"> flex item #2 - Stevan commented this out as I was trying to optimise the chart for smaller screens -->
 
-          <div class = 'row'>
-              
-                <form action="{% url 'index' %}" method = 'post' id='mainform'>
-                <div style="overflow-x: auto; max-width: 100%;">
-                {% csrf_token %}
-                <!-- button for analysing -->
-                <div id="button-row">
-                  <button class="btn btn-primary" disabled type="submit" value="Analyse" name="Analyse" id="analysis_button">
-                    <span id="analyse_text">Analyse</span>
-                  </button>
+    <div id="mainpanel" class="container" style="max-width: 100%;">
 
-                  <!-- Button for analysing and download a pdf report -->
-                  <button class="btn btn-primary" type="submit" value="pdf" name="pdf" id="pdf_button">
-                    <span id="pdf_text">PDF</span>
-                  </button>
+      <div class='row'>
 
-                  <!-- button to reset slope -->
-                  <a class="btn btn-primary" href='{% url "reset" %}' id="reset_button">Clear Slope</a>
-                  <span class="btn btn-primary disabled" id="reset_button_disabled" style="display:none">Clear Slope</span>
-                
-                  <!-- Spinner -->
-                  <span class="spinner-border spinner-border-sm loader" role="status" aria-hidden="true" id="loading-spinner"></span>
-                </div>
-                <!--Main app navigation tab-->
-                <div class="border mt-2" style="display: flex; overflow-x: auto; max-width: 100%;">
-                <ul class="nav nav-tabs flex-nowrap py-2" id="myTab" role="tablist">
-                    {% for name, form, type in forms %}
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="{{name}}-tab" data-bs-toggle="tab" data-bs-target="#{{name}}" type="button" role="tab" aria-controls="{{name}}" aria-selected="true">{{name.capitalize}}</button>
-                        </li>
+        <form action="{% url 'index' %}" method='post' id='mainform'>
+          <div style="overflow-x: auto; max-width: 100%;">
+            {% csrf_token %}
+            <!-- button for analysing -->
+            <div id="button-row">
+              <button class="btn btn-primary" disabled type="submit" value="Analyse" name="Analyse"
+                id="analysis_button">
+                <span id="analyse_text">Analyse</span>
+              </button>
+
+              <!-- Button for analysing and download a pdf report -->
+              <!-- Need to update fos value (0) everytime the fos value is changed or on dom load -->
+              <a class="btn btn-primary" id="pdf_button" href='{% url "pdf/0"}'>
+                <span id="pdf_text">PDF</span>
+              </a>
+
+              <!-- button to reset slope -->
+              <a class="btn btn-primary" href='{% url "reset" %}' id="reset_button">Clear Slope</a>
+              <span class="btn btn-primary disabled" id="reset_button_disabled" style="display:none">Clear Slope</span>
+
+              <!-- Spinner -->
+              <span class="spinner-border spinner-border-sm loader" role="status" aria-hidden="true"
+                id="loading-spinner"></span>
+            </div>
+            <!--Main app navigation tab-->
+            <div class="border mt-2" style="display: flex; overflow-x: auto; max-width: 100%;">
+              <ul class="nav nav-tabs flex-nowrap py-2" id="myTab" role="tablist">
+                {% for name, form, type in forms %}
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="{{name}}-tab" data-bs-toggle="tab" data-bs-target="#{{name}}"
+                    type="button" role="tab" aria-controls="{{name}}" aria-selected="true">{{name.capitalize}}</button>
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+            <!-- Content for main app navigation tab-->
+            <br>
+          </div>
+
+          <div class="card tab-content" id="myTabContent" style="display: flex; overflow-x: auto; max-width: 100%;">
+            {% for name, forms, type in forms %}
+
+            <div class="tab-pane fade" id={{name}} role="tabpanel" aria-labelledby="{{name}}-tab">
+              {% csrf_token %}
+              {% if type == 'formset' %}
+              {{ forms.management_form }}
+              {{ forms.non_form_errors.as_ul }}
+              <table id="formset-{{name}}" class="form">
+                {% for form in forms.forms %}
+                {% if forloop.first %}
+                <thead>
+                  <tr>
+                    {% for field in form.visible_fields %}
+                    <th class="{{field.label}}">{{ field.label|capfirst }}</th>
                     {% endfor %}
-                </ul>
-                </div>
-                <!-- Content for main app navigation tab-->
+                  </tr>
+                </thead>
+                {% endif %}
+                <tr class='formset-row-{{name}} formset-row' style='max-width: 150px;'>
+                  {% for field in form.visible_fields %}
+                  <td>
+                    {% if forloop.first %}
+                    {% for hidden in form.hidden_fields %}
+                    {{ hidden }}
+                    {% endfor %}
+                    {% endif %}
+                    {{ field.errors.as_ul }}
+                    {{ field }}
+                  </td>
+
+                  {% endfor %}
+                  <td><button class="align-self-center btn btn-danger delete-{{name}}-form"
+                      style="padding:1px 8px">X</button></td>
+                </tr>
+                <div class='end-row-{{name}}'></div>
+                {% endfor %}
+              </table>
+
+              <button id='add-{{name}}-form' class='btn btn-primary my-3'>Add another row</button>
+
+              {% else %}
+
+              {% for field in forms %}
+              <div class='{{name}}-div'>
+                <div class="align-self-center col-3 col-form-label" style='display:inline-block'
+                  id='{{name}}-{{field.label}}'>{{ field.label_tag }}</div>
+                <div class="col-8" style='display:inline-block'>{{ field }}</div>
                 <br>
-                </div>
+              </div>
+              {% endfor %}
 
-                <div class="card tab-content" id="myTabContent" style="display: flex; overflow-x: auto; max-width: 100%;">
-                    {% for name, forms, type in forms %}
-                        
-                        <div class="tab-pane fade" id={{name}} role="tabpanel" aria-labelledby="{{name}}-tab">
-                          {% csrf_token %}
-                          {% if type == 'formset' %}
-                              {{ forms.management_form }}
-                              {{ forms.non_form_errors.as_ul }}
-                                  <table id="formset-{{name}}" class="form" >
-                                  {% for form in forms.forms %}
-                                    {% if forloop.first %}
-                                    <thead><tr>
-                                      {% for field in form.visible_fields %}
-                                          <th class="{{field.label}}">{{ field.label|capfirst }}</th>
-                                      {% endfor %}
-                                    </tr></thead>
-                                    {% endif %}
-                                    <tr class='formset-row-{{name}} formset-row' style='max-width: 150px;'>
-                                    {% for field in form.visible_fields %}
-                                      <td>
-                                      {% if forloop.first %}
-                                        {% for hidden in form.hidden_fields %}
-                                        {{ hidden }}
-                                        {% endfor %}
-                                      {% endif %}
-                                        {{ field.errors.as_ul }}
-                                        {{ field }}
-                                      </td>
-                                                                           
-                                    {% endfor %}
-                                    <td><button class="align-self-center btn btn-danger delete-{{name}}-form" style="padding:1px 8px">X</button></td>
-                                    </tr>
-                                    <div class='end-row-{{name}}'></div>
-                                  {% endfor %}
-                                  </table>
-                                  
-                            <button id='add-{{name}}-form' class = 'btn btn-primary my-3'>Add another row</button>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
 
-                          {% else %}
-                            
-                            {% for field in forms  %}
-                              <div class = '{{name}}-div'>
-                                  <div class = "align-self-center col-3 col-form-label" style='display:inline-block' id='{{name}}-{{field.label}}'>{{ field.label_tag }}</div>
-                                  <div class = "col-8" style='display:inline-block'>{{ field }}</div>
-                                  <br>
-                              </div>
-                            {% endfor %}
-
-                          {% endif %}
-                        </div>
-                    {% endfor %}
-                </div>
-
-            </form>
-        </div>
+        </form>
       </div>
+    </div>
 
-      <div style="max-width:1200px; max-height: 100%; height: 100%">
-        <div id ='plotly_js' style="width: 100%;"></div>
-      </div>
-      
-      <div id="mobile_screen_menus">
-        <table class="table">
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Colour</th>
-              <th scope="col">γ</th>
-              <th scope="col">c</th>
-              <th scope="col">ϕ</th>
-            </tr>
-          </thead>
-          <tbody id="mobile_soil_table">
-          </tbody>
-        </table>
+    <div style="max-width:1200px; max-height: 100%; height: 100%">
+      <div id='plotly_js' style="width: 100%;"></div>
+    </div>
 
-        <h5 class="text-center">Factor of safety legend</h5>
-        <div class="row">
-          <div class="col"><b>0</b></div>
-          <div class="col text-center"><b>1</b></div>
-          <div class="col text-center"><b>2</b></div>
-          <div class="col text-end"><b>3</b></div>
-        </div>
-        <table class="table" style="table-layout: fixed;">
-          <tbody>
-            <tr id="FOS_legend"></tr>
-          </tbody>
-        </table>
+    <div id="mobile_screen_menus">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Colour</th>
+            <th scope="col">γ</th>
+            <th scope="col">c</th>
+            <th scope="col">ϕ</th>
+          </tr>
+        </thead>
+        <tbody id="mobile_soil_table">
+        </tbody>
+      </table>
+
+      <h5 class="text-center">Factor of safety legend</h5>
+      <div class="row">
+        <div class="col"><b>0</b></div>
+        <div class="col text-center"><b>1</b></div>
+        <div class="col text-center"><b>2</b></div>
+        <div class="col text-end"><b>3</b></div>
       </div>
-      <!-- 
+      <table class="table" style="table-layout: fixed;">
+        <tbody>
+          <tr id="FOS_legend"></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- 
       <div class ='card' id="aside">
         {{plot|safe}}
       </div>
     -->
 
-      
-    </div><!-- end #inner-flex-container -->
+
+  </div><!-- end #inner-flex-container -->
 
 </div><!-- end #outer-flex-container -->
 
