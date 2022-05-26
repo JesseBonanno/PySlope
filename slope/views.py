@@ -9,6 +9,7 @@ import base64
 from plotly.io import to_json, from_json
 
 from pyslope.pyslope import utilities
+from plotly import graph_objects as go
 
 # import backend section of code
 import os, sys
@@ -42,6 +43,8 @@ from .forms import (
     LimitsForm,
 )
 
+MAX_COLOUR_KEY = max(COLOUR_FOS_DICT)
+
 
 def reset(request):
     # remove all saved information to allow the form to reset to default parameters
@@ -51,6 +54,82 @@ def reset(request):
     # get request the main page, however now session information is set to none meaning
     # that the default values are returned to the user.
     return redirect("index")
+
+
+def pdf(request, max_fos=5):
+    # get saved data, still taking forever.
+    if request.session["plot_json"] == [] or request.session["search"] == []:
+        return redirect("index")
+    plot = from_json(request.session["plot_json"])
+    search = list(eval(str(request.session["search"])))
+
+    max_fos = float(max_fos)
+
+    # turn json data back into a plotly chart
+    traces = []
+
+    for i in search:
+
+        FOS = i["FOS"]
+        if FOS < max_fos:
+
+            c_x = i["c_x"]
+            c_y = i["c_y"]
+            radius = i["radius"]
+            l_c = i["l_c"]
+            r_c = i["r_c"]
+
+            color = COLOUR_FOS_DICT[min(round(FOS, 1), MAX_COLOUR_KEY)]
+
+            # generate points for circle, generates points only along bottom half of circle
+            x, y = utilities.generate_circle_coordinates(c_x, c_y, radius)
+
+            # empty vectors for circle points that we will actually include
+            x_ = []
+            y_ = []
+
+            # 65 long list but the last half of points are for the top half of
+            # circle and so will never actually be required.
+            for i in range(len(x)):
+                # x coordinate should be between left and right
+                # note for y, should be less than left y but can stoop
+                # below right i
+                if x[i] <= r_c[0] and x[i] >= l_c[0] and y[i] <= l_c[1]:
+                    x_.append(x[i])
+                    y_.append(y[i])
+
+            x_ = [l_c[0]] + x_ + [r_c[0]]
+            y_ = [l_c[1]] + y_ + [r_c[1]]
+
+            traces.append(
+                {
+                    "hovertemplate": "%{meta[0]}",
+                    "line": {"color": color},
+                    "meta": [round(FOS, 3)],
+                    "mode": "lines",
+                    "name": "",
+                    "x": x_,
+                    "y": y_,
+                    "type": "scatter",
+                }
+            )
+
+    traces.reverse()
+
+    temp = plot.to_dict()
+    temp["data"] = tuple(list(temp["data"]) + traces)
+
+    plot = go.Figure(temp)
+
+    # return pdf and redirect?
+    pdf = plot.to_image(format="pdf", width=1600, height=900)
+
+    response = HttpResponse(pdf, content_type="application/pdf")
+    filename = "report.pdf"
+    content = f"attachment; filename={filename}"
+    response["Content-Disposition"] = content
+
+    return response
 
 
 def index(request):
@@ -141,6 +220,10 @@ def index(request):
             plot_json = (
                 slope.plot_critical().update_layout(height=1200, width=2000).to_json()
             )
+
+            request.session["search"] = search
+            request.session["plot_json"] = plot_json
+            request.session["forms"] = request.POST
 
         return render(
             request,
@@ -239,26 +322,6 @@ def index(request):
             request.session["search"] = search
             request.session["plot_json"] = plot_json
             request.session["forms"] = request.POST
-
-            # return pdf if required
-            if request.POST.get("pdf"):
-                try:
-                    max_fos = int(options_form.cleaned_data["max_display_FOS"])
-                except:
-                    max_fos = 0
-
-                plot = slope.plot_all_planes(
-                    material_table=True, legend=True, max_fos=max_fos
-                )
-
-                pdf = plot.to_image(format="pdf", width=1600, height=900)
-
-                response = HttpResponse(pdf, content_type="application/pdf")
-                filename = "report.pdf"
-                content = f"attachment; filename={filename}"
-                response["Content-Disposition"] = content
-
-                return response
 
             return render(
                 request,
