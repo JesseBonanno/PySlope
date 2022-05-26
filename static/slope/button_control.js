@@ -10,16 +10,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     inputs = document.getElementsByTagName('input');
     for (var i = 0; i < inputs.length; i++) {
-        inputs[i].oninput = function () {
-            document.getElementById('analysis_button').disabled = false
+        if (inputs[i].id != 'id_options-max_display_FOS') {
+            inputs[i].addEventListener('change', () => {
+                document.getElementById('analysis_button').disabled = false
 
-            // for pdf_button it has been changed to a link so need 
-            document.getElementById('pdf_button').classList.add('disabled');
-            document.getElementById('pdf_button').href = '';
-
+                // for pdf_button it has been changed to a link so need 
+                document.getElementById('pdf_button').classList.add('disabled');
+                document.getElementById('pdf_button').href = '';
+            });
         }
     }
-})
+});
 
 function trigger_spinner() {
 
