@@ -481,7 +481,7 @@ def create_slope(
             )
 
     if options_form.cleaned_data["analysis_choice"] == "normal":
-        slope.analyse_slope()
+        slope.analyse_slope(max_fos=5)
     else:
 
         # might fail if no dynamic loads set up
