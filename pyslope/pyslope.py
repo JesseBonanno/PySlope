@@ -221,7 +221,13 @@ class Slope:
         # intialise options
         self.update_boundary_options(MIN_EXT_H=6, MIN_EXT_L=10)
         self.set_external_boundary(height=height, angle=angle, length=length)
-        self.update_analysis_options(slices=25, iterations=1000, min_failure_dist=0)
+        self.update_analysis_options(
+            slices=25,
+            iterations=1000,
+            min_failure_dist=0,
+            tolerance=0.005,
+            max_iterations=15,
+        )
 
         self.update_water_analysis_options(auto=True)
 
@@ -607,6 +613,8 @@ class Slope:
         slices: int = None,
         iterations: int = None,
         min_failure_dist: int = None,
+        tolerance: float = None,
+        max_iterations: int = None,
     ):
         """Function to update analysis modelling options.
 
@@ -621,6 +629,12 @@ class Slope:
         min_failure_distance : int, optional
             If specified only failure slopes with a distance greater than the
             min failure distance will be assessed, by default None.
+        tolerance : float, optional
+            Convergance tolerance on bishops. Calculation will stop when change in factor
+            of safety is less than the tolerance specified. By default None. Inialised as 0.005.
+        max_iterations : int, optional
+            Maximum number of iterations for convergence on bishop factor of safety. By default
+            None. Initialised as 15.
         """
         if slices:
             self._slices = max(min(500, slices), 10)
@@ -632,6 +646,12 @@ class Slope:
             self._min_failure_distance = min(
                 min_failure_dist, self._external_length * 0.9
             )
+
+        if tolerance is not None:
+            self._tolerance = tolerance
+
+        if max_iterations is not None:
+            self._max_iterations = max_iterations
 
         # reset results
         self._reset_results()
@@ -779,6 +799,10 @@ class Slope:
         while num_points_top * num_points_bot * num_circles < self._iterations:
             num_points_bot += 1
 
+        # remove number of points on top to be spread to allow for specific
+        # points next to the edge of loads
+        num_points_top = num_points_top - len(self._lls) - len(self._udls)
+
         # get limits on bounds of slope
         # not some limits might still stretch off slope
         # but <= check later considers this.
@@ -805,6 +829,14 @@ class Slope:
 
         search = []
 
+        # add in coordinates directly adjacent to loads
+        for ll in self._lls:
+            left_coords += [(ll.coord - 0.001, self._top_coord[1])]
+
+        for udl in self._udls:
+            left_coords += [(udl.left - 0.001, self._top_coord[1])]
+
+        # loop through left and right points to generate coordinates
         for l_c in tqdm(left_coords):
             for r_c in right_coords:
                 if utilities.dist_points(l_c, r_c) > self._min_failure_distance:
@@ -855,13 +887,13 @@ class Slope:
         # increase to 1.1 to prevent ma denominator issues for bishops method.
         start_radius = half_coord_distance / cos(beta) * 1.1
         # start_centre = (l_c[0] + start_radius, l_c[1])
-        start_chord_to_centre = sqrt(start_radius ** 2 - half_coord_distance ** 2)
+        start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
         start_chord_to_edge = start_radius - start_chord_to_centre
 
         # two intersecting chords through circle have segments of chords related
         # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
         # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-        C = half_coord_distance ** 2
+        C = half_coord_distance**2
 
         for i in range(0, num_circles):
 
@@ -956,7 +988,7 @@ class Slope:
         # reset results
         self._reset_results()
 
-    def analyse_slope(self):
+    def analyse_slope(self, max_fos=None):
         """Analyse many possible failure planes for a slope OR
         indivually added failure planes if added to slope."""
 
@@ -985,7 +1017,10 @@ class Slope:
         # to be sorted from lowest FOS to highest FOS
         search = list(filter((lambda x: x["FOS"] is not None), self._search))
         search.sort(key=lambda x: x["FOS"])
-        self._search = list(filter(lambda x: (x["FOS"] <= 5), search))
+        if max_fos:
+            search = list(filter(lambda x: (x["FOS"] <= max_fos), search))
+
+        self._search = search
 
         if os.environ.get("DJANGO_DEBUG") == "TRUE":
             print(f"length of search is {len(self._search)}")
@@ -1063,7 +1098,7 @@ class Slope:
             # HAS ERROR
             # (cy - s_yb) ** 2 + abs(s_x-c_x)**2 = R ** 2
             # sqrt(R**2 - abs(s_x-c_x)**2) = c_y - s_yb
-            s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
+            s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
 
             # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
@@ -1106,8 +1141,12 @@ class Slope:
                 # determine H factor based on setting
                 # https://www.rocscience.com/help/slide2/documentation/slide-model/material-properties/define-material-properties/water-parameters
 
-                # only use H factor if on the slope, otherwise use 1
-                if self._top_coord[0] < s_x < self._bot_coord[0]:
+                # only use H factor if water sloping
+                if (
+                    self.get_external_x_intersection(self._water_RL)
+                    < s_x
+                    < self._bot_coord[0]
+                ):
                     U = (
                         max(min(self._water_RL, s_yt) - s_yb, 0)
                         * 9.81
@@ -1197,7 +1236,7 @@ class Slope:
         # width of a slice
         b = dist / SLICES
 
-        for _ in range(10):
+        for _ in range(self._max_iterations):
             # initialise centre point of first slice
             s_x = i_list[0][0] + b / 2
 
@@ -1215,7 +1254,7 @@ class Slope:
                 # if radius < abs(s_x - c_x):
                 #     return None
 
-                s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
+                s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
 
                 # get y coordinate at slice top
                 s_yt = self.get_external_y_intersection(s_x)
@@ -1268,7 +1307,11 @@ class Slope:
                     # https://www.rocscience.com/help/slide2/documentation/slide-model/material-properties/define-material-properties/water-parameters
 
                     # only use H factor if on the slope, otherwise use 1
-                    if self._top_coord[0] < s_x < self._bot_coord[0]:
+                    if (
+                        self.get_external_x_intersection(self._water_RL)
+                        < s_x
+                        < self._bot_coord[0]
+                    ):
                         U = (
                             max(min(self._water_RL, s_yt) - s_yb, 0)
                             * 9.81
@@ -1300,7 +1343,7 @@ class Slope:
                 return None
 
             FS = resisting / pushing
-            if abs(prev_FS - FS) < 0.01:
+            if abs(prev_FS - FS) < self._tolerance:
                 return FS
             else:
                 prev_FS = FS
@@ -1502,7 +1545,7 @@ class Slope:
         # loop through materials noting that they are already sorted by depth
         for m in self._materials:
             # while layers are higher than the top of the slice ignore the material
-            if m.RL > s_yt:
+            if m.RL >= s_yt:
                 continue
             # while the bottom of layer is in the slice consider, go from the
             # current top to the bottom of the layer
@@ -1859,10 +1902,6 @@ class Slope:
 
         fig = self.plot_critical(material_table=material_table, legend=legend)
 
-        data_validation.assert_strictly_positive_number(
-            max_fos, "max factor of safety (max_fos)"
-        )
-
         fig = self._plot_FOS_legend(fig)
 
         # JB 20.04.22 - 'hacked' into how plotly works to make faster
@@ -1873,7 +1912,7 @@ class Slope:
         for i in tqdm(self._search):
 
             FOS = i["FOS"]
-            if FOS < max_fos:
+            if max_fos is None or FOS < max_fos:
 
                 c_x = i["c_x"]
                 c_y = i["c_y"]
@@ -2507,27 +2546,31 @@ class Slope:
 
 if __name__ == "__main__":
 
-    # Arbritrary example defined in README.md
-
-    # slope defined with height (m) of slope and angle (deg) or length (m) of slope,
-    # depending on which value is set and which is None.
     s = Slope(height=1, angle=None, length=1)
 
-    # define a material with unit weight, friction angle, cohesion and depth from top
-    # of slope to bottom of layer. The model will automatically order units and if
-    # a material is the lowest it will be extended to the bottom of the model
-    m1 = Material(unit_weight=20, friction_angle=35, cohesion=2, depth_to_bottom=2)
+    m1 = Material(20, 35, 0, 0.5)
+    m2 = Material(20, 35, 2, 1)
+    m3 = Material(18, 30, 0, 5)
 
-    # the created material objects can then be assigned to the model.
-    # The same depth to bottom cant be specified for two different materials and an
-    # error will be raised if this happens
-    s.set_materials(m1)
+    s.set_materials(m1, m2, m3)
 
-    s.add_single_entry_exit_plane(4.45, 5.45, 5)
-    s.add_single_entry_exit_plane(4, 5, 10)
-    s.add_single_entry_exit_plane(3, 5.4, 5)
+    for r in range(2, 6):
+        s.add_single_circular_plane(
+            c_x=s.get_bottom_coordinates()[0],
+            c_y=s.get_bottom_coordinates()[1] + 2.5,
+            radius=r,
+        )
+
+    s.update_analysis_options(slices=50)
+
+    s.set_water_table(0.7)
 
     s.analyse_slope()
 
-    fig = s.plot_all_planes()
-    fig.show()
+    # print the critical FOS for the slope
+    print("fos:", s.get_min_FOS())
+
+    # plot the critical failure surface
+    fig_1 = s.plot_all_planes(max_fos=None)
+    fig_1.update_layout(width=1200, height=700)
+    fig_1.show()

@@ -185,7 +185,7 @@ def index(request):
             slope = Slope(angle=45)
             slope.set_materials(Material())
             slope.update_analysis_options(iterations=500, slices=10)
-            slope.analyse_slope()
+            slope.analyse_slope(max_fos=5)
 
             for s in slope._search:
 
@@ -490,6 +490,6 @@ def create_slope(
                 critical_fos=options_form.cleaned_data["critical_FOS"]
             )
         except:
-            slope.analyse_slope()
+            slope.analyse_slope(max_fos = 5)
 
     return slope
