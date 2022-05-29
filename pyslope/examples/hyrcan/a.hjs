@@ -1,0 +1,45 @@
+// start with a newmodel
+newmodel();
+
+// Geometry for user to edit
+var height = 1;
+var length = 1;
+
+var crest_x = 4.5;
+var crest_y = 6;
+
+var base_x = Math.round((crest_x + length) * 1000) / 1000;
+var base_y = Math.round((crest_y - height) * 1000) / 1000;
+
+// End_x is the x coordinate of the end/right of the model (y coordinate would be same as crest)
+var end_x = Math.round(crest_x + base_x + 1);
+
+
+// Set up external boundary
+extboundary(0, 0, 0, crest_y, crest_x, crest_y, base_x, base_y, end_x, base_y, end_x, 0, 0, 0)
+
+// Define materials
+definemat("ground", "matID", 1, "matName", "m1", "uw", 20, "cohesion", 0, "friction", 35)
+definemat("ground", "matID", 2, "matName", "m2", "uw", 20, "cohesion", 0, "friction", 35)
+definemat("ground", "matID", 3, "matName", "m3", "uw", 18, "cohesion", 0, "friction", 30)
+
+
+// Define material boundaries and assign materials (optional)
+var d_mat_1 = 0.5;
+var d_mat_2 = 1;
+
+matboundary(0, crest_y - d_mat_1, end_x, crest_y - d_mat_1)
+matboundary(0, crest_y - d_mat_2, end_x, crest_y - d_mat_2)
+
+assignsoilmat("matid", 1, "atpoint", crest_x, crest_y - 0.01)
+assignsoilmat("matid", 2, "atpoint", crest_x, crest_y - 0.01 - d_mat_1)
+assignsoilmat("matid", 3, "atpoint", crest_x, crest_y - 0.01 - d_mat_2)
+
+// add surface to look at
+set("numSlice",50)
+set("maxIter",15)
+set("failureDir", "l2r" );
+set("searchMethod", "userDefined" );
+definelimits("limit",0,11)
+
+for (var i = 2; i < 6; i++) { addsurface("center", base_x, base_y + 2.5, "radius" , i); }
