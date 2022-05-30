@@ -143,6 +143,7 @@ s.update_analysis_options(slices=50, iterations=2500)
 
 # run analysis
 s.analyse_slope()
+```
 
 ### Interpretting results
 
