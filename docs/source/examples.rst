@@ -356,3 +356,73 @@ Plot generated using `plot_all_planes()` function with keyword argument `max_fos
 
 3. Validation of Results
 ==============================
+
+3.1 Validation Tools
+++++++++++++++++++++++++
+
+To simplify validating results the results of ``pySlope`` will be compared to other similiar software for a range of cases.
+The software to be considered is:
+
+   - RocScience Slide v6.0
+   - Hyrcan Version 1.75
+
+Rocscience is a commercial software for 2D Limit Equilibrium Analysis for Slopes widely used in the industry. 
+
+.. figure:: ../../pySlope/examples/slide/slide.png
+  :width: 700
+  :alt: slide_model
+
+HYRCAN is a free Slope Stability analysis program for Geo-Engineers and can be found at this link: http://www.geowizard.org/download_hyrcan.html
+
+.. figure:: ../../pySlope/examples/hyrcan/hyrcan.png
+  :width: 700
+  :alt: hyrcan_model
+
+To be consistent the following settings were normalised across all programs:
+
+   - slices = 50
+   - tolerance = 0.005
+   - max_iterations = 15
+
+3.2 Validation Models
++++++++++++++++++++++++++
+
+Description
+-------------
+
+The following models were seperately assessed to validate ``pySlope``:
+
+   a. Typical model with no cohesion
+   b. Case a. + material 2 updated to have cohesion
+   c. Case b. + water table added in at 0.7 m below ground level
+   d. Case c. + 20 kPa load offset at 0.5 m with a 2 m length added to slope
+   e. Case c. + 5 kN/m LineLoad added at offset of 1 m.
+
+For each model specific circular failures where assessed. They were all centred 2.5 m above the toe of the slope with radii from 2 m up to 6 m.
+
+Code
+----------
+
+You can view the models created with ``pySlope`` online: |binder|
+
+.. |binder| image:: https://mybinder.org/badge_logo.svg
+   :target: https://mybinder.org/v2/gh/JesseBonanno/pySlope/main?filepath=pySlope%2Fexamples%2Fvalidation.ipynb
+
+
+Results
+-------------
+
+.. pyexcel-table:: ../../pySlope/examples/summary_results.xlsx
+
+3.3 Effect of Number of slices on results
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+For case a. pySlope and Slide results were compared for a different range of slices.
+Both show results are reasonably close to the result with a large number of slices, however Slide does appear to do better with lower numbers of slices
+(it is possible using a more precise method to calculate strip weight rather than an approximation as pySlope does).
+
+.. pyexcel-table:: ../../pySlope/examples/slices.xlsx
+
+3.4 Effectiveness of Slope Search Method
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
