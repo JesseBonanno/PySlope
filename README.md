@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-lightgreen.svg)](https://github.com/JesseBonanno/pyslope/blob/main/LICENSE.txt)
 [![CodeFactor](https://www.codefactor.io/repository/github/jessebonanno/pyslope/badge?s=43db3d31fb1ca55747ede7e5205c7d9e0cf37ced)](https://www.codefactor.io/repository/github/jessebonanno/pyslope)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JesseBonanno/pyslope/main?filepath=pyslope%2Fexamples%2Freadme_example.ipynb)
-[![Documentation Status](https://readthedocs.org/projects/pyslope/badge/?version=main)](https://pyslope.readthedocs.io/en/latest)
+[![Documentation Status](https://readthedocs.org/projects/pyslope/badge/?version=latest)](https://pyslope.readthedocs.io/en/latest)
 [![Code Style](https://img.shields.io/badge/code%20style-black-black)](https://github.com/psf/black)
 [![Downloads](https://pepy.tech/badge/pyslope)](https://pepy.tech/project/pyslope)
 
@@ -218,16 +218,35 @@ pip install pyslope
 The library dependencies are listed in the file `requirements.txt`, but you only need to look at them if you clone the repository.
 If you install the package via `pip`, the listed dependencies should be installed automatically.
 
+## Testing
+
+This project uses ``pytest`` to run tests and also to test docstring examples.
+
+Install the test dependencies.
+
+.. code-block:: bash
+
+   $ pip install -r requirements.txt
+
+Run the tests from the top level directory.
+
+.. code-block:: bash
+
+    $ pytest
+    === 3 passed in 0.13 seconds ===
+
+## Validation
+
+The results of this project have been validated against Slidev6.0 and Hyrcanv1.75. See the [documentation](https://pyslope.readthedocs.io/en/latest/examples.html#validation-of-results) for more detail 
+
 ## Future Work
 
 There is a lot of room for expansion of the project, and the direction of the project will strongly be affected by open-source contribution from the community. Some things in the short to medium term scope of work are:
 
-- host online web based application to use
-- Shift graphing from backend to front end for web application
 - better documentation
 - unit testing
-- other analysis methods
-- faster plotting
+- horizontal loads
+
 
 ## Contributing
 

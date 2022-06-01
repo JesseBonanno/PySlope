@@ -50,6 +50,17 @@ class Material:
         web compatible representation. If not provided color automatically
         assigned.
 
+    Examples
+    ------------
+    >>> Material(20,35,2,5)
+    Material:(uw=20,phi=35,c=2,d_bot=5)
+    >>> Material()
+    Material:(uw=20,phi=35,c=2,d_bot=5)
+    >>> a = Material()
+    >>> a.cohesion == 2
+    True
+
+
     """
 
     unit_weight: float = 20
@@ -111,6 +122,15 @@ class Udl:
         analysis" is run. (For a standard analysis the offset value is still used).
         By default False.
 
+    Examples
+    ------------
+    >>> Udl(magnitude = 10, offset = 1, length = 2, color = "pink")
+    UDL: 10 kPa, offset = 1 m, load length = 2 m
+    >>> Udl()
+    UDL: 0 kPa, offset = 0 m, load length = None m
+    >>> a = Udl()
+    >>> a.magnitude == 0
+    True
 
     """
 
