@@ -26,5 +26,11 @@ jobs:
           pip install -e .
           pip install -r requirements.txt
 
+      - name: Djange
+        run: |
+          python manage.py migrate
+          python manage.py makemigrations
+          python manage.py collectstatic
+
       - name: Run tests
         run: pytest
