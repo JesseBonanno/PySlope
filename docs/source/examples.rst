@@ -403,9 +403,9 @@ For each model specific circular failures where assessed. They were all centred 
 Code
 ----------
 
-You can view the models created with ``pySlope`` online: |binder|
+You can view the models created with ``pySlope`` online: |binder_validation|
 
-.. |binder| image:: https://mybinder.org/badge_logo.svg
+.. |binder_validation| image:: https://mybinder.org/badge_logo.svg
    :target: https://mybinder.org/v2/gh/JesseBonanno/pySlope/main?filepath=pySlope%2Fexamples%2Fvalidation.ipynb
 
 
@@ -417,12 +417,145 @@ Results
 3.3 Effect of Number of slices on results
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+Description
+--------------
+
 For case a. pySlope and Slide results were compared for a different range of slices.
 Both show results are reasonably close to the result with a large number of slices, however Slide does appear to do better with lower numbers of slices
 (it is possible using a more precise method to calculate strip weight rather than an approximation as pySlope does).
+
+Code
+---------
+
+.. code-block:: python
+
+       # Effect of slices on results
+       s = Slope(height=1, angle=None, length=1)
+ 
+       m1 = Material(20, 35, 0, 0.5)
+       m2 = Material(20, 35, 0, 1)
+       m3 = Material(18, 30, 0, 5)
+ 
+       s.set_materials(m1, m2, m3)
+ 
+       for r in range(2, 6):
+           s.add_single_circular_plane(
+               c_x=s.get_bottom_coordinates()[0],
+               c_y=s.get_bottom_coordinates()[1] + 2.5,
+               radius=r,
+           )
+
+       slices = [10, 25, 50, 500, 2000]
+ 
+       for i in slices:
+           
+           s.update_analysis_options(slices=i)
+           s.analyse_slope()
+ 
+           print(f'Slices: {i}')
+           for a in s._search:
+               print(f'radius: {a["radius"]}, FOS: {a["FOS"]}')
+
+Results
+-------------
 
 .. pyexcel-table:: ../../pySlope/examples/slices.xlsx
 
 3.4 Effectiveness of Slope Search Method
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Description
+----------------
+
+
+
+code
+---------
+
+.. code-block:: python
+
+       s = Slope(height=1, angle=None, length=1.5)
+
+       m1 = Material(20, 40, 1, 0.3)
+       m2 = Material(20, 35, 2, 1)
+       m3 = Material(18, 30, 0, 1.5)
+       m4 = Material(16, 28, 0, 5)
+
+       s.set_materials(m1, m2, m3, m4)
+
+       ll1 = LineLoad(
+           magnitude = 5,
+           offset = 0.5,
+       )
+
+       ll2 = LineLoad(
+           magnitude=20,
+           offset = 2.5,
+       )
+
+       s.set_lls(ll1, ll2)
+
+       udl1 = Udl(
+           magnitude=100,
+           offset = 1,
+           length =0.5,
+       )
+
+       udl2 = Udl(
+           magnitude=300,
+           length=0.5,
+           offset = 3,
+       )
+
+       s.set_udls(udl1,udl2)
+
+       iterations = [1000, 2000, 5000]
+
+       for i in iterations:
+           s.update_analysis_options(slices=50, iterations = i)
+           s.analyse_slope()
+
+           # plot the critical failure surface
+           fig_1 = s.plot_all_planes(max_fos=1.4)
+           # fig_1.write_image(f'./search/pySlope_{i}.png')
+
+Results
+------------
+
+.. pyexcel-table:: ../../pySlope/examples/search.xlsx
+
+*Note that for pySlope the factor of safety increases with the search in this case.
+This is not typical and probability wise the reverse is more common.
+
+
+Plots
+------------
+
+pySlope 1000 iterations with factor of safety <= 1.4 below.
+
+.. figure:: ../../pySlope/examples/search/pySlope_1000.png
+  :width: 700
+  :alt: dynamic
+
+
+pySlope 5000 iterations with factor of safety <= 1.4 below.
+
+.. figure:: ../../pySlope/examples/search/pySlope_5000.png
+  :width: 700
+  :alt: dynamic
+
+
+Slide 1000 iterations with factor of safety <= 1.4 below.
+
+.. figure:: ../../pySlope/examples/search/slide_1000.png
+  :width: 700
+  :alt: dynamic
+
+
+Slide 5000 iterations with factor of safety <= 1.4 below.
+
+.. figure:: ../../pySlope/examples/search/slide_5000.png
+  :width: 700
+  :alt: dynamic
+
 
