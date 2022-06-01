@@ -10,3 +10,4 @@ psycopg2-binary
 kaleido
 sphinxcontrib-excel
 pyexcel-xlsx
+pytest
