@@ -8,7 +8,7 @@ This section demonstrates the core functionality of the ``pySlope`` package with
 You can follow along with examples online: |binder|
 
 .. |binder| image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/JesseBonanno/pySlope/main?filepath=pySlope%2Fexamples%2Freadme_example.ipynb
+   :target: https://mybinder.org/v2/gh/JesseBonanno/pyslope/main?filepath=pySlope%2Fexamples%2Freadme_example.ipynb
 
 
 2. Basic Usage (Readme example)
@@ -19,7 +19,7 @@ You can follow along with examples online: |binder|
 
 Let's walk through a typical use case to investigate the slope shown in the figure below.
 
-.. figure:: ../../pySlope/examples/readme_example_plot_boundary.png
+.. figure:: ../../pyslope/examples/readme_example_plot_boundary.png
   :width: 700
   :alt: slope_boundary_plot
 
@@ -62,7 +62,7 @@ Plot
 
 Plot generated using `plot_boundary()` function.
 
-.. figure:: ../../pySlope/examples/readme_img/slope.png
+.. figure:: ../../pyslope/examples/readme_img/slope.png
   :width: 700
   :alt: slope_plot
 
@@ -105,7 +105,7 @@ Plot
 
 Plot generated using `plot_boundary()` function.
 
-.. figure:: ../../pySlope/examples/readme_img/materials.png
+.. figure:: ../../pyslope/examples/readme_img/materials.png
   :width: 700
   :alt: materials_plot
 
@@ -139,7 +139,7 @@ Plot
 
 Plot generated using `plot_boundary()` function.
 
-.. figure:: ../../pySlope/examples/readme_img/udls.png
+.. figure:: ../../pyslope/examples/readme_img/udls.png
   :width: 700
   :alt: udls_plot
 
@@ -171,7 +171,7 @@ Plot
 
 Plot generated using `plot_boundary()` function.
 
-.. figure:: ../../pySlope/examples/readme_img/lls.png
+.. figure:: ../../pyslope/examples/readme_img/lls.png
   :width: 700
   :alt: lineloads_plot
 
@@ -197,7 +197,7 @@ Plot
 
 Plot generated using `plot_boundary()` function.
 
-.. figure:: ../../pySlope/examples/readme_img/water.png
+.. figure:: ../../pyslope/examples/readme_img/water.png
   :width: 700
   :alt: watertable_plot
 
@@ -226,7 +226,7 @@ Plot
 
 Plot generated using `plot_boundary()` function.
 
-.. figure:: ../../pySlope/examples/readme_img/limits.png
+.. figure:: ../../pyslope/examples/readme_img/limits.png
   :width: 700
   :alt: limits_plot
 
@@ -288,15 +288,15 @@ Plots
 
 Plots generated from code above in their respective orders.
 
-.. figure:: ../../pySlope/examples/readme_img/plot_boundary.png
+.. figure:: ../../pyslope/examples/readme_img/plot_boundary.png
   :width: 700
   :alt: plot_boundary
 
-.. figure:: ../../pySlope/examples/readme_img/plot_critical.png
+.. figure:: ../../pyslope/examples/readme_img/plot_critical.png
   :width: 700
   :alt: plot_critical
 
-.. figure:: ../../pySlope/examples/readme_img/plot_all_planes2.png
+.. figure:: ../../pyslope/examples/readme_img/plot_all_planes2.png
   :width: 700
   :alt: plot_all_planes2
 
@@ -349,7 +349,7 @@ Plot
 
 Plot generated using `plot_all_planes()` function with keyword argument `max_fos=2`.
 
-.. figure:: ../../pySlope/examples/readme_example_plot_dynamic.png
+.. figure:: ../../pyslope/examples/readme_example_plot_dynamic.png
   :width: 700
   :alt: dynamic
 
@@ -368,13 +368,13 @@ The software to be considered is:
 
 Rocscience is a commercial software for 2D Limit Equilibrium Analysis for Slopes widely used in the industry. 
 
-.. figure:: ../../pySlope/examples/slide/slide.png
+.. figure:: ../../pyslope/examples/slide/slide.png
   :width: 700
   :alt: slide_model
 
 HYRCAN is a free Slope Stability analysis program for Geo-Engineers and can be found at this link: http://www.geowizard.org/download_hyrcan.html
 
-.. figure:: ../../pySlope/examples/hyrcan/hyrcan.png
+.. figure:: ../../pyslope/examples/hyrcan/hyrcan.png
   :width: 700
   :alt: hyrcan_model
 
@@ -406,7 +406,7 @@ Code
 You can view the models created with ``pySlope`` online: |binder_validation|
 
 .. |binder_validation| image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/JesseBonanno/pySlope/main?filepath=pySlope%2Fexamples%2Fvalidation.ipynb
+   :target: https://mybinder.org/v2/gh/JesseBonanno/pyslope/main?filepath=pySlope%2Fexamples%2Fvalidation.ipynb
 
 
 Results
