@@ -1,5 +1,0 @@
-colour
-plotly
-shapely
-tqdm
-pytest
