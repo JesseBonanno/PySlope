@@ -412,7 +412,7 @@ You can view the models created with ``pySlope`` online: |binder_validation|
 Results
 -------------
 
-.. pyexcel-table:: ../../pySlope/examples/summary_results.xlsx
+.. pyexcel-table:: ../../pyslope/examples/summary_results.xlsx
 
 3.3 Effect of Number of slices on results
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -459,7 +459,7 @@ Code
 Results
 -------------
 
-.. pyexcel-table:: ../../pySlope/examples/slices.xlsx
+.. pyexcel-table:: ../../pyslope/examples/slices.xlsx
 
 3.4 Effectiveness of Slope Search Method
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -522,7 +522,7 @@ code
 Results
 ------------
 
-.. pyexcel-table:: ../../pySlope/examples/search.xlsx
+.. pyexcel-table:: ../../pyslope/examples/search.xlsx
 
 *Note that for pySlope the factor of safety increases with the search in this case.
 This is not typical and probability wise the reverse is more common.
@@ -533,28 +533,28 @@ Plots
 
 pySlope 1000 iterations with factor of safety <= 1.4 below.
 
-.. figure:: ../../pySlope/examples/search/pySlope_1000.png
+.. figure:: ../../pyslope/examples/search/pySlope_1000.png
   :width: 700
   :alt: dynamic
 
 
 pySlope 5000 iterations with factor of safety <= 1.4 below.
 
-.. figure:: ../../pySlope/examples/search/pySlope_5000.png
+.. figure:: ../../pyslope/examples/search/pySlope_5000.png
   :width: 700
   :alt: dynamic
 
 
 Slide 1000 iterations with factor of safety <= 1.4 below.
 
-.. figure:: ../../pySlope/examples/search/slide_1000.png
+.. figure:: ../../pyslope/examples/search/slide_1000.png
   :width: 700
   :alt: dynamic
 
 
 Slide 5000 iterations with factor of safety <= 1.4 below.
 
-.. figure:: ../../pySlope/examples/search/slide_5000.png
+.. figure:: ../../pyslope/examples/search/slide_5000.png
   :width: 700
   :alt: dynamic
 
