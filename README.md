@@ -233,7 +233,7 @@ Run the tests from the top level directory.
 ```shell
 $ pytest
 === 3 passed in 0.13 seconds ===
-```shell
+```
 
 ## Validation
 
