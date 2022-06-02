@@ -7,50 +7,81 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='MaterialModel',
+            name="MaterialModel",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('unit_weight', models.FloatField(default=20)),
-                ('friction_angle', models.FloatField(default=35)),
-                ('cohesion', models.FloatField(default=2)),
-                ('depth_to_bottom', models.FloatField(default=5)),
-                ('name', models.CharField(default='', max_length=50)),
-                ('color', models.CharField(default='', max_length=20)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("unit_weight", models.FloatField(default=20)),
+                ("friction_angle", models.FloatField(default=35)),
+                ("cohesion", models.FloatField(default=2)),
+                ("depth_to_bottom", models.FloatField(default=5)),
+                ("name", models.CharField(default="", max_length=50)),
+                ("color", models.CharField(default="", max_length=20)),
             ],
         ),
         migrations.CreateModel(
-            name='PointLoadModel',
+            name="PointLoadModel",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('magnitude', models.FloatField(default=0)),
-                ('offset', models.FloatField(default=0)),
-                ('color', models.CharField(default='blue', max_length=20)),
-                ('dynamic_offset', models.BooleanField(default=False)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("magnitude", models.FloatField(default=0)),
+                ("offset", models.FloatField(default=0)),
+                ("color", models.CharField(default="blue", max_length=20)),
+                ("dynamic_offset", models.BooleanField(default=False)),
             ],
         ),
         migrations.CreateModel(
-            name='SlopeModel',
+            name="SlopeModel",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('height', models.FloatField(default=1)),
-                ('angle', models.FloatField(default=30)),
-                ('length', models.FloatField(default=0)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("height", models.FloatField(default=1)),
+                ("angle", models.FloatField(default=30)),
+                ("length", models.FloatField(default=0)),
             ],
         ),
         migrations.CreateModel(
-            name='UdlModel',
+            name="UdlModel",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('magnitude', models.FloatField(default=0)),
-                ('offset', models.FloatField(default=0)),
-                ('length', models.FloatField(default=0)),
-                ('color', models.CharField(default='red', max_length=20)),
-                ('dynamic_offset', models.BooleanField(default=False)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("magnitude", models.FloatField(default=0)),
+                ("offset", models.FloatField(default=0)),
+                ("length", models.FloatField(default=0)),
+                ("color", models.CharField(default="red", max_length=20)),
+                ("dynamic_offset", models.BooleanField(default=False)),
             ],
         ),
     ]

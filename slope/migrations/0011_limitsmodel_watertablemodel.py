@@ -6,28 +6,44 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('slope', '0010_alter_materialmodel_name'),
+        ("slope", "0010_alter_materialmodel_name"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='LimitsModel',
+            name="LimitsModel",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('consider_limits', models.BooleanField(default=False)),
-                ('left_x', models.FloatField(default=0)),
-                ('right_x', models.FloatField(default=3)),
-                ('consider_internal_limits', models.BooleanField(default=False)),
-                ('left_x_right', models.FloatField(default=1)),
-                ('right_x_left', models.FloatField(default=2)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("consider_limits", models.BooleanField(default=False)),
+                ("left_x", models.FloatField(default=0)),
+                ("right_x", models.FloatField(default=3)),
+                ("consider_internal_limits", models.BooleanField(default=False)),
+                ("left_x_right", models.FloatField(default=1)),
+                ("right_x_left", models.FloatField(default=2)),
             ],
         ),
         migrations.CreateModel(
-            name='WaterTableModel',
+            name="WaterTableModel",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('consider_water', models.BooleanField(default=False)),
-                ('water_depth', models.FloatField(default=1)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("consider_water", models.BooleanField(default=False)),
+                ("water_depth", models.FloatField(default=1)),
             ],
         ),
     ]

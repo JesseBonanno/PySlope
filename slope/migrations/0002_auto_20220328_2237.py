@@ -6,28 +6,28 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('slope', '0001_initial'),
+        ("slope", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='materialmodel',
-            name='color',
-            field=models.CharField(blank=True, default='', max_length=20),
+            model_name="materialmodel",
+            name="color",
+            field=models.CharField(blank=True, default="", max_length=20),
         ),
         migrations.AlterField(
-            model_name='materialmodel',
-            name='name',
-            field=models.CharField(blank=True, default='', max_length=50),
+            model_name="materialmodel",
+            name="name",
+            field=models.CharField(blank=True, default="", max_length=50),
         ),
         migrations.AlterField(
-            model_name='pointloadmodel',
-            name='color',
-            field=models.CharField(blank=True, default='blue', max_length=20),
+            model_name="pointloadmodel",
+            name="color",
+            field=models.CharField(blank=True, default="blue", max_length=20),
         ),
         migrations.AlterField(
-            model_name='udlmodel',
-            name='color',
-            field=models.CharField(blank=True, default='red', max_length=20),
+            model_name="udlmodel",
+            name="color",
+            field=models.CharField(blank=True, default="red", max_length=20),
         ),
     ]

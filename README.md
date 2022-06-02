@@ -247,7 +247,6 @@ There is a lot of room for expansion of the project, and the direction of the pr
 - unit testing
 - horizontal loads
 
-
 ## Contributing
 
 The guidelines for contributing are specified [here](https://github.com/JesseBonanno/pyslope/blob/main/CONTRIBUTING.md).
@@ -256,6 +255,17 @@ The guidelines for contributing are specified [here](https://github.com/JesseBon
 
 The guidelines for support are specified [here](https://github.com/JesseBonanno/pyslope/blob/main/SUPPORT.md).
 
+
+## Developing
+
+This project uses ``black`` to format code and ``flake8`` for linting. We also support ``pre-commit`` to ensure
+these have been run. To configure your local environment please install these development dependencies and set up
+the commit hooks.
+
+.. code-block:: bash
+
+   $ pip install black flake8 pre-commit
+   $ pre-commit install
 
 ## License
 

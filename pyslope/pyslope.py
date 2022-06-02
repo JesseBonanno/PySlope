@@ -1,6 +1,5 @@
 # standard library imports
 from math import radians, tan, sqrt, atan, cos, sin
-import time
 from dataclasses import dataclass
 import os
 
@@ -96,7 +95,13 @@ class Material:
         self.user_defined_color = self.color
 
     def __repr__(self):
-        return f"Material:{self.name}(uw={self.unit_weight},phi={self.friction_angle},c={self.cohesion},d_bot={self.depth_to_bottom})"
+        return (
+            f"Material:{self.name}"
+            f"(uw={self.unit_weight},"
+            f"phi={self.friction_angle},"
+            f"c={self.cohesion},"
+            f"d_bot={self.depth_to_bottom})"
+        )
 
 
 @dataclass
@@ -908,13 +913,13 @@ class Slope:
         # increase to 1.1 to prevent ma denominator issues for bishops method.
         start_radius = half_coord_distance / cos(beta) * 1.1
         # start_centre = (l_c[0] + start_radius, l_c[1])
-        start_chord_to_centre = sqrt(start_radius ** 2 - half_coord_distance ** 2)
+        start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
         start_chord_to_edge = start_radius - start_chord_to_centre
 
         # two intersecting chords through circle have segments of chords related
         # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
         # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-        C = half_coord_distance ** 2
+        C = half_coord_distance**2
 
         for i in range(0, num_circles):
 
@@ -1119,7 +1124,7 @@ class Slope:
             # HAS ERROR
             # (cy - s_yb) ** 2 + abs(s_x-c_x)**2 = R ** 2
             # sqrt(R**2 - abs(s_x-c_x)**2) = c_y - s_yb
-            s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
+            s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
 
             # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
@@ -1138,7 +1143,7 @@ class Slope:
             alpha = atan(dx / dy)
 
             # get length
-            l = b / cos(alpha)
+            inclined_length = b / cos(alpha)
 
             # calculate strip weight
             W = self._calculate_strip_weight(b, s_yt, s_yb)
@@ -1171,18 +1176,23 @@ class Slope:
                     U = (
                         max(min(self._water_RL, s_yt) - s_yb, 0)
                         * 9.81
-                        * l
+                        * inclined_length
                         * self._water_analysis_H
                     )
                 else:
-                    U = max(min(self._water_RL, s_yt) - s_yb, 0) * 9.81 * l * 1
+                    U = (
+                        max(min(self._water_RL, s_yt) - s_yb, 0)
+                        * 9.81
+                        * inclined_length
+                        * 1
+                    )
             else:
                 U = 0
 
             # calculate resisting
-            resisting += cohesion * l + max(0, (W * cos(alpha) - U)) * tan(
-                radians(friction_angle)
-            )
+            resisting += cohesion * inclined_length + max(
+                0, (W * cos(alpha) - U)
+            ) * tan(radians(friction_angle))
 
             # calculate pushing
             pushing += W * sin(alpha)
@@ -1275,7 +1285,7 @@ class Slope:
                 # if radius < abs(s_x - c_x):
                 #     return None
 
-                s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
+                s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
 
                 # get y coordinate at slice top
                 s_yt = self.get_external_y_intersection(s_x)
@@ -1291,7 +1301,7 @@ class Slope:
                 alpha = atan(dx / dy)
 
                 # get length
-                l = b / cos(alpha)
+                # l = b / cos(alpha)
 
                 # calculate strip weight
                 W = self._calculate_strip_weight(b, s_yt, s_yb)
@@ -1855,7 +1865,12 @@ class Slope:
                     mode="lines",
                     meta=[m.unit_weight, m.cohesion, m.friction_angle, m.name],
                     fill="toself",
-                    name=f"{m.name}<br>γ: {m.unit_weight} kN/m3<br>c: {m.cohesion} kPa<br>ϕ: {m.friction_angle} degrees",
+                    name=(
+                        f"{m.name}<br>"
+                        f"γ: {m.unit_weight} kN/m3<br>"
+                        f"c: {m.cohesion} kPa<br>"
+                        f"ϕ: {m.friction_angle} degrees"
+                    ),
                     hovertemplate="",
                     fillcolor=m.color,
                 )
@@ -2024,7 +2039,7 @@ class Slope:
     def _plot_water(self, fig):
         """Add water table to plot"""
 
-        if self._water_RL == None:
+        if self._water_RL is None:
             return fig
 
         y = self._water_RL
@@ -2461,7 +2476,7 @@ class Slope:
             yref="paper",
             x=(x0 + x1) / 2,
             y=yi,
-            text=f"<b>Legend</b>",
+            text="<b>Legend</b>",
             align="center",
             showarrow=False,
             yshift=33,

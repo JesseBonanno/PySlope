@@ -2,5 +2,5 @@ from django.apps import AppConfig
 
 
 class SlopeConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'slope'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "slope"

@@ -1,20 +1,15 @@
 from django.shortcuts import render, redirect
 from django.forms import modelformset_factory
-from django.http import Http404, HttpResponse
-from shapely.geometry import Point
-import time
-import json
+from django.http import HttpResponse
 
-import base64
-from plotly.io import to_json, from_json
+from plotly.io import from_json
 
 from pyslope.pyslope import utilities
 from plotly import graph_objects as go
 
 # import backend section of code
-import os, sys
-
-sys.path.insert(0, os.path.abspath("../../"))
+import os
+import sys
 
 from pyslope.pyslope import (
     Slope,
@@ -25,12 +20,9 @@ from pyslope.pyslope import (
 )
 
 from .models import (
-    SlopeModel,
     MaterialModel,
     UdlModel,
     LineLoadModel,
-    WaterTableModel,
-    LimitsModel,
 )
 
 from .forms import (
@@ -42,6 +34,8 @@ from .forms import (
     WaterTableForm,
     LimitsForm,
 )
+
+sys.path.insert(0, os.path.abspath("../../"))
 
 MAX_COLOUR_KEY = max(COLOUR_FOS_DICT)
 
@@ -164,7 +158,7 @@ def index(request):
                 limits_form = LimitsForm(previous_forms, prefix="limits")
                 options_form = AnalysisOptionsForm(previous_forms, prefix="options")
 
-            except:
+            except Exception:
                 return redirect("reset")
 
         else:
@@ -489,7 +483,7 @@ def create_slope(
             slope.analyse_dynamic(
                 critical_fos=options_form.cleaned_data["critical_FOS"]
             )
-        except:
-            slope.analyse_slope(max_fos = 5)
+        except Exception:
+            slope.analyse_slope(max_fos=5)
 
     return slope

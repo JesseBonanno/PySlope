@@ -2,7 +2,6 @@
 from math import cos, sin, sqrt, radians
 from shapely.geometry import Point
 from colour import Color
-from functools import wraps
 
 MATERIAL_COLORS = [
     "#efa59c",
@@ -21,9 +20,8 @@ MATERIAL_COLORS = [
 def is_color(color):
     try:
         color = Color(color)
-        c = color.hex
         return True
-    except:
+    except ValueError:
         return False
 
 
@@ -40,7 +38,7 @@ def circle_radius_from_abcd(c_to_e, C):
     # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
     # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
 
-    return (C + c_to_e ** 2) / (2 * c_to_e)
+    return (C + c_to_e**2) / (2 * c_to_e)
 
 
 def circle_centre(beta, chord_intersection, chord_to_centre):
@@ -58,11 +56,11 @@ def cirle_line_intersection(top_coord, bot_coord, cx, cy, r):
 
     dx = bot_coord[0] - top_coord[0]
     dy = bot_coord[1] - top_coord[1]
-    dr = sqrt(dx ** 2 + dy ** 2)
+    dr = sqrt(dx**2 + dy**2)
 
     D = top_coord[0] * bot_coord[1] - bot_coord[0] * top_coord[1]
 
-    disc = abs(r ** 2 * dr ** 2) - abs(D ** 2)
+    disc = abs(r**2 * dr**2) - abs(D**2)
 
     if disc < 0:
         return []
@@ -72,11 +70,11 @@ def cirle_line_intersection(top_coord, bot_coord, cx, cy, r):
     else:
         m = 1
 
-    x1 = (D * dy + m * dx * sqrt(disc)) / dr ** 2 + cx
-    x2 = (D * dy - m * dx * sqrt(disc)) / dr ** 2 + cx
+    x1 = (D * dy + m * dx * sqrt(disc)) / dr**2 + cx
+    x2 = (D * dy - m * dx * sqrt(disc)) / dr**2 + cx
 
-    y1 = ((-(D * dx)) + abs(dy) * sqrt(disc)) / dr ** 2 + cy
-    y2 = ((-(D * dx)) - abs(dy) * sqrt(disc)) / dr ** 2 + cy
+    y1 = ((-(D * dx)) + abs(dy) * sqrt(disc)) / dr**2 + cy
+    y2 = ((-(D * dx)) - abs(dy) * sqrt(disc)) / dr**2 + cy
 
     if disc == 0:
         return [(x1, y1)]

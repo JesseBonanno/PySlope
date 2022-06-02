@@ -6,17 +6,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('slope', '0006_auto_20220411_0851'),
+        ("slope", "0006_auto_20220411_0851"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='materialmodel',
-            name='color',
+            model_name="materialmodel",
+            name="color",
         ),
         migrations.AlterField(
-            model_name='materialmodel',
-            name='name',
-            field=models.CharField(blank=True, default='Fill', max_length=50, null=True),
+            model_name="materialmodel",
+            name="name",
+            field=models.CharField(
+                blank=True, default="Fill", max_length=50, null=True
+            ),
         ),
     ]
