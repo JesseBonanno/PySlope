@@ -28,3 +28,6 @@ jobs:
 
       - name: Run tests
         run: pytest pyslope
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-actions@v1

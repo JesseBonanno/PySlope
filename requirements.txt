@@ -11,3 +11,4 @@ sphinxcontrib-excel
 pyexcel-xlsx
 pytest
 sphinx-rtd-theme
+pytest-cov

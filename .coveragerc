@@ -1,0 +1,10 @@
+[run]
+omit = 
+    setup.py
+    versioneer.py
+    manage.py
+    ./slope/*
+    ./engineering/*
+    ./pyslope/__init__.py
+    ./pyslope/_version.py
+    *test*
