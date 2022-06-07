@@ -36,7 +36,6 @@ setup(
     ],  # Keywords that define your package best
     install_requires=[
         "colour>=0.1.5",
-        "shapely>=1.8.0",
         "tqdm>=4.54.1",
         "plotly>=4.14.1",
     ],

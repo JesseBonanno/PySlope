@@ -1,6 +1,5 @@
 # standard library imports
 from math import cos, sin, sqrt, radians
-from shapely.geometry import Point
 from colour import Color
 
 MATERIAL_COLORS = [
@@ -25,7 +24,7 @@ def is_color(color):
         return False
 
 
-def mid_coord(p1: Point, p2: Point) -> Point:
+def mid_coord(p1: tuple, p2: tuple) -> tuple:
     return [(a + b) / 2 for a, b in zip(p1, p2)]
 
 

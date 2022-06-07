@@ -5,7 +5,6 @@ import os
 
 # third party imports
 from plotly import graph_objects as go
-from shapely.geometry import LinearRing
 from tqdm import tqdm
 
 # have to do this to allow for relative imports
@@ -324,10 +323,16 @@ class Slope:
         top = (dx, tot_h)
         bot = (dx + length, tot_h - height)
 
-        # set up external boundary as a shapely LinearRing
-        self._external_boundary = LinearRing(
-            [(0, 0), (0, top[1]), top, bot, (tot_l, bot[1]), (tot_l, 0), (0, 0)]
-        )
+        # set up external boundary as list of coordinates
+        self._external_boundary = [
+            (0, 0),
+            (0, top[1]),
+            top,
+            bot,
+            (tot_l, bot[1]),
+            (tot_l, 0),
+            (0, 0),
+        ]
 
         # set relevant variables to self
         self._length = length
@@ -337,8 +342,8 @@ class Slope:
         self._top_coord = top
         self._bot_coord = bot
 
-        self._external_length = self._external_boundary.bounds[2]
-        self._external_height = self._external_boundary.bounds[3]
+        self._external_length = tot_l
+        self._external_height = tot_h
 
         # udl coordinates can be effected by external boundary modification
         # need to update coordinates.
@@ -1795,7 +1800,8 @@ class Slope:
 
         """
         # draw the external boundary
-        x_, y_ = self._external_boundary.coords.xy
+        x_ = [x for x, y in self._external_boundary]
+        y_ = [y for x, y in self._external_boundary]
         fig = go.Figure(go.Scatter(x=list(x_), y=list(y_), mode="lines", name=""))
 
         fig.update_layout(width=2000, height=1200)
@@ -1818,7 +1824,7 @@ class Slope:
 
         # get the points representing the top line of the model
         # to help with drawing materials
-        top = self._external_boundary.coords[1:3]
+        top = self._external_boundary[1:3]
 
         # length of model (max x coordinate)
         tot_l = self._external_length
@@ -1845,7 +1851,7 @@ class Slope:
 
             # if we are at the last material make the bottom the bottom of the model
             if i == num_materials - 1:
-                bot = self._external_boundary.coords[-2:]
+                bot = self._external_boundary[-2:]
             else:
                 bot = line
 

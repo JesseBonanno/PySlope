@@ -1,6 +1,5 @@
 colour
 plotly
-shapely
 tqdm
 gunicorn
 django
