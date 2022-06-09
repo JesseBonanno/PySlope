@@ -270,6 +270,26 @@ $ pip install black flake8 pre-commit
 $ pre-commit install
 ```
 
+Releasing
+---------
+
+Releases are published automatically when a tag is pushed to GitHub.
+
+.. code-block:: bash
+
+   # Set next version number
+   export RELEASE=vX.X.X
+
+   # Create tags
+   git commit --allow-empty -m "Release $RELEASE"
+   git tag -a $RELEASE -m "Version $RELEASE"
+
+   # Push (for working from a fork)
+   git push upstream --tags
+
+   # if not working from fork would instead be
+   # git push origin --tags
+
 ## License
 
 [![License](https://img.shields.io/badge/license-MIT-lightgreen.svg)](https://github.com/JesseBonanno/pyslope/blob/main/LICENSE.txt)
