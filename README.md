@@ -275,20 +275,22 @@ Releasing
 
 Releases are published automatically when a tag is pushed to GitHub.
 
-.. code-block:: bash
+```shell
+# Set next version number
+export RELEASE=vX.X.X
 
-   # Set next version number
-   export RELEASE=vX.X.X
+# Create tags
+git commit --allow-empty -m "Release $RELEASE"
+git tag -a $RELEASE -m "Version $RELEASE"
 
-   # Create tags
-   git commit --allow-empty -m "Release $RELEASE"
-   git tag -a $RELEASE -m "Version $RELEASE"
+# Push (for working from a fork)
+git push upstream --tags
 
-   # Push (for working from a fork)
-   git push upstream --tags
+# if not working from fork would instead be
+# git push origin --tags
+```
 
-   # if not working from fork would instead be
-   # git push origin --tags
+Or set a tag with Github Desktop.
 
 ## License
 
