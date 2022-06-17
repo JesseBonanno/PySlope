@@ -444,11 +444,12 @@ class Slope:
                 ):
                     self._udls.remove(check_udl)
 
-        self._udl_max = max(self._udls, key=lambda x: x.magnitude)
-
         if remove_all:
             self._udls = []
             self._udl_max = 0
+        
+        if self._udls:
+            self._udl_max = max(self._udls, key=lambda x: x.magnitude)
 
         # reset results
         self._reset_results()
