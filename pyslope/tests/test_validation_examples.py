@@ -285,4 +285,3 @@ def test_example_g():
         s.analyse_slope()
 
         assert s.get_min_FOS()
-
