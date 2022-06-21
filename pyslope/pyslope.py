@@ -994,13 +994,13 @@ class Slope:
         # increase to 1.1 to prevent ma denominator issues for bishops method.
         start_radius = half_coord_distance / cos(beta) * 1.1
         # start_centre = (l_c[0] + start_radius, l_c[1])
-        start_chord_to_centre = sqrt(start_radius ** 2 - half_coord_distance ** 2)
+        start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
         start_chord_to_edge = start_radius - start_chord_to_centre
 
         # two intersecting chords through circle have segments of chords related
         # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
         # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-        C = half_coord_distance ** 2
+        C = half_coord_distance**2
 
         for i in range(0, num_circles):
 
@@ -1205,7 +1205,7 @@ class Slope:
             # HAS ERROR
             # (cy - s_yb) ** 2 + abs(s_x-c_x)**2 = R ** 2
             # sqrt(R**2 - abs(s_x-c_x)**2) = c_y - s_yb
-            s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
+            s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
 
             # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
@@ -1366,7 +1366,7 @@ class Slope:
                 # if radius < abs(s_x - c_x):
                 #     return None
 
-                s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
+                s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
 
                 # get y coordinate at slice top
                 s_yt = self.get_external_y_intersection(s_x)
