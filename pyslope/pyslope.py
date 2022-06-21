@@ -131,7 +131,7 @@ class Udl:
     >>> Udl(magnitude = 10, offset = 1, length = 2, color = "pink")
     UDL: 10 kPa, offset = 1 m, load length = 2 m
     >>> Udl()
-    UDL: 0 kPa, offset = 0 m, load length = None m
+    UDL: 0 kPa, offset = 0 m, load length continuous
     >>> a = Udl()
     >>> a.magnitude == 0
     True
@@ -164,7 +164,10 @@ class Udl:
             self.color = "red"
 
     def __repr__(self):
-        return f"UDL: {self.magnitude} kPa, offset = {self.offset} m, load length = {self.length} m"
+        if self.length is None:
+            return f"UDL: {self.magnitude} kPa, offset = {self.offset} m, load length continuous"
+        else:
+            return f"UDL: {self.magnitude} kPa, offset = {self.offset} m, load length = {self.length} m"
 
 
 @dataclass
@@ -189,6 +192,16 @@ class LineLoad:
         If True then the load offset will be dynamically moved if a "dynamic
         analysis" is run. (For a standard analysis the offset value is still used).
         By default False.
+
+    Examples
+    ------------
+    >>> LineLoad(magnitude = 10, offset = 1, color = "pink")
+    LineLoad: 10 kN/m, offset = 1 m
+    >>> LineLoad()
+    LineLoad: 0 kN/m, offset = 0 m
+    >>> a = LineLoad()
+    >>> a.magnitude == 0
+    True
     """
 
     magnitude: float = 0
@@ -209,7 +222,7 @@ class LineLoad:
             self.color = "blue"
 
     def __repr__(self):
-        return f"Line: {self.magnitude} kN/m, offset = {self.offset} m"
+        return f"LineLoad: {self.magnitude} kN/m, offset = {self.offset} m"
 
 
 class Slope:
@@ -223,6 +236,17 @@ class Slope:
         angle of slope (only used if length None), by default 30
     length : float, optional
         length of slope in metres, by default None
+
+    Examples
+    ------------
+    >>> Slope(height = 1, angle = 50, length = None)
+    Slope: 1V : 0.839H
+    >>> Slope(height = 1, angle = 50, length = 2)
+    Slope: 1V : 2H
+    >>> Slope(height = 1, angle = None, length = 2)
+    Slope: 1V : 2H
+    >>> Slope()
+    Slope: 1V : 1.732H
     """
 
     def __repr__(self):
@@ -258,8 +282,9 @@ class Slope:
         # sets default analysis limits (ie no limit)
         self.remove_analysis_limits()
 
-    # clears search value, run when model results no longer valid.
     def _reset_results(self):
+        """clears search value, run when model results no longer valid."""
+
         self._search = []
         self._min_FOS = 0
         self._min_FOS_location = []
@@ -273,14 +298,14 @@ class Slope:
         }
 
     def set_external_boundary(
-        self, height: float = 2, angle: int = 30, length: float = None
+        self, height: float = 1, angle: int = 30, length: float = None
     ):
         """Set external boundary for model.
 
         Parameters
         ----------
         height : float, optional
-            height of slope in metres, by default 2
+            height of slope in metres, by default 1
         angle : int, optional
             angle of slope in degrees (may be left as none if slope
             is instead expressed by length of slope), by default 30
@@ -292,9 +317,19 @@ class Slope:
         ------
         ValueError
             If input not in required range or of required type
+
+        Examples
+        ------------
+        >>> a = Slope(height = 1, angle = 45, length = None)
+        >>> a
+        Slope: 1V : 1.0H
+        >>> a.set_external_boundary(height = 2, length = 0.5)
+        >>> a
+        Slope: 2V : 0.5H
         """
         # validate inputs
-        data_validation.assert_strictly_positive_number(height, "height")
+        if height is not None:
+            data_validation.assert_strictly_positive_number(height, "height")
         if angle is not None:
             # is allowed to be 90 but not 0
             data_validation.assert_range(angle, "angle", 0, 90, not_low=True)
@@ -363,6 +398,13 @@ class Slope:
         ----------
         depth : float
             depth of water from top of slope.
+
+        Examples
+        ------------
+        >>> s = Slope()
+        >>> s.set_water_table(1.2)
+        >>> s._water_depth
+        1.2
         """
 
         if depth is None:
@@ -370,13 +412,24 @@ class Slope:
         else:
             data_validation.assert_positive_number(depth, "water depth")
             self._water_RL = max(0, self._top_coord[1] - depth)
+            self._water_depth = depth
 
         # reset results
         self._reset_results()
 
     def remove_water_table(self):
-        """Remove water table from model"""
+        """Remove water table from model.
+
+        Examples
+        ------------
+        >>> s = Slope()
+        >>> s.set_water_table(1.2)
+        >>> s.remove_water_table()
+        >>> s._water_RL == s._water_depth == None
+        True
+        """
         self._water_RL = None
+        self._water_depth = None
 
         # reset results
         self._reset_results()
@@ -388,6 +441,16 @@ class Slope:
         ----------
         *udls : Udl objects
             Udl object to be assigned to the slope object.
+
+        Examples
+        ------------
+        >>> s = Slope()
+        >>> u1 = Udl(5)
+        >>> u2 = Udl(10)
+        >>> s.set_udls(u1, u2)
+        >>> len(s._udls) == 2
+        True
+
         """
 
         for udl in udls:
@@ -433,6 +496,18 @@ class Slope:
             Udl object to be removed from the slope object.
         remove_all : bool, optional
             If true remove all udls, by default False
+
+        Examples
+        ------------
+        >>> s = Slope()
+        >>> u1, u2 = Udl(5), Udl(10)
+        >>> s.set_udls(u1, u2)
+        >>> s.remove_udls(u1)
+        >>> len(s._udls) == 1
+        True
+        >>> s.remove_udls(remove_all=True)
+        >>> len(s._udls) == 0
+        True
         """
 
         for udl in udls:
@@ -919,13 +994,13 @@ class Slope:
         # increase to 1.1 to prevent ma denominator issues for bishops method.
         start_radius = half_coord_distance / cos(beta) * 1.1
         # start_centre = (l_c[0] + start_radius, l_c[1])
-        start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
+        start_chord_to_centre = sqrt(start_radius ** 2 - half_coord_distance ** 2)
         start_chord_to_edge = start_radius - start_chord_to_centre
 
         # two intersecting chords through circle have segments of chords related
         # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
         # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-        C = half_coord_distance**2
+        C = half_coord_distance ** 2
 
         for i in range(0, num_circles):
 
@@ -1130,7 +1205,7 @@ class Slope:
             # HAS ERROR
             # (cy - s_yb) ** 2 + abs(s_x-c_x)**2 = R ** 2
             # sqrt(R**2 - abs(s_x-c_x)**2) = c_y - s_yb
-            s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
+            s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
 
             # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
@@ -1291,7 +1366,7 @@ class Slope:
                 # if radius < abs(s_x - c_x):
                 #     return None
 
-                s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
+                s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
 
                 # get y coordinate at slice top
                 s_yt = self.get_external_y_intersection(s_x)
