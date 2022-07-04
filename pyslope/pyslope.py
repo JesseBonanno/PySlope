@@ -536,6 +536,16 @@ class Slope:
         -----------------
         *lls : LineLoad objects
             LineLoad object to be assigned to the slope object.
+
+        Examples
+        ------------
+        >>> s = Slope()
+        >>> ll1 = LineLoad(5)
+        >>> ll2 = LineLoad(10)
+        >>> s.set_lls(ll1, ll2)
+        >>> len(s._lls) == 2
+        True
+
         """
 
         for ll in lls:
@@ -572,6 +582,19 @@ class Slope:
             LineLoad object to be removed from the slope object.
         remove_all : bool, optional
             if true remove all lls, by default False
+
+        Examples
+        ------------
+        >>> s = Slope()
+        >>> ll1 = LineLoad(5)
+        >>> ll2 = LineLoad(10)
+        >>> s.set_lls(ll1, ll2)
+        >>> s.remove_lls(ll1)
+        >>> len(s._lls) == 1
+        True
+        >>> s.remove_lls(remove_all=True)
+        >>> len(s._lls) == 0
+        True
         """
 
         # can probably write this as O(n) rather than O(n^2)
@@ -594,13 +617,28 @@ class Slope:
         *materials : Material (list), optional
             Material instances to be associated with slope.
 
-
         Raises
         ------
         ValueError
             If material not instance of Material class error is raised.
         ValueError
             If non-unique material depths then error is raised.
+
+        Examples
+        -----------------
+        >>> s = Slope()
+        >>> m1 = Material()
+        >>> m2 = Material(unit_weight = 18,cohesion=2, friction_angle = 30,depth_to_bottom = 1.32)
+        >>> s.set_materials(m1, m2)
+        >>> len(s._materials) == 2
+        True
+        >>> s.remove_material(m1)
+        >>> len(s._materials) == 1
+        True
+        >>> s.remove_material(remove_all=True)
+        >>> len(s._materials) == 0
+        True
+
         """
 
         # check material object entered
@@ -662,6 +700,22 @@ class Slope:
         remove_all : Boolean, optional
             if true all materials removed, default false
 
+
+        Examples
+        -----------------
+        >>> s = Slope()
+        >>> m1 = Material()
+        >>> m2 = Material(unit_weight = 18,cohesion=2,friction_angle = 30,depth_to_bottom = 1.32)
+        >>> s.set_materials(m1, m2)
+        >>> len(s._materials) == 2
+        True
+        >>> s.remove_material(m1)
+        >>> len(s._materials) == 1
+        True
+        >>> s.remove_material(remove_all=True)
+        >>> len(s._materials) == 0
+        True
+
         """
         # general note: depth used to remove object rather than directly removing
         # even when material class provided because a user might reinitialise
@@ -697,6 +751,13 @@ class Slope:
         H : int, optional
             factor on water pressure. If 1 water head equals distance between water
             table and bottom of slice. If 0 no water pressure is considered. By default 1.
+
+
+        Examples
+        -----------------
+        >>> s = Slope()
+        >>> s.update_water_analysis_options(auto=True)
+        >>> s.update_water_analysis_options(auto=False, H = 0.72)
         """
 
         if auto:
@@ -733,7 +794,7 @@ class Slope:
         iterations : int, optional
             Approximate number of potential slopes to check (between 500 and 100000).
             If None doesnt update the parameter, by default None.
-        min_failure_distance : int, optional
+        min_failure_dist : int, optional
             If specified only failure slopes with a distance greater than the
             min failure distance will be assessed, by default None.
         tolerance : float, optional
@@ -742,6 +803,11 @@ class Slope:
         max_iterations : int, optional
             Maximum number of iterations for convergence on bishop factor of safety. By default
             None. Initialised as 15.
+
+        Examples
+        -----------------
+        >>> s = Slope()
+        >>> s.update_analysis_options(slices = 25,iterations = 2500,min_failure_dist = 0.2,tolerance = 0.005,max_iterations = 50)
         """
         if slices:
             self._slices = max(min(500, slices), 10)
@@ -778,6 +844,16 @@ class Slope:
         MIN_EXT_H : float, optional
             Minimum external boundary height. If None doesnt update
             the parameter, by default None.
+
+        Examples
+        -----------------
+        >>> s = Slope()
+        >>> s.update_boundary_options(MIN_EXT_L = 100)
+        >>> s._external_length == 100
+        True
+        >>> s.update_boundary_options(MIN_EXT_H = 200)
+        >>> s._external_height == 200
+        True
         """
 
         if MIN_EXT_H:
@@ -994,13 +1070,13 @@ class Slope:
         # increase to 1.1 to prevent ma denominator issues for bishops method.
         start_radius = half_coord_distance / cos(beta) * 1.1
         # start_centre = (l_c[0] + start_radius, l_c[1])
-        start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
+        start_chord_to_centre = sqrt(start_radius ** 2 - half_coord_distance ** 2)
         start_chord_to_edge = start_radius - start_chord_to_centre
 
         # two intersecting chords through circle have segments of chords related
         # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
         # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-        C = half_coord_distance**2
+        C = half_coord_distance ** 2
 
         for i in range(0, num_circles):
 
@@ -1205,7 +1281,7 @@ class Slope:
             # HAS ERROR
             # (cy - s_yb) ** 2 + abs(s_x-c_x)**2 = R ** 2
             # sqrt(R**2 - abs(s_x-c_x)**2) = c_y - s_yb
-            s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
+            s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
 
             # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
@@ -1366,7 +1442,7 @@ class Slope:
                 # if radius < abs(s_x - c_x):
                 #     return None
 
-                s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
+                s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
 
                 # get y coordinate at slice top
                 s_yt = self.get_external_y_intersection(s_x)
