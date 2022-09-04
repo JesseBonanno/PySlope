@@ -2482,12 +2482,12 @@ class Slope:
         )
 
         # add columns in
-        column_unit_positions = [20, 15, 10, 10, 10]
+        column_unit_positions = [20, 12, 15, 12, 12]
         column_rel_positions = []
 
         total_width = sum(column_unit_positions)
 
-        column_text_unit_xshift = [1, 1, 4, 4, 4]
+        column_text_unit_xshift = [1, 1, 1, 5, 5]
         assumed_graph_width = 1000
         column_rel_xshift = [
             a / total_width * assumed_graph_width * table_width
@@ -2516,7 +2516,7 @@ class Slope:
             )
 
         # add in header text
-        table_header = ["MATERIAL", "COLOR", "γ", "c", "ϕ"]
+        table_header = ["MATERIAL", "COLOR", "γ (kN/m3)", "c (kPa)", "ϕ (deg)"]
         table_header = ["<b>" + a + "</b>" for a in table_header]
 
         x = x0
@@ -2770,7 +2770,7 @@ if __name__ == "__main__":
 
     s.set_materials(m1, m2, m3)
 
-    s.update_analysis_options(slices=50, iterations=5000)
+    s.update_analysis_options(slices=10, iterations=500)
 
     s.set_water_table(0.7)
     s.analyse_slope()
@@ -2779,6 +2779,6 @@ if __name__ == "__main__":
     print("fos:", s.get_min_FOS())
 
     # plot the critical failure surface
-    # fig_1 = s.plot_all_planes(max_fos=None)
-    # fig_1.update_layout(width=1200, height=700)
-    # fig_1.show()
+    fig_1 = s.plot_all_planes(max_fos=None)
+    fig_1.update_layout(width=1200, height=700)
+    fig_1.show()
