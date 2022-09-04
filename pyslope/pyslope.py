@@ -2,6 +2,7 @@
 from math import radians, tan, sqrt, atan, cos, sin
 from dataclasses import dataclass
 import os
+import multiprocessing
 
 # third party imports
 from plotly import graph_objects as go
@@ -11,7 +12,7 @@ from tqdm import tqdm
 # have to allow for relative imports so also works with django
 
 # if using this file or sphinx, cant be relative
-if __name__ == "__main__" or __name__ == "pyslope":
+if __name__ in ("__main__", "pyslope", "__mp_main__"):
     import data_validation
     import utilities
 # if running from django need to use relative
@@ -807,7 +808,8 @@ class Slope:
         Examples
         -----------------
         >>> s = Slope()
-        >>> s.update_analysis_options(slices = 25,iterations = 2500,min_failure_dist = 0.2,tolerance = 0.005,max_iterations = 50)
+        >>> s.update_analysis_options(slices = 25,iterations = 2500,min_failure_dist = 0.2)
+        >>> s.update_analysis_options(tolerance = 0.005,max_iterations = 50)
         """
         if slices:
             self._slices = max(min(500, slices), 10)
@@ -1020,7 +1022,7 @@ class Slope:
             left_coords += [(udl.left - 0.001, self._top_coord[1])]
 
         # loop through left and right points to generate coordinates
-        for l_c in tqdm(left_coords):
+        for l_c in left_coords:
             for r_c in right_coords:
                 if utilities.dist_points(l_c, r_c) > self._min_failure_distance:
                     search += self._generate_planes(l_c, r_c, num_circles)
@@ -1070,13 +1072,13 @@ class Slope:
         # increase to 1.1 to prevent ma denominator issues for bishops method.
         start_radius = half_coord_distance / cos(beta) * 1.1
         # start_centre = (l_c[0] + start_radius, l_c[1])
-        start_chord_to_centre = sqrt(start_radius ** 2 - half_coord_distance ** 2)
+        start_chord_to_centre = sqrt(start_radius**2 - half_coord_distance**2)
         start_chord_to_edge = start_radius - start_chord_to_centre
 
         # two intersecting chords through circle have segments of chords related
         # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
         # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
-        C = half_coord_distance ** 2
+        C = half_coord_distance**2
 
         for i in range(0, num_circles):
 
@@ -1184,14 +1186,34 @@ class Slope:
             self._set_entry_exit_planes()
 
         # go through each assumed plane and calculate the FOS
-        for i, search in enumerate(tqdm(self._search)):
-            self._search[i]["FOS"] = self._analyse_circular_failure_bishop(
-                c_x=search["c_x"],
-                c_y=search["c_y"],
-                radius=search["radius"],
-                l_c=search["l_c"],
-                r_c=search["r_c"],
-            )
+        # if not much to do then dont use multiprocessing, otherwise use multiprocessing
+        if self._slices * self._iterations < 25000:
+            for i, search in enumerate(tqdm(self._search)):
+                self._search[i]["FOS"] = self._analyse_circular_failure_bishop(
+                    c_x=search["c_x"],
+                    c_y=search["c_y"],
+                    radius=search["radius"],
+                )
+        else:
+
+            # use multiprocessing to get results
+            with multiprocessing.Manager() as manager:
+                with manager.Pool() as pool:
+                    results = pool.starmap(
+                        self._analyse_circular_failure_bishop,
+                        [
+                            (
+                                search["c_x"],
+                                search["c_y"],
+                                search["radius"],
+                            )
+                            for search in self._search
+                        ],
+                    )
+
+            # add results to dictionary
+            for i in range(len(self._search)):
+                self._search[i]["FOS"] = results[i]
 
         if os.environ.get("DJANGO_DEBUG") == "TRUE":
             print(f"length of search is {len(self._search)}")
@@ -1281,7 +1303,7 @@ class Slope:
             # HAS ERROR
             # (cy - s_yb) ** 2 + abs(s_x-c_x)**2 = R ** 2
             # sqrt(R**2 - abs(s_x-c_x)**2) = c_y - s_yb
-            s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
+            s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
 
             # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
@@ -1442,7 +1464,7 @@ class Slope:
                 # if radius < abs(s_x - c_x):
                 #     return None
 
-                s_yb = c_y - sqrt(radius ** 2 - abs(s_x - c_x) ** 2)
+                s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
 
                 # get y coordinate at slice top
                 s_yt = self.get_external_y_intersection(s_x)
@@ -2748,23 +2770,15 @@ if __name__ == "__main__":
 
     s.set_materials(m1, m2, m3)
 
-    for r in range(2, 6):
-        s.add_single_circular_plane(
-            c_x=s.get_bottom_coordinates()[0],
-            c_y=s.get_bottom_coordinates()[1] + 2.5,
-            radius=r,
-        )
-
-    s.update_analysis_options(slices=50)
+    s.update_analysis_options(slices=50, iterations=5000)
 
     s.set_water_table(0.7)
-
     s.analyse_slope()
 
     # print the critical FOS for the slope
     print("fos:", s.get_min_FOS())
 
     # plot the critical failure surface
-    fig_1 = s.plot_all_planes(max_fos=None)
-    fig_1.update_layout(width=1200, height=700)
-    fig_1.show()
+    # fig_1 = s.plot_all_planes(max_fos=None)
+    # fig_1.update_layout(width=1200, height=700)
+    # fig_1.show()
