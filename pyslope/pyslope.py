@@ -1,7 +1,6 @@
 # standard library imports
 from math import radians, tan, sqrt, atan, cos, sin
 from dataclasses import dataclass
-import os
 import multiprocessing
 
 # third party imports
@@ -254,7 +253,6 @@ class Slope:
         return f"Slope: {round(self._height,3)}V : {round(self._length,3)}H"
 
     def __init__(self, height: float = 1, angle: int = 30, length: float = None):
-
         # initialise empty properties used in other components of class
         self._materials = []
         self._water_RL = None
@@ -478,7 +476,6 @@ class Slope:
         "Update coordinates for left and right of udl based on external boundary and Udl object"
 
         for udl in self._udls:
-
             right_x = self._top_coord[0] - udl.offset
             if udl.length:
                 left_x = max(0, right_x - udl.length)
@@ -1081,7 +1078,6 @@ class Slope:
         C = half_coord_distance**2
 
         for i in range(0, num_circles):
-
             # doesnt include going all the way in which we dont want to do anyways
             chord_to_edge = start_chord_to_edge * (num_circles - i) / num_circles
             radius = utilities.circle_radius_from_abcd(chord_to_edge, C)
@@ -1195,7 +1191,6 @@ class Slope:
                     radius=search["radius"],
                 )
         else:
-
             # use multiprocessing to get results
             with multiprocessing.Manager() as manager:
                 with manager.Pool() as pool:
@@ -1215,9 +1210,6 @@ class Slope:
             for i in range(len(self._search)):
                 self._search[i]["FOS"] = results[i]
 
-        if os.environ.get("DJANGO_DEBUG") == "TRUE":
-            print(f"length of search is {len(self._search)}")
-
         # tidy the information to remove anything that didnt run and
         # to be sorted from lowest FOS to highest FOS
         search = list(filter((lambda x: x["FOS"] is not None), self._search))
@@ -1226,9 +1218,6 @@ class Slope:
             search = list(filter(lambda x: (x["FOS"] <= max_fos), search))
 
         self._search = search
-
-        if os.environ.get("DJANGO_DEBUG") == "TRUE":
-            print(f"length of search is {len(self._search)}")
 
     def _analyse_circular_failure_ordinary(
         self, c_x: float, c_y: float, radius: float, l_c=None, r_c=None
@@ -1573,7 +1562,14 @@ class Slope:
         # check case for load at right and load at left before
         # trying to converge on position
         right = 0.0
-        left = self._length - 0.01
+
+        # get the length of the top and subtract the largest dynamic load length
+        left = self._length
+        for udl in self._udls:
+            if udl.dynamic_offset:
+                left = max(left, self._top_coord[0] - udl.length)
+
+        left -= 0.01
 
         # check for extreme case with loads at crest (right)
         # if slope is safe (FOS high) then return
@@ -2126,10 +2122,8 @@ class Slope:
         traces = []
 
         for i in tqdm(self._search):
-
             FOS = i["FOS"]
             if max_fos is None or FOS < max_fos:
-
                 c_x = i["c_x"]
                 c_y = i["c_y"]
                 radius = i["radius"]
@@ -2624,7 +2618,6 @@ class Slope:
             )
 
             if round(k, 1) % 1 == 0:
-
                 # bandaid fix because i cant figure out why the scale shows wrong
                 if k < 2.5:
                     y = float(yi) + float(k - 0.15) * float(yf - yi) / float(
@@ -2761,7 +2754,6 @@ class Slope:
 
 
 if __name__ == "__main__":
-
     s = Slope(height=1, angle=None, length=1)
 
     m1 = Material(20, 35, 0, 0.5)
