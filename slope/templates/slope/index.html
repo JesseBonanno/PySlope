@@ -43,7 +43,7 @@
             {% csrf_token %}
             <!-- button for analysing -->
             <div id="button-row">
-              <button class="btn btn-primary" disabled type="submit" value="Analyse" name="Analyse"
+              <button class="btn btn-primary" type="submit" value="Analyse" name="Analyse"
                 id="analysis_button">
                 <span id="analyse_text">Analyse</span>
               </button>
@@ -119,7 +119,6 @@
               <button id='add-{{name}}-form' class='btn btn-primary my-3'>Add another row</button>
 
               {% else %}
-
               {% for field in forms %}
               <div class='{{name}}-div'>
                 <div class="align-self-center col-3 col-form-label" style='display:inline-block'
