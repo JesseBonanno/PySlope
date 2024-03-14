@@ -429,3 +429,38 @@ def draw_arrow(
         fig.add_annotation(annotation)
 
     return fig
+
+def draw_square(fig, x0, y0, x1, y1, color="Black"):
+    """Draw a solid square on a plotly figure.
+
+    Parameters:
+    - fig: The plotly figure to which the square will be added.
+    - x0, y0: The x and y coordinates of the first corner of the square.
+    - x1, y1: The x and y coordinates of the opposite corner of the square.
+    - color: The color of the square. Defaults to 'Black'.
+    - line_width: The width of the square's outline. Defaults to 0 for a solid fill with no outline.
+
+    Returns:
+    - The plotly figure with the square added.
+    """
+    fig.add_shape(type="rect",
+                  x0=x0, y0=y0, x1=x1, y1=y1,
+                  line=dict(color=color, width=1),
+                  fillcolor=color)
+    return fig
+
+
+def draw_wall(fig, x, y, depth, width=30, angle=90, color="black"):
+    print(f"Drawing wall: {x},{y} depth:{depth} width={width} angle={angle} color={color}")
+    # TODO: Plot angle
+
+    fig = draw_square(
+        fig,
+        x0=x - (width/2),
+        y0=y,
+        x1=x + (width/2),
+        y1=y - depth,
+        color=color,
+    )
+
+    return fig

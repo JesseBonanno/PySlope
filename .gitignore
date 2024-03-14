@@ -121,5 +121,6 @@ app/main.py
 django application/engineering/.vscode/launch.json
 .vscode/launch.json
 *.json
+*.DS_Store
 
 staticfiles/*

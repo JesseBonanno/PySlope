@@ -224,6 +224,93 @@ class LineLoad:
     def __repr__(self):
         return f"LineLoad: {self.magnitude} kN/m, offset = {self.offset} m"
 
+@dataclass
+class RetainingWall:
+    """
+    A class representing a retaining wall.
+
+    Attributes:
+    -----------
+    location : float
+        The x-coordinate of the wall's base relative to the slope. This represents
+        the horizontal distance along the slope from a defined origin.
+
+    height : float
+        The vertical height of the wall. It is the distance from the base to the
+        top of the wall.
+
+    thickness : float
+        The thickness of the wall. This represents the depth of the wall
+        perpendicular to its face.
+
+    unit_weight : float
+        The unit weight of the wall material, typically given in kN/m^3. This is
+        used to calculate the weight of the wall, which contributes to the
+        resisting forces against slope failure.
+
+    angle : float
+        The angle of the wall from the vertical, measured in degrees. A value of
+        0° represents a perfectly vertical wall, while greater values indicate a
+        wall leaning into or away from the slope.
+    """
+    location: float = 0
+    height: float = 0
+    thickness: float = 0.2
+    unit_weight: float = 20
+    angle: float = 90
+
+    def __init__(self, location, height, thickness, unit_weight, angle):
+        self.location = location
+        self.height = height
+        self.thickness = thickness
+        self.unit_weight = unit_weight
+        self.angle = angle
+
+    def calculate_weight(self):
+        """
+        Calculates the total weight of the retaining wall.
+
+        Returns:
+        --------
+        float
+            The total weight of the wall (in kN).
+        """
+        return self.unit_weight * self.height * self.thickness
+
+    def calculate_passive_pressure(self, soil_unit_weight, soil_friction_angle):
+        """
+        Calculates the passive earth pressure against the wall.
+
+        Parameters:
+        -----------
+        soil_unit_weight : float
+            The unit weight of the soil (kN/m³).
+        soil_friction_angle : float
+            The friction angle of the soil (degrees).
+
+        Returns:
+        --------
+        float
+            Passive earth pressure (kPa).
+        """
+        # Rankine passive earth pressure condition
+        phi = radians(soil_friction_angle)
+        kp = tan(radians(45) + phi / 2) ** 2  # Passive earth pressure coefficient
+        passive_pressure = 0.5 * kp * soil_unit_weight * self.height ** 2
+        return passive_pressure
+
+    def __repr__(self):
+        """
+        String representation of the RetainingWall instance.
+
+        Returns:
+        --------
+        str
+            A string describing the wall.
+        """
+        return (f"RetainingWall(Location: {self.location} m, "
+                f"Height: {self.height} m, Thickness: {self.thickness} m, "
+                f"Unit Weight: {self.unit_weight} kN/m³, Angle: {self.angle}°)")
 
 class Slope:
     """Slope object.
@@ -258,6 +345,7 @@ class Slope:
         self._water_RL = None
         self._udls = []
         self._lls = []
+        self._retaining_walls = []
 
         # NOTE: dont want to reset with changes to the model, just need to initialise here
         self._dynamic_results = {}
@@ -1169,6 +1257,36 @@ class Slope:
         # reset results
         self._reset_results()
 
+    def set_retaining_walls(self, *retaining_walls):
+        for wall in retaining_walls:
+            if isinstance(wall, RetainingWall):
+                if wall.height > 0:
+                    self._retaining_walls.append(wall)
+
+
+        self._update_retaining_wall_coordinates()
+
+        # reset results
+        self._reset_results()
+
+    def _update_retaining_wall_coordinates(self):
+        "Update coordinates for retaining wall based on external boundary and RetainingWall object"
+
+        for wall in self._retaining_walls:
+            wall.coord = max(0, self._top_coord[0] + wall.location)
+
+    def remove_retaining_walls(self, *retaining_walls, remove_all=False):
+        for wall in retaining_walls:
+            for check_retaining_wall in self._retaining_walls:
+                if check_retaining_wall.location == wall.location:
+                    self._retaining_walls.remove(check_retaining_wall)
+
+        if remove_all:
+            self._retaining_walls = []
+
+        # reset results
+        self._reset_results()
+
     def analyse_slope(self, max_fos=None):
         """Analyse many possible failure planes for a slope OR
         indivually added failure planes if added to slope."""
@@ -1318,6 +1436,7 @@ class Slope:
 
             # get material properties at the bottom of the slice
             bottom_material = self._get_material_at_depth(s_yb)
+            wall_pressure_sum = 0
 
             cohesion = bottom_material.cohesion
             friction_angle = bottom_material.friction_angle
@@ -1357,10 +1476,37 @@ class Slope:
             else:
                 U = 0
 
+            for wall in self._retaining_walls:
+                # Check if the slice intersects with the wall's location
+                # The wall is considered to intersect the slice if its location is within the slice's x-coordinates
+                if s_x <= wall.coord <= s_x + b:
+                    wall_pressure = wall.calculate_passive_pressure(
+                        soil_unit_weight=bottom_material.unit_weight,
+                        soil_friction_angle=bottom_material.friction_angle
+                    )
+                    # Calculate the wall's weight
+                    wall_weight = wall.calculate_weight()
+
+                    # Adjusting for the wall's angle relative to the circular failure plane
+                    # Assume wall.angle is the angle from vertical in degrees, 90 is vertical, <90 is leaning towards slope
+                    angle_difference = radians(wall.angle) - alpha  # Convert wall angle to radians and subtract slice angle
+                    angle_factor = cos(angle_difference)  # Cosine of angle difference to adjust force contributions
+
+                    # Adjust wall pressure by the cosine of angle difference, assuming vertical face for simplicity
+                    adjusted_wall_pressure = wall_pressure * angle_factor
+
+                    # Adjust the wall's weight contribution based on its angle
+                    adjusted_wall_weight = wall_weight * angle_factor
+
+                    W += adjusted_wall_weight
+
+                    # Add the adjusted wall pressure and wall weight to the resisting forces
+                    wall_pressure_sum += adjusted_wall_pressure
+
             # calculate resisting
-            resisting += cohesion * inclined_length + max(
+            resisting += (cohesion * inclined_length + max(
                 0, (W * cos(alpha) - U)
-            ) * tan(radians(friction_angle))
+            ) * tan(radians(friction_angle))) + wall_pressure_sum
 
             # calculate pushing
             pushing += W * sin(alpha)
@@ -1476,6 +1622,7 @@ class Slope:
 
                 # get material properties at the bottom of the slice
                 bottom_material = self._get_material_at_depth(s_yb)
+                wall_pressure_sum = 0
 
                 cohesion = bottom_material.cohesion
                 friction_angle = bottom_material.friction_angle
@@ -1525,10 +1672,37 @@ class Slope:
                 # calculate ma
                 ma = cos(alpha) + sin(alpha) * tan(radians(friction_angle)) / prev_FS
 
+                for wall in self._retaining_walls:
+                    # Check if the slice intersects with the wall's location
+                    # The wall is considered to intersect the slice if its location is within the slice's x-coordinates
+                    if s_x <= wall.coord <= s_x + b:
+                        wall_pressure = wall.calculate_passive_pressure(
+                            soil_unit_weight=bottom_material.unit_weight,
+                            soil_friction_angle=bottom_material.friction_angle
+                        )
+                        # Calculate the wall's weight
+                        wall_weight = wall.calculate_weight()
+
+                        # Adjusting for the wall's angle relative to the circular failure plane
+                        # Assume wall.angle is the angle from vertical in degrees, 90 is vertical, <90 is leaning towards slope
+                        angle_difference = radians(wall.angle) - alpha  # Convert wall angle to radians and subtract slice angle
+                        angle_factor = cos(angle_difference)  # Cosine of angle difference to adjust force contributions
+
+                        # Adjust wall pressure by the cosine of angle difference, assuming vertical face for simplicity
+                        adjusted_wall_pressure = wall_pressure * angle_factor
+
+                        # Adjust the wall's weight contribution based on its angle
+                        adjusted_wall_weight = wall_weight * angle_factor
+
+                        W += adjusted_wall_weight
+
+                        # Add the adjusted wall pressure and wall weight to the resisting forces
+                        wall_pressure_sum += wall_pressure
+
                 # calculate resisting
-                resisting += (
+                resisting += ((
                     cohesion * b + (W - U) * tan(radians(friction_angle))
-                ) / ma
+                ) / ma) + wall_pressure_sum
 
                 # calculate pushing
                 pushing += W * sin(alpha)
@@ -1642,6 +1816,7 @@ class Slope:
         # remove loads
         self.remove_udls(remove_all=True)
         self.remove_lls(remove_all=True)
+        self.remove_retaining_walls(remove_all=True)
 
         # update loads
         for udl in udls:
@@ -2072,6 +2247,9 @@ class Slope:
         if self._water_RL:
             fig = self._plot_water(fig)
 
+        if self._retaining_walls:
+            fig = self._plot_retaining_walls(fig)
+
         fig = self._plot_limits(fig)
 
         return fig
@@ -2348,6 +2526,23 @@ class Slope:
             units="kN/m",
             arrowhead=10,
         )
+
+        return fig
+
+    def _plot_retaining_walls(self, fig):
+        """Add retaining wall to plot"""
+        for wall in self._retaining_walls:
+            wall_x = wall.coord
+            wall_y = self.get_external_y_intersection(wall_x)
+            if isinstance(wall_y, (int, float)):
+                fig = utilities.draw_wall(
+                    fig,
+                    x=wall_x,
+                    y=wall_y,
+                    depth=wall.height,
+                    width=wall.thickness,
+                    angle=wall.angle,
+                )
 
         return fig
 

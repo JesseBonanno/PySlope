@@ -16,6 +16,7 @@ from pyslope.pyslope import (
     Material,
     Udl,
     LineLoad,
+    RetainingWall,
     COLOUR_FOS_DICT,
 )
 
@@ -23,6 +24,7 @@ from .models import (
     MaterialModel,
     UdlModel,
     LineLoadModel,
+    RetainingWallModel,
 )
 
 from .forms import (
@@ -30,6 +32,7 @@ from .forms import (
     MaterialForm,
     UdlForm,
     LineLoadForm,
+    RetainingWallForm,
     AnalysisOptionsForm,
     WaterTableForm,
     LimitsForm,
@@ -132,6 +135,7 @@ def index(request):
     MaterialFormSet = modelformset_factory(MaterialModel, MaterialForm, extra=1)
     UdlFormSet = modelformset_factory(UdlModel, UdlForm, extra=1)
     LineLoadFormSet = modelformset_factory(LineLoadModel, LineLoadForm, extra=1)
+    RetainingWallFormSet = modelformset_factory(RetainingWallModel, RetainingWallForm, extra=1)
 
     if request.method == "GET":
         # if forms have been saved initialise with previous data, otherwise reset.
@@ -153,6 +157,7 @@ def index(request):
                 material_formset = MaterialFormSet(previous_forms, prefix="material")
                 udl_formset = UdlFormSet(previous_forms, prefix="udl")
                 line_load_formset = LineLoadFormSet(previous_forms, prefix="lineload")
+                retaining_wall_formset = RetainingWallFormSet(previous_forms, prefix="retainingwall")
 
                 water_table_form = WaterTableForm(previous_forms, prefix="watertable")
                 limits_form = LimitsForm(previous_forms, prefix="limits")
@@ -170,6 +175,9 @@ def index(request):
             udl_formset = UdlFormSet(queryset=UdlModel.objects.none(), prefix="udl")
             line_load_formset = LineLoadFormSet(
                 queryset=LineLoadModel.objects.none(), prefix="lineload"
+            )
+            retaining_wall_formset = RetainingWallFormSet(
+                queryset=RetainingWallModel.objects.none(), prefix="retainingwall"
             )
 
             water_table_form = WaterTableForm(prefix="watertable")
@@ -228,6 +236,7 @@ def index(request):
                 "material_formset": material_formset,
                 "udl_formset": udl_formset,
                 "line_load_formset": line_load_formset,
+                "retaining_wall_formset": retaining_wall_formset,
                 "water_table_form": water_table_form,
                 "limits_form": limits_form,
                 "options_form": options_form,
@@ -236,6 +245,7 @@ def index(request):
                     ("Materials", material_formset, "formset"),
                     ("Udls", udl_formset, "formset"),
                     ("LineLoads", line_load_formset, "formset"),
+                    ("RetainingWalls", retaining_wall_formset, "formset"),
                     ("WaterTable", water_table_form, "form"),
                     ("Limits", limits_form, "form"),
                     ("Options", options_form, "form"),
@@ -253,6 +263,7 @@ def index(request):
         material_formset = MaterialFormSet(request.POST, prefix="material")
         udl_formset = UdlFormSet(request.POST, prefix="udl")
         line_load_formset = LineLoadFormSet(request.POST, prefix="lineload")
+        retaining_wall_formset = RetainingWallFormSet(request.POST, prefix="retainingwall")
 
         water_table_form = WaterTableForm(request.POST, prefix="watertable")
         limits_form = LimitsForm(request.POST, prefix="limits")
@@ -263,6 +274,7 @@ def index(request):
             material_formset,
             udl_formset,
             line_load_formset,
+            retaining_wall_formset,
             water_table_form,
             limits_form,
             options_form,
@@ -326,6 +338,7 @@ def index(request):
                     "material_formset": material_formset,
                     "udl_formset": udl_formset,
                     "line_load_formset": line_load_formset,
+                    "retaining_wall_formset": retaining_wall_formset,
                     "water_table_form": water_table_form,
                     "limits_form": limits_form,
                     "options_form": options_form,
@@ -334,6 +347,7 @@ def index(request):
                         ("Materials", material_formset, "formset"),
                         ("Udls", udl_formset, "formset"),
                         ("LineLoads", line_load_formset, "formset"),
+                        ("RetainingWalls", retaining_wall_formset, "formset"),
                         ("WaterTable", water_table_form, "form"),
                         ("Limits", limits_form, "form"),
                         ("Options", options_form, "form"),
@@ -351,6 +365,7 @@ def create_slope(
     material_formset,
     udl_formset,
     line_load_formset,
+    retaining_wall_formset,
     water_table_form,
     limits_form,
     options_form,
@@ -426,6 +441,36 @@ def create_slope(
                     dynamic_offset=LineLoadModel._meta.get_field(
                         "dynamic_offset"
                     ).get_default(),
+                )
+            )
+
+    # add retaining walls to slope
+    for retaining_wall_form in retaining_wall_formset.cleaned_data:
+        if retaining_wall_form:
+            print(RetainingWall(
+                    location=retaining_wall_form["location"],
+                    height=retaining_wall_form["height"],
+                    thickness=retaining_wall_form["thickness"],
+                    unit_weight=retaining_wall_form["unit_weight"],
+                    angle=retaining_wall_form["angle"]
+                ))
+            slope.set_retaining_walls(
+                RetainingWall(
+                    location=retaining_wall_form["location"],
+                    height=retaining_wall_form["height"],
+                    thickness=retaining_wall_form["thickness"],
+                    unit_weight=retaining_wall_form["unit_weight"],
+                    angle=retaining_wall_form["angle"]
+                )
+            )
+        else:
+            slope.set_retaining_walls(
+                RetainingWall(
+                    location=RetainingWallModel._meta.get_field("location").get_default(),
+                    height=RetainingWallModel._meta.get_field("height").get_default(),
+                    thickness=RetainingWallModel._meta.get_field("thickness").get_default(),
+                    unit_weight=RetainingWallModel._meta.get_field("unit_weight").get_default(),
+                    angle=RetainingWallModel._meta.get_field("angle").get_default(),
                 )
             )
 

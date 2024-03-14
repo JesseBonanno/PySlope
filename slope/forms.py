@@ -6,6 +6,7 @@ from .models import (
     LineLoadModel,
     WaterTableModel,
     LimitsModel,
+    RetainingWallModel,
 )
 
 from .widgets import RangeInput
@@ -134,7 +135,7 @@ class AnalysisOptionsForm(forms.Form):
 
     iterations = forms.IntegerField(
         min_value=500,
-        max_value=5000,
+        max_value=15000,
         required=True,
         label="Iterations",
         initial=500,
@@ -143,7 +144,7 @@ class AnalysisOptionsForm(forms.Form):
 
     slices = forms.IntegerField(
         min_value=10,
-        max_value=50,
+        max_value=100,
         required=True,
         label="Slices",
         initial=25,
@@ -186,4 +187,31 @@ class LimitsForm(forms.ModelForm):
             "consider_internal_limits": "Consider Internal Limits?",
             "left_x_right": "left internal x coordinate (m)",
             "right_x_left": "right internal x coordinate (m)",
+        }
+
+class RetainingWallForm(forms.ModelForm):
+    class Meta:
+        model = RetainingWallModel
+        fields = (
+            'location',
+            'height',
+            'thickness',
+            'unit_weight',
+            'angle',
+        )
+
+        labels = {
+            'location': 'Wall Location along Slope (m)',
+            'height': 'Wall Height (m)',
+            'thickness': 'Wall Thickness (m)',
+            'unit_weight': 'Wall Material Unit Weight (kN/m³)',
+            'angle': 'Wall Angle with respect to Horizontal (degrees)',
+        }
+
+        widgets = {
+            'angle': forms.NumberInput(attrs={'step': '0.1'}),
+        }
+
+        help_texts = {
+            'angle': 'Enter 90 for a vertical wall.',
         }
