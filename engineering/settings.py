@@ -34,6 +34,8 @@ else:
         "https://pyslope.herokuapp.com/",
         ".pyslope.com",
         "pyslope.herokuapp.com",
+        "http://127.0.0.1:8000/",
+        "127.0.0.1",
     ]
 
 

@@ -272,6 +272,29 @@ $ pip install black flake8 pre-commit
 $ pre-commit install
 ```
 
+### Run Django frontend UI locally
+
+1. Run Django migrations
+`python manage.py migrate`
+
+2. Set secret key
+The Django app will look for a secret key to run.
+export SECRET_KEY=<your_key>
+
+3. Create static files 
+Django will complain about staticfiles not found
+```
+ValueError: Missing staticfiles manifest entry for 'slope/styles.css'
+[08/Mar/2024 20:09:53] "GET / HTTP/1.1" 500 145
+```
+Run command below:
+
+`python manage.py collectstatic`
+
+4. Run server
+
+`python manage.py runserver`
+
 Releasing
 ---------
 
@@ -297,3 +320,5 @@ Or set a tag with Github Desktop.
 ## License
 
 [![License](https://img.shields.io/badge/license-MIT-lightgreen.svg)](https://github.com/JesseBonanno/pyslope/blob/main/LICENSE.txt)
+
+
