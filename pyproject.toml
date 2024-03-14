@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "pyslope"
+version = "0.1.0"
+description = ""
+authors = ["MyGuyInGithub"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.7"
+colour = "*"
+plotly = "*"
+tqdm = "*"
+gunicorn = "*"
+django = "*"
+whitenoise = "*"
+dj-database-url = "*"
+psycopg2-binary = "*"
+pytest = "*"
+pytest-cov = "*"
+kaleido = "0.2.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+pyslope = "pyslope.cli:cli"
