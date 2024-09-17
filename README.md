@@ -166,6 +166,21 @@ s.plot_critical()  # plots the boundary with the critical failure of the slope
 s.plot_all_planes(max_fos=i) # plots boundary with all slope failures below fos i (where i is number)
 ```
 
+You can show the plot or save the plot to a local html file or image.
+
+```python
+fig = s.plot_boundary()  # store a plot in local variable
+
+fig.show()                          # shows the plot
+fig.write_html("./example.html")    # save the plot as a html
+
+# writing image requires - pip install -U kaleido
+fig.write_image("./example.png")
+fig.write_image("./example.jpg")
+fig.write_image("./example.svg")
+```
+
+
 Examples of the plots are shown below. 
 
 ![example_1 plot critical](https://github.com/JesseBonanno/pyslope/blob/main/pyslope/examples/readme_example_plot_critical.png)
