@@ -7,23 +7,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const addMaterialFormBtn = document.querySelector('#add-Materials-form');
     const addUdlFormBtn = document.querySelector('#add-Udls-form');
     const addLineLoadFormBtn = document.querySelector('#add-LineLoads-form');
+    const addRetainingWallFormBtn = document.querySelector('#add-RetainingWalls-form');
 
     const materialForm = document.getElementsByClassName("formset-row-Materials");
     const udlForm = document.getElementsByClassName("formset-row-Udls");
     const lineLoadForm = document.getElementsByClassName("formset-row-LineLoads");
+    const retainingWallForm = document.getElementsByClassName("formset-row-RetainingWalls");
 
     const mainMaterialForm = document.querySelector("#formset-Materials");
     const mainUdlForm = document.querySelector("#formset-Udls");
     const mainLineLoadForm = document.querySelector("#formset-LineLoads");
+    const mainRetainingWallForm = document.querySelector("#formset-RetainingWalls");
 
     const totalMaterialForms = document.querySelector('#id_material-TOTAL_FORMS');
     const totalLineLoadForms = document.querySelector('#id_lineload-TOTAL_FORMS');
     const totalUdlForms = document.querySelector("#id_udl-TOTAL_FORMS");
+    const totalRetainingWallForms = document.getElementById("id_retainingwall-TOTAL_FORMS");
 
 
     let materialFormCount = materialForm.length - 1;
     let udlFormCount = udlForm.length - 1;
     let lineLoadFormCount = lineLoadForm.length - 1;
+    let retainingWallFormCount = retainingWallForm.length - 1;
 
     addMaterialFormBtn.addEventListener('click', function(event) {
         event.preventDefault();
@@ -65,6 +70,27 @@ document.addEventListener("DOMContentLoaded", () => {
         mainLineLoadForm.insertBefore(newLineLoadForm, lineLoadEnd);
         totalLineLoadForms.setAttribute('value', `${lineLoadFormCount+1}`);
 
+    });
+
+    addRetainingWallFormBtn.addEventListener('click', function(event) {
+        event.preventDefault();
+
+        // clone a New Form
+        const newRetainingWallForm = retainingWallForm[0].cloneNode(true);
+
+        //get end position
+        const retainingWallEnd = document.querySelector('#end-row-RetainingWalls');
+
+        retainingWallFormCount++;
+        const RetainingWallFormRegex = RegExp(`retainingwall-(\\d){1}-`, 'g');
+
+        newRetainingWallForm.innerHTML = newRetainingWallForm.innerHTML.replace(
+            RetainingWallFormRegex,
+            `retainingwall-${retainingWallFormCount}-`,
+        );
+
+        mainRetainingWallForm.insertBefore(newRetainingWallForm, retainingWallEnd);
+        totalRetainingWallForms.setAttribute('value', `${retainingWallFormCount+1}`);
     });
 
 
@@ -149,6 +175,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 event.target.parentElement.parentElement.remove();
                 lineLoadFormCount--;
                 totalLineLoadForms.setAttribute('value', `${lineLoadFormCount+1}`);
+            }
+            updateForms(event);
+        }
+    })
+
+    mainRetainingWallForm.addEventListener("click", function(event) {
+        if (event.target.classList.contains("delete-RetainingWalls-form")) {
+            event.preventDefault();
+            if (retainingWallFormCount > 0) {
+                event.target.parentElement.parentElement.remove();
+                retainingWallFormCount--;
+                totalRetainingWallForms.setAttribute('value', `${retainingWallFormCount+1}`);
             }
             updateForms(event);
         }

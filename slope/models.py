@@ -1,8 +1,5 @@
 from django.db import models
 
-# Create your models here.
-
-
 class MaterialModel(models.Model):
     unit_weight = models.FloatField(default=20)
     friction_angle = models.FloatField(default=35)
@@ -46,3 +43,10 @@ class LimitsModel(models.Model):
     consider_internal_limits = models.BooleanField(default=False)
     left_x_right = models.FloatField(default=4)
     right_x_left = models.FloatField(default=6)
+
+class RetainingWallModel(models.Model):
+    location = models.FloatField(default=0)
+    height = models.FloatField(default=0)
+    thickness = models.FloatField(default=0.3)
+    unit_weight = models.FloatField(default=22)  # Default: 22 kN/m^3
+    angle = models.FloatField(default=90)  # Angle with the horizontal, in degrees
