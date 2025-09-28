@@ -249,7 +249,7 @@ class Slope:
     """
 
     def __repr__(self):
-        return f"Slope: {round(self._height,3)}V : {round(self._length,3)}H"
+        return f"Slope: {round(self._height, 3)}V : {round(self._length, 3)}H"
 
     def __init__(self, height: float = 1, angle: int = 30, length: float = None):
         # initialise empty properties used in other components of class
@@ -1187,7 +1187,6 @@ class Slope:
                 c_y=search["c_y"],
                 radius=search["radius"],
             )
-
 
         # tidy the information to remove anything that didnt run and
         # to be sorted from lowest FOS to highest FOS
