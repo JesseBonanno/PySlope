@@ -77,6 +77,8 @@ class Material:
         self.cohesion = abs(self.cohesion)
         self.depth_to_bottom = abs(self.depth_to_bottom)
 
+        self.tan_friction_angle = tan(radians(self.friction_angle))
+
         if self.name is None:
             self.name = ""
         if self.color is None:
@@ -1288,8 +1290,10 @@ class Slope:
             dx = c_x - s_x
             alpha = atan(dx / dy)
 
+            cos_alpha = cos(alpha)
+
             # get length
-            inclined_length = b / cos(alpha)
+            inclined_length = b / cos_alpha
 
             # calculate strip weight
             W = self._calculate_strip_weight(b, s_yt, s_yb)
@@ -1298,15 +1302,18 @@ class Slope:
             bottom_material = self._get_material_at_depth(s_yb)
 
             cohesion = bottom_material.cohesion
-            friction_angle = bottom_material.friction_angle
+            tan_friction_angle = bottom_material.tan_friction_angle
+
+            strip_xl = s_x - (b / 2)
+            strip_xr = s_x + (b / 2)
 
             # if there is a udl load on the strip apply it.
             for udl in self._udls:
-                W += self._calculate_strip_udl_force(b, s_x, udl)
+                W += self._calculate_strip_udl_force(b, udl, strip_xl, strip_xr)
 
             # if there is a point load on the strip apply it.
             for ll in self._lls:
-                W += self._calculate_strip_ll(b, s_x, ll)
+                W += self._calculate_strip_ll(b, ll, strip_xl, strip_xr)
 
             # consideration for water
             if self._water_RL:
@@ -1336,9 +1343,10 @@ class Slope:
                 U = 0
 
             # calculate resisting
-            resisting += cohesion * inclined_length + max(
-                0, (W * cos(alpha) - U)
-            ) * tan(radians(friction_angle))
+            resisting += (
+                cohesion * inclined_length
+                + max(0, (W * cos_alpha - U)) * tan_friction_angle
+            )
 
             # calculate pushing
             pushing += W * sin(alpha)
@@ -1456,7 +1464,7 @@ class Slope:
                 bottom_material = self._get_material_at_depth(s_yb)
 
                 cohesion = bottom_material.cohesion
-                friction_angle = bottom_material.friction_angle
+                tan_friction_angle = bottom_material.tan_friction_angle
 
                 # ACCORDING TO GEOSLOPE SHOULD DO THE CHECK BELOW.
                 # THIS HOWEVER ELIMINATES ALMOST ALL OF THE PROPOSED SLOPES
@@ -1470,13 +1478,16 @@ class Slope:
                 #     if alpha * 180 / 3.14 < 45 - friction_angle/2:
                 #         return None
 
+                strip_xl = s_x - (b / 2)
+                strip_xr = s_x + (b / 2)
+
                 # if there is a udl load on the strip apply it.
                 for udl in self._udls:
-                    W += self._calculate_strip_udl_force(b, s_x, udl)
+                    W += self._calculate_strip_udl_force(b, udl, strip_xl, strip_xr)
 
                 # if there is a point load on the strip apply it.
                 for ll in self._lls:
-                    W += self._calculate_strip_ll(b, s_x, ll)
+                    W += self._calculate_strip_ll(b, ll, strip_xl, strip_xr)
 
                 # consideration for water
                 if self._water_RL:
@@ -1501,12 +1512,10 @@ class Slope:
                     U = 0
 
                 # calculate ma
-                ma = cos(alpha) + sin(alpha) * tan(radians(friction_angle)) / prev_FS
+                ma = cos(alpha) + sin(alpha) * tan_friction_angle / prev_FS
 
                 # calculate resisting
-                resisting += (
-                    cohesion * b + (W - U) * tan(radians(friction_angle))
-                ) / ma
+                resisting += (cohesion * b + (W - U) * tan_friction_angle) / ma
 
                 # calculate pushing
                 pushing += W * sin(alpha)
@@ -1725,31 +1734,35 @@ class Slope:
         # intialize properties
         W = 0.0  # kN
         top = s_yt
+        materials = self._materials
 
         # loop through materials noting that they are already sorted by depth
-        for m in self._materials:
+        for m in materials:
+            rl = m.RL
+            uw = m.unit_weight
+
             # while layers are higher than the top of the slice ignore the material
-            if m.RL >= s_yt:
+            if rl >= s_yt:
                 continue
             # while the bottom of layer is in the slice consider, go from the
             # current top to the bottom of the layer
             # this captures the case of the top of the strip being partially in a layer
-            elif m.RL < s_yt and m.RL > s_yb:
-                W += b * m.unit_weight * (top - m.RL)
-                top = m.RL
+            elif rl < s_yt and rl > s_yb:
+                W += b * uw * (top - rl)
+                top = rl
             # in the case that the bottom of the strip is now outside the range
             # we still have material between the current top and the bottom of the strip
-            # we capture it in this edge case and then break since everything below can be ignored
+            # we capture it in this edge case and then return since everything below can be ignored
             # we also grab the material properties at the base
             else:
-                W += b * m.unit_weight * (top - s_yb)
-                top = m.RL
-                break
+                W += b * uw * (top - s_yb)
+                top = rl
+                return W
 
         # check case that ran out of layers (loop terminated earlier than expected)
         if top > s_yb:
             m = self._materials[-1]
-            W += b * m.unit_weight * (top - s_yb)
+            W += b * uw * (top - s_yb)
 
         return W
 
@@ -1774,17 +1787,19 @@ class Slope:
 
         return self._materials[-1]
 
-    def _calculate_strip_udl_force(self, b, s_x, udl):
+    def _calculate_strip_udl_force(self, b, udl, strip_xl, strip_xr):
         """Calculates the udl force over strip.
 
         Parameters
         ----------
         b : float,
             strip width in m
-        s_x : float,
-            strip x coordinate (for center of strip)
         udl : Udl object,
             udl object
+        strip_xl : float
+            Left x-coordinate of the strip.
+        strip_xr : float
+            Right x-coordinate of the strip.
 
         Returns
         -------
@@ -1793,43 +1808,42 @@ class Slope:
         """
         W = 0
 
-        load_xl, load_xr = udl.left, udl.right
-        strip_xl = s_x - (b / 2)
-        strip_xr = s_x + (b / 2)
+        magnitude = udl.magnitude
+        load_xl = udl.left
+        load_xr = udl.right
 
         # case 1 clearly load is completely inside
         if load_xl <= strip_xl and load_xr >= strip_xr:
-            W += b * udl.magnitude
+            W += b * magnitude
         # case 2 on the left inside the load
         elif strip_xl <= load_xl and strip_xr >= load_xl:
-            W += (strip_xr - load_xl) * udl.magnitude
+            W += (strip_xr - load_xl) * magnitude
 
         # case 3 on the right side of the load
         elif strip_xl <= load_xr and strip_xr >= load_xr:
-            W += (load_xr - strip_xl) * udl.magnitude
+            W += (load_xr - strip_xl) * magnitude
 
         return W
 
-    def _calculate_strip_ll(self, b, s_x, ll):
+    def _calculate_strip_ll(self, b, ll, strip_xl, strip_xr):
         """Calculates the ll force over strip.
 
         Parameters
         ----------
         b : float,
             strip width in m
-        s_x : float,
-            strip x coordinate (for center of strip)
         ll : LineLoad object,
             LineLoad object
+        strip_xl : float
+            Left x-coordinate of the strip.
+        strip_xr : float
+            Right x-coordinate of the strip.
 
         Returns
         -------
         float
             udl force on strip in kN
         """
-
-        strip_xl = s_x - (b / 2)
-        strip_xr = s_x + (b / 2)
 
         # Need just one comparison to be equal to or greater than so that
         # in the case the point load is excatly at the boundary
