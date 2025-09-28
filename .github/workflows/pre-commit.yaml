@@ -20,7 +20,7 @@ jobs:
         run: pip install --upgrade pip pre-commit
 
       - name: Run pre-commit hooks
-        uses: pre-commit/action@v3
+        uses: pre-commit/action@v2
         with:
           extra_args: --all-files
           skip-automatic-cache: true  # avoids cache outage errors
