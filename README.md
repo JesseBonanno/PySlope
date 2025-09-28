@@ -289,6 +289,8 @@ $ pre-commit install
 ### Run UI deployment With Poetry
 
 1. Install deps
+`pip install poetry`
+
 `poetry install`
 
 2. Set secret key
