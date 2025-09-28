@@ -1255,16 +1255,19 @@ class Slope:
 
         # width of a slice
         b = dist / SLICES
+        half_b = b / 2
 
         if b <= 0.000001:
             return None
 
         # initialise centre point of first slice
-        s_x = i_list[0][0] + b / 2
+        s_x = i_list[0][0] + half_b
 
         # intialise the push and resistance components for FOS before looping
         pushing = 0.0
         resisting = 0.0
+
+        radius_squared = radius**2
 
         # loop through slices
         for _ in range(0, SLICES):
@@ -1272,7 +1275,7 @@ class Slope:
             # HAS ERROR
             # (cy - s_yb) ** 2 + abs(s_x-c_x)**2 = R ** 2
             # sqrt(R**2 - abs(s_x-c_x)**2) = c_y - s_yb
-            s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
+            s_yb = c_y - sqrt(radius_squared - abs(s_x - c_x) ** 2)
 
             # get y coordinate at slice top
             s_yt = self.get_external_y_intersection(s_x)
@@ -1304,8 +1307,8 @@ class Slope:
             cohesion = bottom_material.cohesion
             tan_friction_angle = bottom_material.tan_friction_angle
 
-            strip_xl = s_x - (b / 2)
-            strip_xr = s_x + (b / 2)
+            strip_xl = s_x - half_b
+            strip_xr = s_x + half_b
 
             # if there is a udl load on the strip apply it.
             for udl in self._udls:
@@ -1420,10 +1423,13 @@ class Slope:
 
         # width of a slice
         b = dist / SLICES
+        half_b = b / 2
+
+        radius_squared = radius**2
 
         for _ in range(self._max_iterations):
             # initialise centre point of first slice
-            s_x = i_list[0][0] + b / 2
+            s_x = i_list[0][0] + half_b
 
             if prev_FS is None:
                 return None
@@ -1439,7 +1445,7 @@ class Slope:
                 # if radius < abs(s_x - c_x):
                 #     return None
 
-                s_yb = c_y - sqrt(radius**2 - abs(s_x - c_x) ** 2)
+                s_yb = c_y - sqrt(radius_squared - abs(s_x - c_x) ** 2)
 
                 # get y coordinate at slice top
                 s_yt = self.get_external_y_intersection(s_x)
@@ -1478,8 +1484,8 @@ class Slope:
                 #     if alpha * 180 / 3.14 < 45 - friction_angle/2:
                 #         return None
 
-                strip_xl = s_x - (b / 2)
-                strip_xr = s_x + (b / 2)
+                strip_xl = s_x - half_b
+                strip_xr = s_x + half_b
 
                 # if there is a udl load on the strip apply it.
                 for udl in self._udls:
