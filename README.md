@@ -11,7 +11,6 @@
 [![codecov](https://codecov.io/gh/JesseBonanno/PySlope/branch/main/graph/badge.svg?token=ASUIW54CXV)](https://codecov.io/gh/JesseBonanno/PySlope)
 [![CI](https://github.com/JesseBonanno/PySlope/actions/workflows/ci.yaml/badge.svg)](https://github.com/JesseBonanno/PySlope/actions/workflows/ci.yaml)
 [![pre-commit](https://github.com/JesseBonanno/PySlope/actions/workflows/pre-commit.yaml/badge.svg)](https://github.com/JesseBonanno/PySlope/actions/workflows/pre-commit.yaml)
-[![Website](https://img.shields.io/badge/website-up-brightgreen)](https://pyslope.herokuapp.com/)
 
 
 pySlope is a 2D slope stability module based on bishops method of slices. This module allows for the following parameters:
@@ -27,7 +26,7 @@ This module can return plots for the critical failure slope or plots for all fai
 
 The purpose of this project is two fold:
 
-   1. Create a free online slope stability software [![Website](https://img.shields.io/badge/website-up-brightgreen)](https://pyslope.herokuapp.com/)
+   1. Create a free online slope stability software (currently not hosted)
    2. Provide a pythonic solution to implementing Bishop's method based on object oriented coding principles
 
 Performing a slope stability calculation by hand is extremely uneconimical and time consuming. The problem involves a lot of geometrical mathematics which can make the calculation hard to achieve with only excel. Python packages exist for geometrical mathematics which makes Python well suited for implementing a slope stability analysis package. There is however, no well-documented open-source slope stability software that can currently be found online. This package aims to fill that gap.
