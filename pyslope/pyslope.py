@@ -1,7 +1,6 @@
 # standard library imports
 from math import radians, tan, sqrt, atan, cos, sin
 from dataclasses import dataclass
-import multiprocessing
 
 # third party imports
 from plotly import graph_objects as go
@@ -1182,33 +1181,13 @@ class Slope:
             self._set_entry_exit_planes()
 
         # go through each assumed plane and calculate the FOS
-        # if not much to do then dont use multiprocessing, otherwise use multiprocessing
-        if self._slices * self._iterations < 25000:
-            for i, search in enumerate(tqdm(self._search)):
-                self._search[i]["FOS"] = self._analyse_circular_failure_bishop(
-                    c_x=search["c_x"],
-                    c_y=search["c_y"],
-                    radius=search["radius"],
-                )
-        else:
-            # use multiprocessing to get results
-            with multiprocessing.Manager() as manager:
-                with manager.Pool() as pool:
-                    results = pool.starmap(
-                        self._analyse_circular_failure_bishop,
-                        [
-                            (
-                                search["c_x"],
-                                search["c_y"],
-                                search["radius"],
-                            )
-                            for search in self._search
-                        ],
-                    )
+        for i, search in enumerate(tqdm(self._search)):
+            self._search[i]["FOS"] = self._analyse_circular_failure_bishop(
+                c_x=search["c_x"],
+                c_y=search["c_y"],
+                radius=search["radius"],
+            )
 
-            # add results to dictionary
-            for i in range(len(self._search)):
-                self._search[i]["FOS"] = results[i]
 
         # tidy the information to remove anything that didnt run and
         # to be sorted from lowest FOS to highest FOS
@@ -2751,26 +2730,3 @@ class Slope:
             fig = self._plot_annotate_FOS(fig, c_x, c_y, radius, FOS)
 
         return fig
-
-
-if __name__ == "__main__":
-    s = Slope(height=1, angle=None, length=1)
-
-    m1 = Material(20, 35, 0, 0.5)
-    m2 = Material(20, 35, 2, 1)
-    m3 = Material(18, 30, 0, 5)
-
-    s.set_materials(m1, m2, m3)
-
-    s.update_analysis_options(slices=10, iterations=500)
-
-    s.set_water_table(0.7)
-    s.analyse_slope()
-
-    # print the critical FOS for the slope
-    print("fos:", s.get_min_FOS())
-
-    # plot the critical failure surface
-    fig_1 = s.plot_all_planes(max_fos=None)
-    fig_1.update_layout(width=1200, height=700)
-    fig_1.show()
