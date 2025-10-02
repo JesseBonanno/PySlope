@@ -1,28 +1,42 @@
-[tool.poetry]
+[project]
 name = "pyslope"
-version = "0.1.0"
-description = ""
-authors = ["MyGuyInGithub"]
+description = "Python slope stability package"
 readme = "README.md"
+license = "MIT"
+authors = [
+    { name="Jesse Bonanno", email="jessebonanno@gmail.com" }
+]
+dynamic = ["version"]
+requires-python = ">=3.7"
+dependencies = [
+    "colour",
+    "plotly",
+    "tqdm",
+    "gunicorn",
+    "django",
+    "whitenoise",
+    "dj-database-url",
+    "psycopg2-binary",
+    "pytest",
+    "pytest-cov",
+    "kaleido==0.2.1",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.7"
-colour = "*"
-plotly = "*"
-tqdm = "*"
-gunicorn = "*"
-django = "*"
-whitenoise = "*"
-dj-database-url = "*"
-psycopg2-binary = "*"
-pytest = "*"
-pytest-cov = "*"
-kaleido = "0.2.1"
+[project.scripts]
+pyslope = "pyslope.cli:cli"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pyslope*"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=80", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
 
-[tool.poetry.scripts]
-pyslope = "pyslope.cli:cli"
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules --verbose --cov=./"
+testpaths = ["pyslope/"]

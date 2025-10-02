@@ -3,5 +3,3 @@ include LICENSE
 include requirements.txt
 graft pyslope
 recursive-exclude * *.py[co]
-include versioneer.py
-include pyslope/_version.py
