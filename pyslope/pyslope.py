@@ -1983,30 +1983,13 @@ class Slope:
         )
 
         # loop over (few) materials and accumulate overlap contribution (vector ops)
-        for (
-            top,
-            bottom,
-            uw,
-        ) in zip(
-            tops,
-            bottoms,
-            uws,
-        ):
-            # overlap height between slice and this layer
-            overlap = np.minimum(
-                s_yt,
-                top,
-            ) - np.maximum(
-                s_yb,
-                bottom,
-            )
-            overlap = np.clip(
-                overlap,
-                0.0,
-                None,
-            )
-            W += b * uw * overlap
+        for top, bottom, uw in zip(tops, bottoms, uws):
+            overlap = np.minimum(s_yt, top)
+            overlap -= np.maximum(s_yb, bottom)
+            overlap[overlap < 0.0] = 0.0  # in-place clip
+            W += uw * overlap
 
+        W *= b
         return W
 
     def _get_material_at_depth(self, s_yb):
