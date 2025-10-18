@@ -22,8 +22,5 @@ jobs:
       - name: Install pre-commit
         run: pip install --upgrade pip pre-commit
 
-      - name: Run pre-commit hooks
-        uses: pre-commit/action@v2.0.3
-        with:
-          extra_args: "--hook-stage manual --all-files"
-          skip-automatic-cache: true
+      - name: Run pre-commit checks
+        run: pre-commit run pyslope

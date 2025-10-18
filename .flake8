@@ -8,6 +8,7 @@ exclude =
     dist,
     venv,
     slope,
+    engineering,
     static,
     pyslope/examples,   # example of a specific subfolder
     pyslope/tests,  # or wherever your test files are
