@@ -44,7 +44,11 @@ def s():
     s.set_water_table(1)
 
     s.update_analysis_options(
-        slices=10, iterations=500, min_failure_dist=1, max_iterations=10, tolerance=0.01
+        slices=10,
+        iterations=500,
+        min_failure_dist=1,
+        max_iterations=10,
+        tolerance=0.01,
     )
 
     s.set_analysis_limits(

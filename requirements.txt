@@ -9,3 +9,4 @@ psycopg2-binary
 kaleido
 pytest
 pytest-cov
+numpy

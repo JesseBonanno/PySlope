@@ -1,0 +1,13 @@
+[flake8]
+max-line-length = 85
+extend-ignore = E203, W503, F401
+exclude =
+    .git,
+    __pycache__,
+    build,
+    dist,
+    venv,
+    slope,
+    static,
+    pyslope/examples,   # example of a specific subfolder
+    pyslope/tests,  # or wherever your test files are

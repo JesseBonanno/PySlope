@@ -34,8 +34,10 @@ def dist_points(p1: tuple, p2: tuple) -> float:
 
 def circle_radius_from_abcd(c_to_e, C):
     # two intersecting chords through circle have segments of chords related
-    # as a * b = c * d , where a and b are the lengths of chord on each side of intersection
-    # as such we have half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
+    # as a * b = c * d , where a and b are the lengths of chord
+    # on each side of intersection
+    # as such we have
+    # half_coord_distance ** 2 = chord_to_edge * (R + (R-chord_to_edge)) = C
 
     return (C + c_to_e**2) / (2 * c_to_e)
 
@@ -226,7 +228,15 @@ def draw_line(
 
 
 def draw_arrowhead(
-    fig, angle, x_sup, y_sup, length=5, xoffset=0, yoffset=0, color="red", line_width=2
+    fig,
+    angle,
+    x_sup,
+    y_sup,
+    length=5,
+    xoffset=0,
+    yoffset=0,
+    color="red",
+    line_width=2,
 ):
     """Draw an anchored arrowhead on a plotly figure.
 
